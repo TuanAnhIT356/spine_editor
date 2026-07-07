@@ -1,0 +1,127 @@
+{
+  "skeleton": {
+    "spine": "4.2.43",
+    "x": -120,
+    "y": -10,
+    "width": 240,
+    "height": 320,
+    "fps": 30,
+    "images": "./images/"
+  },
+  "bones": [
+    { "name": "root" },
+    { "name": "hip", "parent": "root", "y": 100 },
+    { "name": "torso", "parent": "hip", "length": 90, "rotation": 90 },
+    {
+      "name": "arm",
+      "parent": "torso",
+      "length": 60,
+      "x": 90,
+      "rotation": -60,
+      "inherit": "noScale"
+    },
+    { "name": "leg-upper", "parent": "hip", "length": 50, "rotation": -90 },
+    { "name": "leg-lower", "parent": "leg-upper", "length": 50, "x": 50 },
+    { "name": "leg-ik-target", "parent": "root", "x": 30 }
+  ],
+  "slots": [
+    { "name": "torso", "bone": "torso", "attachment": "torso" },
+    { "name": "arm", "bone": "arm", "color": "ff88aaff", "attachment": "arm", "blend": "additive" },
+    { "name": "leg", "bone": "leg-upper", "attachment": "leg-mesh" }
+  ],
+  "ik": [
+    {
+      "name": "leg-ik",
+      "order": 1,
+      "bones": ["leg-upper", "leg-lower"],
+      "target": "leg-ik-target",
+      "mix": 0.9,
+      "bendPositive": false
+    }
+  ],
+  "transform": [
+    {
+      "name": "arm-follow",
+      "order": 2,
+      "bones": ["arm"],
+      "target": "torso",
+      "rotation": 15,
+      "mixRotate": 0.5
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "torso": {
+          "torso": { "width": 80, "height": 120 }
+        },
+        "arm": {
+          "arm": {
+            "path": "arm-upper",
+            "x": 30,
+            "rotation": -45,
+            "width": 40,
+            "height": 80,
+            "color": "ffffffee"
+          }
+        },
+        "leg": {
+          "leg-mesh": {
+            "type": "mesh",
+            "uvs": [0, 0, 1, 0, 1, 1, 0, 1],
+            "triangles": [0, 1, 2, 0, 2, 3],
+            "vertices": [-10, 0, 10, 0, 10, 100, -10, 100],
+            "hull": 4,
+            "width": 20,
+            "height": 100
+          }
+        }
+      }
+    }
+  ],
+  "events": {
+    "footstep": { "int": 1, "audio": "step.wav" }
+  },
+  "animations": {
+    "idle": {
+      "bones": {
+        "torso": {
+          "rotate": [{}, { "time": 1, "value": 2 }]
+        }
+      }
+    },
+    "walk": {
+      "bones": {
+        "torso": {
+          "rotate": [
+            { "value": -5, "curve": [0.25, -5, 0.75, 5] },
+            { "time": 0.5, "value": 5, "curve": "stepped" },
+            { "time": 1, "value": -5 }
+          ]
+        },
+        "hip": {
+          "translate": [
+            { "y": -8, "curve": [0.25, 0, 0.75, 4, 0.25, -8, 0.75, -2] },
+            { "time": 0.5, "x": 4, "y": -2 },
+            { "time": 1, "y": -8 }
+          ]
+        }
+      },
+      "slots": {
+        "arm": {
+          "attachment": [{ "name": "arm" }, { "time": 0.5, "name": null }],
+          "rgba": [{ "color": "ffffffff" }, { "time": 1, "color": "ff8888ff" }]
+        }
+      },
+      "ik": {
+        "leg-ik": [{ "mix": 0.9 }, { "time": 0.5, "mix": 1 }]
+      },
+      "drawOrder": [{ "time": 0.5, "offsets": [{ "slot": "arm", "offset": 1 }] }, { "time": 1 }],
+      "events": [
+        { "time": 0.25, "name": "footstep" },
+        { "time": 0.75, "name": "footstep", "int": 2, "volume": 0.8 }
+      ]
+    }
+  }
+}

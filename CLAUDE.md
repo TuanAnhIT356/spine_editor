@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A web-based 2D skeletal animation editor (Spine-like UI) that exports the Spine JSON format
 (target version **4.2**), with an MCP server + skills so AI agents can rig and animate.
 The full roadmap, architecture rationale, and phase breakdown live in `PLAN.md` — read it before
-starting work on a new phase. Current status: **Phase 0 (scaffolding) done**; next is Phase 1
-(core document model + Spine JSON serializer/parser).
+starting work on a new phase. Current status: **Phase 1 done** (core document model, command
+system with undo/redo, Spine JSON 4.2 parser/serializer with round-trip tests); next is Phase 2
+(editor Setup mode: viewport, bone tools, hierarchy/properties panels).
 
 ## Commands
 
@@ -41,6 +42,10 @@ Key invariants:
 
 - **`core` stays UI-free.** The editor UI and the MCP server are both thin clients over the same
   command API in `core`; every edit operation must be a Command so it is undoable and drivable by AI.
+- **Model split in `core`:** the rig graph (bones/slots/IK/transform) is normalized with Spine
+  defaults applied (`src/model/`); path/physics constraints, skins, events and animations are
+  stored verbatim in typed JSON-format shapes (`src/spine-json/types.ts`) for lossless round-trips.
+  The serializer omits values equal to Spine defaults — round-trip tests require canonical fixtures.
 - Workspace packages are consumed as TypeScript source (`exports` point at `src/index.ts`);
   Vite/Vitest compile them on the fly — there is no per-package `dist` wiring yet.
 - Target Spine JSON format is **4.2** (`SPINE_JSON_TARGET_VERSION` in `@spine-editor/shared`);

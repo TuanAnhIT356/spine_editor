@@ -1,10 +1,21 @@
 /**
  * @spine-editor/core — framework-agnostic heart of the editor.
  *
- * Will contain (Phase 1+): the document model (skeleton/slots/skins/animations),
- * the command system with undo/redo, the animation evaluator, and the
- * Spine JSON serializer/parser. No UI dependencies are allowed in this package.
+ * Contains the document model (skeleton/slots/skins/animations), the command
+ * system with undo/redo, and the Spine JSON serializer/parser. The animation
+ * evaluator arrives in Phase 3. No UI dependencies are allowed in this package.
  */
 
 export { SPINE_JSON_TARGET_VERSION } from '@spine-editor/shared';
-export type { SpineJson, SpineSkeletonMeta, SpineBone } from './spine-json/types.js';
+
+export * from './spine-json/types.js';
+export * from './spine-json/parse.js';
+export * from './spine-json/serialize.js';
+export * from './model/types.js';
+export * from './model/factories.js';
+export * from './validate.js';
+export * from './document.js';
+export * from './commands/history.js';
+export * from './commands/bones.js';
+export * from './commands/slots.js';
+export * from './commands/animations.js';

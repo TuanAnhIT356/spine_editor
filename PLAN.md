@@ -61,13 +61,15 @@ spine_editor/
 
 ## 3. Các giai đoạn thực hiện
 
-### Phase 0 — Scaffolding (nền móng)
+### Phase 0 — Scaffolding (nền móng) ✅ Hoàn thành
 
 - Monorepo pnpm + Vite + TypeScript strict + Vitest + ESLint/Prettier + CI (GitHub Actions).
 - Chốt target format **Spine JSON 4.2**; thu thập bộ file `.json` mẫu chuẩn làm fixture test.
 - Cập nhật `CLAUDE.md` với lệnh build/test thực tế.
 
-### Phase 1 — Core model + Xuất/Nhập JSON _(giá trị cốt lõi, làm trước UI)_
+### Phase 1 — Core model + Xuất/Nhập JSON _(giá trị cốt lõi, làm trước UI)_ ✅ Hoàn thành
+
+> Ghi chú thực hiện: fixture dùng file tự viết tay (không dùng spineboy/raptor vì bản quyền asset của Esoteric Software). Việc kiểm tra file xuất trên Spine runtime chuẩn cần người dùng chạy thủ công trong một project game có license.
 
 - Mô hình dữ liệu đầy đủ trong `packages/core` + command system + undo/redo.
 - **Serializer** xuất Spine JSON 4.2 và **parser** nhập JSON (nhập giúp test round-trip: parse file mẫu → serialize → so sánh).
