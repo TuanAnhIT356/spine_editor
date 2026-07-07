@@ -106,7 +106,9 @@ spine_editor/
 - **Texture atlas packer**: xuất `.atlas` (format libgdx) + PNG.
 - Import file Spine JSON có sẵn để chỉnh sửa.
 
-### Phase 5 — MCP + Skill cho AI _(có thể làm song song từ sau Phase 1)_
+### Phase 5 — MCP + Skill cho AI _(có thể làm song song từ sau Phase 1)_ ✅ Hoàn thành
+
+> Ghi chú thực hiện: MCP server (stdio, `@modelcontextprotocol/sdk`) + WebSocket bridge trên cổng 8017; editor tự kết nối khi mở. ~24 tools gồm đủ 4 nhóm, trong đó `screenshot_viewport` crop đúng khung camera. Chế độ headless (thao tác file không cần browser) chưa làm — mọi tool yêu cầu editor đang mở. Đăng ký server qua file `.mcp.json` của client (xem README). Skills: spine-rigging, spine-animating, spine-export. Verify toàn chuỗi bằng `packages/mcp-server/e2e/bridge.mjs`.
 
 Kiến trúc: `Claude ⇄ MCP server (Node) ⇄ WebSocket ⇄ Editor đang chạy trên browser`. MCP server cũng có **chế độ headless** (thao tác trực tiếp trên file project bằng `core`, không cần browser) cho các tác vụ batch.
 

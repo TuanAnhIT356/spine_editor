@@ -1,5 +1,10 @@
 import type { SkeletonData } from '../model/types.js';
-import type { SpineAnimation, SpineBoneKey, SpineBoneTimelineName } from '../spine-json/types.js';
+import type {
+  SpineAnimation,
+  SpineAttachmentKey,
+  SpineBoneKey,
+  SpineBoneTimelineName,
+} from '../spine-json/types.js';
 import type { Command } from './history.js';
 
 const TIME_EPSILON = 1e-9;
@@ -186,6 +191,54 @@ export class MoveBoneKeyframe implements Command {
     if (this.toTime === 0) delete key.time;
     else key.time = this.toTime;
     keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.before) data.animations[this.animation] = this.before;
+  }
+}
+
+/**
+ * Inserts or replaces a key on a slot's attachment timeline, keeping keys
+ * sorted by time. `name` must be an attachment existing for the slot in some
+ * skin, or null to hide the slot.
+ */
+export class UpsertSlotAttachmentKeyframe implements Command {
+  readonly label: string;
+  private before: SpineAnimation | undefined;
+
+  constructor(
+    private readonly animation: string,
+    private readonly slot: string,
+    private readonly key: SpineAttachmentKey,
+  ) {
+    this.label = `Key attachment on "${slot}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const anim = requireAnimation(data, this.animation);
+    if (!data.slots.some((s) => s.name === this.slot)) {
+      throw new Error(`Slot "${this.slot}" does not exist.`);
+    }
+    const name = this.key.name ?? null;
+    if (name !== null) {
+      const exists = data.skins.some((skin) => skin.attachments?.[this.slot]?.[name]);
+      if (!exists) {
+        throw new Error(`Attachment "${name}" does not exist on slot "${this.slot}" in any skin.`);
+      }
+    }
+    this.before = structuredClone(anim);
+    const slots = (anim.slots ??= {});
+    const timelines = (slots[this.slot] ??= {});
+    const keys = (timelines.attachment ??= []);
+    const time = this.key.time ?? 0;
+    const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
+    if (existing >= 0) {
+      keys[existing] = this.key;
+    } else {
+      keys.push(this.key);
+      keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+    }
   }
 
   undo(data: SkeletonData): void {

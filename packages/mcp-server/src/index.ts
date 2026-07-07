@@ -1,14 +1,22 @@
 /**
- * @spine-editor/mcp-server — MCP server exposing the editor to AI agents.
+ * @spine-editor/mcp-server — MCP server (stdio) exposing the running editor
+ * to AI agents through a WebSocket bridge.
  *
- * Placeholder for Phase 5. Will expose observation, rigging, animating and
- * export tools over MCP, bridged to a running editor via WebSocket, plus a
- * headless mode that operates on project files directly through
- * @spine-editor/core.
+ * Architecture: AI ⇄ MCP (this process, stdio) ⇄ WebSocket ⇄ editor tab.
+ * Start with: pnpm --filter @spine-editor/mcp-server start
+ * Then open the editor; it auto-connects to the bridge.
  */
 
-import { SPINE_JSON_TARGET_VERSION } from '@spine-editor/core';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { DEFAULT_BRIDGE_PORT } from '@spine-editor/shared';
+import { BridgeServer } from './bridge-server.js';
+import { registerTools } from './tools.js';
 
-export function serverInfo(): { name: string; targetFormat: string } {
-  return { name: 'spine-editor-mcp', targetFormat: SPINE_JSON_TARGET_VERSION };
-}
+const port = Number(process.env['SPINE_BRIDGE_PORT'] ?? DEFAULT_BRIDGE_PORT);
+const bridge = new BridgeServer(port);
+const server = new McpServer({ name: 'spine-editor', version: '0.1.0' });
+registerTools(server, bridge);
+
+await server.connect(new StdioServerTransport());
+console.error(`[spine-editor-mcp] ready — waiting for the editor on ws://localhost:${port}/editor`);

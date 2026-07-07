@@ -15,6 +15,7 @@ pnpm --filter @spine-editor/editor build
 (cd packages/editor && npx vite preview --port 4173 &)   # serve the built app
 node packages/editor/e2e/smoke.mjs <outDir>              # setup mode: rig + attach + export
 node packages/editor/e2e/anim.mjs <outDir>               # animate mode: keys + playback
+node packages/mcp-server/e2e/bridge.mjs <outDir>         # full MCP chain (spawns MCP server itself)
 ```
 
 `packages/editor/e2e/smoke.mjs` uses playwright-core with the pre-installed
@@ -35,3 +36,8 @@ confirm rendering (grid, Spine-style bone triangles, attached sprites).
   `.viewport` element on first load.
 - Autosave debounce is 800 ms — wait ≥1.2 s before reloading to test it.
 - A single favicon 404 in console errors is benign.
+- The MCP chain test binds port 8017. If it dies mid-run, an orphaned tsx
+  process keeps the port and the next run gets EADDRINUSE + "No editor
+  connected" — free it with `fuser -k 8017/tcp` first. Redirect the script's
+  output to a file instead of piping to `tail` (child processes hold the pipe
+  open after a timeout kill).

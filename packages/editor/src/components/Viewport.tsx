@@ -14,8 +14,9 @@ import {
   type SpineBoneKey,
 } from '@spine-editor/core';
 import { useEffect, useRef } from 'react';
+import { bridgeRuntime } from '../bridge/runtime.js';
 import { uniqueName, useEditor } from '../state/store.js';
-import { SceneRenderer } from '../viewport/renderer.js';
+import { SceneRenderer, type RenderInput } from '../viewport/renderer.js';
 
 const RAD_DEG = 180 / Math.PI;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -70,22 +71,26 @@ export function Viewport() {
     return doc.data.bones;
   }
 
-  function redraw() {
-    const r = rendererRef.current;
-    if (!r?.ready) return;
+  function buildRenderInput(): RenderInput {
     const state = useEditor.getState();
     const animated =
       state.mode === 'animate' && state.anim.current
         ? computeAnimatedAttachments(state.doc.data, state.anim.current, state.anim.time)
         : undefined;
     const base = overrideRef.current ?? (state.mode === 'animate' ? baseLocals() : undefined);
-    void r.render({
+    return {
       data: state.doc.data,
       bonesOverride: base,
       slotAttachments: animated,
       assets: state.assets,
       selection: state.selection,
-    });
+    };
+  }
+
+  function redraw() {
+    const r = rendererRef.current;
+    if (!r?.ready) return;
+    void r.render(buildRenderInput());
   }
 
   useEffect(() => {
@@ -94,6 +99,10 @@ export function Viewport() {
     const renderer = new SceneRenderer();
     rendererRef.current = renderer;
     void renderer.init(host).then(() => redraw());
+    bridgeRuntime.renderer = renderer;
+    bridgeRuntime.renderNow = async () => {
+      if (renderer.ready) await renderer.render(buildRenderInput());
+    };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = host.getBoundingClientRect();
@@ -105,6 +114,8 @@ export function Viewport() {
       host.removeEventListener('wheel', onWheel);
       renderer.destroy();
       rendererRef.current = null;
+      bridgeRuntime.renderer = null;
+      bridgeRuntime.renderNow = null;
     };
   }, []);
 

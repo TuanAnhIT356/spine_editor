@@ -13,7 +13,7 @@ import {
   type SkeletonData,
   type SpineRegionAttachment,
 } from '@spine-editor/core';
-import { Application, Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Graphics, Matrix, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { ImageAsset, Selection } from '../state/store.js';
 
 export interface RenderInput {
@@ -109,6 +109,15 @@ export class SceneRenderer {
 
   getBoneWorld(name: string): Mat2D | undefined {
     return this.lastPose.get(name);
+  }
+
+  /** PNG data URL of the current viewport (used by the MCP bridge). */
+  async screenshot(): Promise<string> {
+    if (!this.ready) throw new Error('Renderer not ready.');
+    // Crop to the visible camera framing; without a frame, extract renders
+    // the stage's full bounds (the entire world grid).
+    const frame = new Rectangle(0, 0, this.app.renderer.width, this.app.renderer.height);
+    return this.app.renderer.extract.base64({ target: this.app.stage, frame });
   }
 
   /** Nearest bone origin within pick radius (screen px), or null. */
