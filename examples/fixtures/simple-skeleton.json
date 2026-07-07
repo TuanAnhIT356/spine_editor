@@ -1,0 +1,46 @@
+{
+  "skeleton": {
+    "spine": "4.2.43",
+    "x": -50,
+    "y": 0,
+    "width": 100,
+    "height": 200,
+    "images": "./images/",
+    "audio": ""
+  },
+  "bones": [
+    { "name": "root" },
+    { "name": "torso", "parent": "root", "length": 80, "y": 60, "rotation": 90 },
+    { "name": "head", "parent": "torso", "length": 40, "x": 80 }
+  ],
+  "slots": [
+    { "name": "torso", "bone": "torso", "attachment": "torso" },
+    { "name": "head", "bone": "head", "attachment": "head" }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "torso": {
+          "torso": { "x": 40, "rotation": -90, "width": 60, "height": 100 }
+        },
+        "head": {
+          "head": { "x": 25, "rotation": -90, "width": 70, "height": 70 }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {
+      "bones": {
+        "head": {
+          "rotate": [
+            { "value": 0, "curve": [0.25, 0, 0.75, 5] },
+            { "time": 0.5, "value": 5, "curve": [0.75, 5, 1.25, 0] },
+            { "time": 1, "value": 0 }
+          ]
+        }
+      }
+    }
+  }
+}
