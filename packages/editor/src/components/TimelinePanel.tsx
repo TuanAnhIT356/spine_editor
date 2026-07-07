@@ -112,16 +112,70 @@ export function TimelinePanel() {
     return (keys ?? []).map((k) => k.time ?? 0);
   }
 
-  function setKeyCurve(ref: KeyRef, curve: 'linear' | 'stepped') {
+  type CurveChoice = 'linear' | 'stepped' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'bezier';
+
+  /** Per-channel key values (rotate: value; two-axis timelines: x,y). */
+  function channelValues(tl: SpineBoneTimelineName, key: SpineBoneKey): number[] {
+    const dflt = tl.startsWith('scale') ? 1 : 0;
+    if (tl === 'translate' || tl === 'scale' || tl === 'shear') {
+      return [key.x ?? dflt, key.y ?? dflt];
+    }
+    return [key.value ?? dflt];
+  }
+
+  function setKeyCurve(ref: KeyRef, choice: CurveChoice) {
     const state = useEditor.getState();
-    if (!anim.current) return;
+    if (!anim.current || choice === 'bezier') return;
     const keys = state.doc.getAnimation(anim.current)?.bones?.[ref.bone]?.[ref.timeline];
-    const key = keys?.find((k) => Math.abs((k.time ?? 0) - ref.time) < 1e-6);
-    if (!key) return;
+    const idx = keys?.findIndex((k) => Math.abs((k.time ?? 0) - ref.time) < 1e-6) ?? -1;
+    const key = keys?.[idx];
+    if (!keys || !key) return;
     const next: SpineBoneKey = { ...key };
-    if (curve === 'stepped') next.curve = 'stepped';
-    else delete next.curve;
+    if (choice === 'linear') delete next.curve;
+    else if (choice === 'stepped') next.curve = 'stepped';
+    else {
+      const k2 = keys[idx + 1];
+      if (!k2) {
+        state.setError('Ease presets need a following key to curve toward.');
+        return;
+      }
+      // CSS-style control points, scaled to the segment per channel.
+      const [ax, bx] =
+        choice === 'ease-in' ? [0.42, 1] : choice === 'ease-out' ? [0, 0.58] : [0.42, 0.58];
+      const t1 = key.time ?? 0;
+      const dt = (k2.time ?? 0) - t1;
+      const v1s = channelValues(ref.timeline, key);
+      const v2s = channelValues(ref.timeline, k2);
+      const curve: number[] = [];
+      v1s.forEach((v1, ch) => {
+        const v2 = v2s[ch] ?? v1;
+        curve.push(t1 + ax * dt, v1, t1 + bx * dt, v2);
+      });
+      next.curve = curve;
+    }
     state.execute(new UpsertBoneKeyframe(anim.current, ref.bone, ref.timeline, next));
+  }
+
+  const [copiedKey, setCopiedKey] = useState<(KeyRef & { key: SpineBoneKey }) | null>(null);
+
+  function copySelectedKey() {
+    if (!selectedKey || !selectedKeyData) return;
+    setCopiedKey({ ...selectedKey, key: { ...selectedKeyData } });
+  }
+
+  function pasteKeyAtPlayhead() {
+    const state = useEditor.getState();
+    if (!copiedKey || !anim.current) return;
+    const time = snap(anim.time);
+    const key: SpineBoneKey = { ...copiedKey.key };
+    delete key.curve; // curves reference segment values; re-ease after pasting
+    if (time > 0) key.time = time;
+    else delete key.time;
+    if (
+      state.execute(new UpsertBoneKeyframe(anim.current, copiedKey.bone, copiedKey.timeline, key))
+    ) {
+      setSelectedKey({ bone: copiedKey.bone, timeline: copiedKey.timeline, time });
+    }
   }
 
   const selectedKeyData =
@@ -168,16 +222,39 @@ export function TimelinePanel() {
         <span className="time-display">
           {anim.time.toFixed(2)}s / {duration.toFixed(2)}s
         </span>
+        {copiedKey && (
+          <button
+            onClick={pasteKeyAtPlayhead}
+            title={`Paste ${copiedKey.timeline} key of "${copiedKey.bone}" at the playhead`}
+          >
+            Paste @ {anim.time.toFixed(2)}s
+          </button>
+        )}
         {selectedKey && selectedKeyData && (
           <span className="key-tools">
             key @ {selectedKey.time.toFixed(2)}s
             <select
-              value={selectedKeyData.curve === 'stepped' ? 'stepped' : 'linear'}
-              onChange={(e) => setKeyCurve(selectedKey, e.target.value as 'linear' | 'stepped')}
+              value={
+                selectedKeyData.curve === 'stepped'
+                  ? 'stepped'
+                  : Array.isArray(selectedKeyData.curve)
+                    ? 'bezier'
+                    : 'linear'
+              }
+              onChange={(e) => setKeyCurve(selectedKey, e.target.value as CurveChoice)}
             >
               <option value="linear">linear</option>
               <option value="stepped">stepped</option>
+              <option value="ease-in">ease-in</option>
+              <option value="ease-out">ease-out</option>
+              <option value="ease-in-out">ease-in-out</option>
+              <option value="bezier" disabled>
+                bezier
+              </option>
             </select>
+            <button onClick={copySelectedKey} title="Copy key values">
+              Copy
+            </button>
             <button
               onClick={() => {
                 if (!anim.current) return;

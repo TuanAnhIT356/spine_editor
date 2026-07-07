@@ -6,7 +6,7 @@
  * Convention: x' = a*x + b*y + tx, y' = c*x + d*y + ty, Y axis up (Spine).
  */
 
-import type { BoneData, SkeletonData } from './model/types.js';
+import type { BoneData, SkeletonData, TransformConstraintData } from './model/types.js';
 
 export interface Mat2D {
   a: number;
@@ -162,13 +162,71 @@ function applyIk2(
   lower.rotation = lerpAngle(lower.rotation, lowerDesired, mix);
 }
 
+/** Rotation of a world matrix's +X axis in degrees CCW. */
+export function worldRotationOf(m: Mat2D): number {
+  return Math.atan2(m.c, m.a) * RAD_DEG;
+}
+const worldRotationDeg = worldRotationOf;
+
 /**
- * World matrices for every bone with IK constraints applied (in `order`).
- * `locals` overrides the setup locals (animated pose); `ikOverrides` carries
- * per-constraint timeline values. Bones must be ordered parents-first.
+ * Pulls each constrained bone toward the target's world transform, blended by
+ * the constraint mixes. Covers the common non-local, non-relative case for
+ * rotation, translation and scale; shear mixes and the local/relative flags
+ * are not applied (documented approximation).
+ */
+function applyTransformConstraint(
+  work: BoneData[],
+  world: Map<string, Mat2D>,
+  c: TransformConstraintData,
+): void {
+  const target = world.get(c.target);
+  if (!target) return;
+  const targetRot = worldRotationDeg(target);
+  const targetScaleX = Math.hypot(target.a, target.c);
+  for (const boneName of c.bones) {
+    const bone = work.find((b) => b.name === boneName);
+    const boneWorld = world.get(boneName);
+    if (!bone || !boneWorld) continue;
+    const parentWorld = (bone.parent !== null ? world.get(bone.parent) : undefined) ?? IDENTITY;
+    if (c.mixRotate !== 0) {
+      const current = worldRotationDeg(boneWorld);
+      const next = lerpAngle(current, targetRot + c.rotation, c.mixRotate);
+      bone.rotation += normalizeDeg(next - current);
+    }
+    if (c.mixX !== 0 || c.mixY !== 0) {
+      const desired = applyMat(target, c.x, c.y);
+      const nx = boneWorld.tx + (desired.x - boneWorld.tx) * c.mixX;
+      const ny = boneWorld.ty + (desired.y - boneWorld.ty) * c.mixY;
+      const local = applyMat(invertMat(parentWorld), nx, ny);
+      bone.x = local.x;
+      bone.y = local.y;
+    }
+    if (c.mixScaleX !== 0) {
+      const current = Math.hypot(boneWorld.a, boneWorld.c);
+      if (current > 1e-9) {
+        const next = current + (targetScaleX + c.scaleX - current) * c.mixScaleX;
+        bone.scaleX *= next / current;
+      }
+    }
+    if (c.mixScaleY !== 0) {
+      const current = Math.hypot(boneWorld.b, boneWorld.d);
+      if (current > 1e-9) {
+        const targetScaleY = Math.hypot(target.b, target.d);
+        const next = current + (targetScaleY + c.scaleY - current) * c.mixScaleY;
+        bone.scaleY *= next / current;
+      }
+    }
+  }
+}
+
+/**
+ * World matrices for every bone with IK and transform constraints applied in
+ * `order`. `locals` overrides the setup locals (animated pose); `ikOverrides`
+ * carries per-constraint timeline values. Bones must be ordered parents-first.
  * 'normal' and 'onlyTranslation' inherit modes are exact; the remaining modes
- * are approximated as 'normal'. Transform/path/physics constraints are not
- * evaluated yet.
+ * are approximated as 'normal'. Path and physics constraints are not
+ * evaluated (path needs spline sampling, physics a stateful simulation);
+ * their data still round-trips to the export.
  */
 export function computePose(
   data: SkeletonData,
@@ -177,26 +235,39 @@ export function computePose(
 ): Map<string, Mat2D> {
   const work = (locals ?? data.bones).map((b) => ({ ...b }));
   let world = computeWorldRaw(work);
-  if (data.ik.length === 0) return world;
+  if (data.ik.length === 0 && data.transform.length === 0) return world;
 
-  const constraints = [...data.ik].sort((a, b) => a.order - b.order);
-  for (const c of constraints) {
-    const override = ikOverrides?.get(c.name);
-    const mix = override?.mix ?? c.mix;
-    const bendPositive = override?.bendPositive ?? c.bendPositive;
-    if (mix === 0) continue;
-    const target = world.get(c.target);
-    if (!target) continue;
-    const first = work.find((b) => b.name === c.bones[0]);
-    if (!first) continue;
-    const parentWorld = first.parent !== null ? world.get(first.parent) : undefined;
-    if (c.bones.length === 1) {
-      applyIk1(first, parentWorld ?? IDENTITY, target, mix);
-    } else {
-      const second = work.find((b) => b.name === c.bones[1]);
-      if (!second || second.parent !== first.name) continue;
-      applyIk2(first, second, parentWorld ?? IDENTITY, target, mix, bendPositive);
-    }
+  type Entry = { order: number; apply: () => void };
+  const entries: Entry[] = [];
+  for (const c of data.ik) {
+    entries.push({
+      order: c.order,
+      apply: () => {
+        const override = ikOverrides?.get(c.name);
+        const mix = override?.mix ?? c.mix;
+        const bendPositive = override?.bendPositive ?? c.bendPositive;
+        if (mix === 0) return;
+        const target = world.get(c.target);
+        if (!target) return;
+        const first = work.find((b) => b.name === c.bones[0]);
+        if (!first) return;
+        const parentWorld = first.parent !== null ? world.get(first.parent) : undefined;
+        if (c.bones.length === 1) {
+          applyIk1(first, parentWorld ?? IDENTITY, target, mix);
+        } else {
+          const second = work.find((b) => b.name === c.bones[1]);
+          if (!second || second.parent !== first.name) return;
+          applyIk2(first, second, parentWorld ?? IDENTITY, target, mix, bendPositive);
+        }
+      },
+    });
+  }
+  for (const c of data.transform) {
+    entries.push({ order: c.order, apply: () => applyTransformConstraint(work, world, c) });
+  }
+  entries.sort((a, b) => a.order - b.order);
+  for (const entry of entries) {
+    entry.apply();
     world = computeWorldRaw(work);
   }
   return world;

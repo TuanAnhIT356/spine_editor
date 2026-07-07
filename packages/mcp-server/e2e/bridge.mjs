@@ -139,6 +139,44 @@ await call('add_ik_constraint', { name: 'leg', bones: ['upper', 'lower'], target
 const ikShot = await call('screenshot_viewport');
 fs.writeFileSync(`${OUT}/ik-bend.png`, Buffer.from(ikShot.image, 'base64'));
 
+// 9b. Mesh + deform + color: convert to grid mesh, key a deform + tint, screenshot.
+await call('import_image', { name: 'flag', dataUrl: PNG });
+await call('add_bone', { parent: 'root', name: 'mast', x: -60, length: 40 });
+const flagSlot = await call('attach_image', { asset: 'flag', bone: 'mast' });
+const meshInfo = await call('create_mesh', {
+  slot: flagSlot.slot,
+  cols: 2,
+  rows: 2,
+  width: 60,
+  height: 40,
+});
+await call('create_animation', { name: 'flutter' });
+await call('set_deform_keyframe', {
+  animation: 'flutter',
+  slot: flagSlot.slot,
+  attachment: 'flag',
+  time: 0,
+  vertices: [0, 0],
+});
+await call('set_deform_keyframe', {
+  animation: 'flutter',
+  slot: flagSlot.slot,
+  attachment: 'flag',
+  time: 0.5,
+  vertices: [15, 10],
+  offset: 0,
+});
+await call('set_slot_color_keyframe', {
+  animation: 'flutter',
+  slot: flagSlot.slot,
+  time: 0.5,
+  color: 'ff4444ff',
+});
+await call('preview_at_time', { animation: 'flutter', time: 0.25 });
+const meshShot = await call('screenshot_viewport');
+fs.writeFileSync(`${OUT}/mesh-deform.png`, Buffer.from(meshShot.image, 'base64'));
+const meshExport = JSON.parse((await call('export_spine_json')).json);
+
 // 10. Events through MCP land in the export.
 await call('set_event', { name: 'footstep', audio: 'step.wav' });
 await call('create_animation', { name: 'walk' });
@@ -160,6 +198,11 @@ console.log(
       badBoneError,
       animationsAfterUndo: treeAfterUndo.animations,
       atlasHasRegion: atlasText.includes('arm-img'),
+      meshInfo,
+      meshType: meshExport.skins?.[0]?.attachments?.[flagSlot.slot]?.flag?.type,
+      deformKeys:
+        meshExport.animations?.flutter?.attachments?.default?.[flagSlot.slot]?.flag?.deform?.length,
+      colorKeys: meshExport.animations?.flutter?.slots?.[flagSlot.slot]?.rgba?.length,
       eventDefs: exportedEvents.events,
       eventKeys: exportedEvents.animations?.walk?.events,
     },

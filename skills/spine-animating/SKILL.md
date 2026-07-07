@@ -49,10 +49,13 @@ and existing animations.
 
 - Keying the same bone/timeline/time again REPLACES that key (including its
   curve) — re-pass `curve` when updating a key.
-- The evaluator applies bone timelines, slot attachment timelines, and IK
-  (constraint solve + timeline mix/bendPositive). Animate a limb by keying
-  translate on its IK TARGET bone. Slot colors, deform and draw-order
-  timelines are stored/exported but not yet shown in previews.
+- The evaluator applies bone timelines, slot attachment timelines, IK
+  (solve + timeline mix/bendPositive), transform constraints, slot colors
+  (`set_slot_color_keyframe`, rgba+alpha) and mesh deform. Animate a limb by
+  keying translate on its IK TARGET bone. Draw-order timelines and
+  path/physics constraints are stored/exported but not previewed.
+- Squash/flags/hair: `create_mesh` turns a slot's image into a grid mesh,
+  then `set_deform_keyframe` moves vertices (x,y offsets, bone-local).
 - Events: `set_event` to define, `set_event_keyframe` to fire at a time —
   they export correctly; previews don't visualize them.
 - Undo works per keyframe; `delete_bone_keyframe` needs the exact key time.

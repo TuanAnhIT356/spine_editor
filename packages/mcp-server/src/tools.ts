@@ -252,6 +252,47 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   server.tool('redo', 'Redo the last undone edit.', {}, forward('redo'));
 
   server.tool(
+    'create_mesh',
+    "Convert a slot's region attachment into a deformable grid mesh (cols x rows cells). Vertices run row by row from the image's top-left; each vertex is an x,y pair. Use set_deform_keyframe afterwards to animate them.",
+    {
+      slot: z.string(),
+      cols: z.number().int().min(1).optional(),
+      rows: z.number().int().min(1).optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+    },
+    forward('create_mesh'),
+  );
+
+  server.tool(
+    'set_deform_keyframe',
+    "Key vertex offsets on a mesh attachment (default skin). vertices = x,y offset pairs added to the setup vertices; optional offset = start index into the flattened array for sparse keys. Values are in the bone's local space.",
+    {
+      animation: z.string(),
+      slot: z.string(),
+      attachment: z.string(),
+      time: z.number().min(0),
+      vertices: z.array(z.number()),
+      offset: z.number().int().min(0).optional(),
+      curve: curveSchema,
+    },
+    forward('set_deform_keyframe'),
+  );
+
+  server.tool(
+    'set_slot_color_keyframe',
+    'Key a slot\'s tint color (8-digit rgba hex like "ff8800ff"). Evaluated in previews; curve blocks are per r/g/b/a channel.',
+    {
+      animation: z.string(),
+      slot: z.string(),
+      time: z.number().min(0),
+      color: z.string().regex(/^[0-9a-fA-F]{8}$/),
+      curve: curveSchema,
+    },
+    forward('set_slot_color_keyframe'),
+  );
+
+  server.tool(
     'set_event',
     'Define (or redefine) a named event with default payload values.',
     {

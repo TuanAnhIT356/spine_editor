@@ -12,6 +12,7 @@ import {
   DeleteBoneKeyframe,
   RemoveAnimation,
   RemoveBone,
+  AddSkinAttachment,
   RenameBone,
   ReorderSlot,
   ReparentBone,
@@ -19,8 +20,11 @@ import {
   SetEventDef,
   SetSlotProperties,
   UpsertBoneKeyframe,
+  UpsertDeformKeyframe,
   UpsertEventKeyframe,
   UpsertSlotAttachmentKeyframe,
+  UpsertSlotColorKeyframe,
+  buildGridMeshAttachment,
   createBone,
   createEmptySkeleton,
   createSlot,
@@ -393,6 +397,79 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       if (typeof params['string'] === 'string') def['string'] = params['string'];
       if (typeof params['audio'] === 'string') def['audio'] = params['audio'];
       executeOrThrow(new SetEventDef(str(params, 'name'), def));
+      return { ok: true };
+    }
+
+    case 'create_mesh': {
+      // Converts a slot's current region attachment into a deformable grid mesh.
+      const s = state();
+      const slotName = str(params, 'slot');
+      const slot = s.doc.findSlot(slotName);
+      if (!slot?.attachment) throw new Error(`Slot "${slotName}" has no active attachment.`);
+      const attName = slot.attachment;
+      const existing = s.doc.data.skins.find((sk) => sk.name === 'default')?.attachments?.[
+        slotName
+      ]?.[attName];
+      if (existing && existing.type !== undefined && existing.type !== 'region') {
+        throw new Error(`Attachment "${attName}" is not a region attachment.`);
+      }
+      const asset = s.assets[(existing as { path?: string } | undefined)?.path ?? attName];
+      const width =
+        optNum(params, 'width') ??
+        (existing as { width?: number } | undefined)?.width ??
+        asset?.width;
+      const height =
+        optNum(params, 'height') ??
+        (existing as { height?: number } | undefined)?.height ??
+        asset?.height;
+      if (!width || !height) throw new Error('Cannot determine mesh size; pass width/height.');
+      const cols = Math.max(1, Math.round(optNum(params, 'cols') ?? 3));
+      const rows = Math.max(1, Math.round(optNum(params, 'rows') ?? 3));
+      const mesh = buildGridMeshAttachment(width, height, cols, rows);
+      if ((existing as { path?: string } | undefined)?.path) {
+        mesh.path = (existing as { path?: string }).path;
+      }
+      executeOrThrow(new AddSkinAttachment('default', slotName, attName, mesh, true));
+      return { attachment: attName, vertices: mesh.vertices.length / 2, cols, rows };
+    }
+
+    case 'set_deform_keyframe': {
+      const vertices = params['vertices'];
+      if (!Array.isArray(vertices) || !vertices.every((v) => typeof v === 'number')) {
+        throw new Error('Param "vertices" must be an array of numbers (x,y offsets).');
+      }
+      const key: Record<string, unknown> = { vertices };
+      const time = optNum(params, 'time');
+      if (time !== undefined && time > 0) key['time'] = time;
+      const offset = optNum(params, 'offset');
+      if (offset !== undefined && offset > 0) key['offset'] = offset;
+      if (params['curve'] === 'stepped') key['curve'] = 'stepped';
+      else if (Array.isArray(params['curve'])) key['curve'] = params['curve'];
+      executeOrThrow(
+        new UpsertDeformKeyframe(
+          str(params, 'animation'),
+          'default',
+          str(params, 'slot'),
+          str(params, 'attachment'),
+          key,
+        ),
+      );
+      return { ok: true };
+    }
+
+    case 'set_slot_color_keyframe': {
+      const key: Record<string, unknown> = { color: str(params, 'color') };
+      const time = optNum(params, 'time');
+      if (time !== undefined && time > 0) key['time'] = time;
+      if (params['curve'] === 'stepped') key['curve'] = 'stepped';
+      else if (Array.isArray(params['curve'])) key['curve'] = params['curve'];
+      executeOrThrow(
+        new UpsertSlotColorKeyframe(
+          str(params, 'animation'),
+          str(params, 'slot'),
+          key as { color: string },
+        ),
+      );
       return { ok: true };
     }
 

@@ -6,6 +6,8 @@ import {
   applyLinear,
   applyMat,
   computeAnimatedAttachments,
+  computeAnimatedColors,
+  computeAnimatedDeforms,
   computeAnimatedLocals,
   createBone,
   invertMat,
@@ -73,15 +75,20 @@ export function Viewport() {
 
   function buildRenderInput(): RenderInput {
     const state = useEditor.getState();
-    const animated =
-      state.mode === 'animate' && state.anim.current
-        ? computeAnimatedAttachments(state.doc.data, state.anim.current, state.anim.time)
-        : undefined;
+    const animating = state.mode === 'animate' && state.anim.current;
     const base = overrideRef.current ?? (state.mode === 'animate' ? baseLocals() : undefined);
     return {
       data: state.doc.data,
       bonesOverride: base,
-      slotAttachments: animated,
+      slotAttachments: animating
+        ? computeAnimatedAttachments(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
+      slotColors: animating
+        ? computeAnimatedColors(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
+      deforms: animating
+        ? computeAnimatedDeforms(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
       assets: state.assets,
       selection: state.selection,
     };

@@ -32,8 +32,18 @@ export interface RenderInput {
   bonesOverride?: BoneData[];
   /** Animated slot attachment overrides (animate mode). */
   slotAttachments?: ReadonlyMap<string, string | null>;
+  /** Animated slot rgba colors (animate mode). */
+  slotColors?: ReadonlyMap<string, string>;
+  /** Animated deform offsets per slot → attachment (animate mode). */
+  deforms?: ReadonlyMap<string, ReadonlyMap<string, Float32Array>>;
   assets: Record<string, ImageAsset>;
   selection: Selection;
+}
+
+function tintOf(color: string): { tint: number; alpha: number } {
+  const rgb = parseInt(color.slice(0, 6), 16);
+  const alpha = color.length >= 8 ? parseInt(color.slice(6, 8), 16) / 255 : 1;
+  return { tint: Number.isNaN(rgb) ? 0xffffff : rgb, alpha: Number.isNaN(alpha) ? 1 : alpha };
 }
 
 const DEG_RAD = Math.PI / 180;
@@ -55,26 +65,33 @@ function meshWorldPositions(
   boneWorld: Mat2D,
   bones: BoneData[],
   pose: Map<string, Mat2D>,
+  deform?: Float32Array,
 ): Float32Array {
   const out = new Float32Array(att.uvs.length);
   const v = att.vertices;
   if (v.length === att.uvs.length) {
     for (let i = 0; i < v.length; i += 2) {
-      const p = applyMat(boneWorld, v[i] ?? 0, v[i + 1] ?? 0);
+      const p = applyMat(
+        boneWorld,
+        (v[i] ?? 0) + (deform?.[i] ?? 0),
+        (v[i + 1] ?? 0) + (deform?.[i + 1] ?? 0),
+      );
       out[i] = p.x;
       out[i + 1] = p.y;
     }
     return out;
   }
   let vi = 0;
+  let di = 0; // deform offsets cover the x,y of each bone influence
   for (let oi = 0; oi < out.length; oi += 2) {
     const count = v[vi++] ?? 0;
     let x = 0;
     let y = 0;
     for (let b = 0; b < count; b++) {
       const boneIdx = v[vi++] ?? 0;
-      const bx = v[vi++] ?? 0;
-      const by = v[vi++] ?? 0;
+      const bx = (v[vi++] ?? 0) + (deform?.[di] ?? 0);
+      const by = (v[vi++] ?? 0) + (deform?.[di + 1] ?? 0);
+      di += 2;
       const w = v[vi++] ?? 0;
       const m = pose.get(bones[boneIdx]?.name ?? '');
       if (!m) continue;
@@ -236,11 +253,15 @@ export class SceneRenderer {
       const boneWorld = pose.get(slot.bone);
       if (!boneWorld) continue;
 
+      const animColor = input.slotColors?.get(slot.name) ?? slot.color;
+      const { tint, alpha } = tintOf(animColor);
+
       if (att.type === 'mesh') {
         const asset = input.assets[att.path ?? attachmentName];
         const texture = asset ? this.textures.get(asset.name) : undefined;
         if (!texture) continue;
-        const positions = meshWorldPositions(att, boneWorld, data.bones, pose);
+        const deform = input.deforms?.get(slot.name)?.get(attachmentName);
+        const positions = meshWorldPositions(att, boneWorld, data.bones, pose, deform);
         let mesh = this.meshes.get(slot.name);
         if (!mesh || mesh.texture !== texture || mesh.vertices.length !== positions.length) {
           mesh?.destroy();
@@ -254,6 +275,8 @@ export class SceneRenderer {
         } else {
           mesh.vertices = positions;
         }
+        mesh.tint = tint;
+        mesh.alpha = alpha;
         this.spriteLayer.addChild(mesh);
         continue;
       }
@@ -285,8 +308,9 @@ export class SceneRenderer {
         ty: region.y ?? 0,
       };
       sprite.setFromMatrix(toPixiMatrix(mulMat(mulMat(boneWorld, local), FLIP_Y)));
+      sprite.tint = tint;
       sprite.alpha =
-        input.selection?.kind === 'slot' && input.selection.name === slot.name ? 1 : 0.95;
+        alpha * (input.selection?.kind === 'slot' && input.selection.name === slot.name ? 1 : 0.95);
       this.spriteLayer.addChild(sprite);
     }
 

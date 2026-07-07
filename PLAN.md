@@ -100,7 +100,7 @@ spine_editor/
 
 ### Phase 4 — Tính năng nâng cao ✅ Hoàn thành (một phần, xem ghi chú)
 
-> Ghi chú thực hiện: **Đã xong** — IK evaluation (solver 1-bone + 2-bone với bendPositive/mix, IK timeline; xấp xỉ: bỏ qua softness/stretch/scale trên chuỗi), texture atlas packer (shelf packing, format libgdx `.atlas` + PNG, nút Export Atlas + tool MCP `export_atlas`), render mesh attachment (unweighted + weighted skinning) trong viewport, events (commands + MCP tools `set_event`/`set_event_keyframe`), Import Spine JSON từ toolbar. **Chưa làm** — UI tạo/sửa mesh và weight painting, deform timeline evaluation, path/physics/transform constraint evaluation.
+> Ghi chú thực hiện: **Đã xong** — IK evaluation (solver 1-bone + 2-bone với bendPositive/mix, IK timeline; xấp xỉ: bỏ qua softness/stretch/scale trên chuỗi), transform constraint evaluation (mixRotate/mixX/mixY/mixScale, trường hợp non-local/non-relative), slot color evaluation (rgba + alpha timelines, tint khi render), deform timeline evaluation (sparse keys, unweighted + weighted), tạo mesh dạng lưới (`create_mesh` chuyển region → grid mesh) + `set_deform_keyframe`/`set_slot_color_keyframe`, texture atlas packer (shelf packing, format libgdx `.atlas` + PNG), render mesh (unweighted + weighted skinning), events, Import Spine JSON. **Chưa làm** — UI kéo vertex mesh và weight painting (chỉnh qua MCP/JSON được), path/physics constraint evaluation (cần spline sampling + mô phỏng stateful; dữ liệu vẫn round-trip đầy đủ).
 
 - Mesh attachment: tạo lưới, chỉnh vertex, **weights** (bind bone, paint weight).
 - IK constraints + timeline IK.
@@ -131,7 +131,9 @@ Skills (`skills/`):
 
 ✅ Nghiệm thu: Claude nhận các ảnh bộ phận nhân vật, tự rig, tự tạo animation idle và xuất `.json` hợp lệ chỉ qua MCP tools.
 
-### Phase 6 — Hoàn thiện
+### Phase 6 — Hoàn thiện ✅ Một phần
+
+> Đã xong: curve presets (linear/stepped/ease-in/ease-out/ease-in-out) và copy/paste key trong dopesheet, favicon, build với `base: './'` chạy trên mọi static host, workflow deploy GitHub Pages (`.github/workflows/deploy.yml` — cần bật Pages trong Settings). Còn lại: dockable panels, curve editor bezier trực quan (kéo control point), phím tắt đầy đủ kiểu Spine.
 
 - Validation + báo lỗi thân thiện, hiệu năng với skeleton lớn, phím tắt giống Spine, tài liệu người dùng, deploy static site (GitHub Pages/Cloudflare).
 

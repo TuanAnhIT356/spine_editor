@@ -4,6 +4,8 @@ import type {
   SpineAttachmentKey,
   SpineBoneKey,
   SpineBoneTimelineName,
+  SpineColorKey,
+  SpineDeformKey,
 } from '../spine-json/types.js';
 import type { Command } from './history.js';
 
@@ -236,6 +238,91 @@ export class UpsertSlotAttachmentKeyframe implements Command {
     if (existing >= 0) {
       keys[existing] = this.key;
     } else {
+      keys.push(this.key);
+      keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+    }
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.before) data.animations[this.animation] = this.before;
+  }
+}
+
+/** Inserts or replaces a key on a slot's rgba color timeline. */
+export class UpsertSlotColorKeyframe implements Command {
+  readonly label: string;
+  private before: SpineAnimation | undefined;
+
+  constructor(
+    private readonly animation: string,
+    private readonly slot: string,
+    private readonly key: SpineColorKey,
+  ) {
+    this.label = `Key color on "${slot}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const anim = requireAnimation(data, this.animation);
+    if (!data.slots.some((s) => s.name === this.slot)) {
+      throw new Error(`Slot "${this.slot}" does not exist.`);
+    }
+    if (!/^[0-9a-fA-F]{8}$/.test(this.key.color ?? '')) {
+      throw new Error('Color must be 8-digit rgba hex, e.g. "ff0000ff".');
+    }
+    this.before = structuredClone(anim);
+    const slots = (anim.slots ??= {});
+    const timelines = (slots[this.slot] ??= {});
+    const keys = (timelines.rgba ??= []);
+    const time = this.key.time ?? 0;
+    const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
+    if (existing >= 0) keys[existing] = this.key;
+    else {
+      keys.push(this.key);
+      keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+    }
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.before) data.animations[this.animation] = this.before;
+  }
+}
+
+/** Inserts or replaces a deform key for a mesh attachment (default skin). */
+export class UpsertDeformKeyframe implements Command {
+  readonly label: string;
+  private before: SpineAnimation | undefined;
+
+  constructor(
+    private readonly animation: string,
+    private readonly skin: string,
+    private readonly slot: string,
+    private readonly attachment: string,
+    private readonly key: SpineDeformKey,
+  ) {
+    this.label = `Key deform on "${slot}/${attachment}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const anim = requireAnimation(data, this.animation);
+    const att = data.skins.find((s) => s.name === this.skin)?.attachments?.[this.slot]?.[
+      this.attachment
+    ];
+    if (!att) {
+      throw new Error(
+        `Attachment "${this.attachment}" not found on slot "${this.slot}" in skin "${this.skin}".`,
+      );
+    }
+    if (att.type !== 'mesh') throw new Error('Deform keys require a mesh attachment.');
+    this.before = structuredClone(anim);
+    const attachments = (anim.attachments ??= {});
+    const bySlot = (attachments[this.skin] ??= {});
+    const byAtt = (bySlot[this.slot] ??= {});
+    const timelines = (byAtt[this.attachment] ??= {});
+    const keys = (timelines.deform ??= []);
+    const time = this.key.time ?? 0;
+    const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
+    if (existing >= 0) keys[existing] = this.key;
+    else {
       keys.push(this.key);
       keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
     }

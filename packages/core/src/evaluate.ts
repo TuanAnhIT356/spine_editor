@@ -17,8 +17,11 @@ import type {
   SpineAnimation,
   SpineAttachmentKey,
   SpineBoneKey,
+  SpineColorKey,
   SpineCurve,
+  SpineDeformKey,
   SpineIkKey,
+  SpineValueKey,
 } from './spine-json/types.js';
 
 function cubic(a: number, b: number, c: number, d: number, t: number): number {
@@ -161,6 +164,147 @@ export function computeAnimatedIk(
   return out;
 }
 
+function hexByte(v: number): string {
+  return Math.round(Math.min(1, Math.max(0, v)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+}
+
+function parseHex(color: string): [number, number, number, number] {
+  const r = parseInt(color.slice(0, 2), 16) / 255;
+  const g = parseInt(color.slice(2, 4), 16) / 255;
+  const b = parseInt(color.slice(4, 6), 16) / 255;
+  const a = color.length >= 8 ? parseInt(color.slice(6, 8), 16) / 255 : 1;
+  return [r, g, b, a];
+}
+
+/** Samples an rgba color timeline (per-channel bezier blocks supported). */
+export function sampleColorTimeline(keys: SpineColorKey[], time: number, setup: string): string {
+  const first = keys[0];
+  if (!first) return setup;
+  const colorOf = (k: SpineColorKey) => k.color ?? setup;
+  if (time <= (first.time ?? 0)) return colorOf(first);
+  let i = 0;
+  while (i < keys.length - 1 && (keys[i + 1]?.time ?? 0) <= time) i++;
+  const k1 = keys[i];
+  if (!k1) return setup;
+  if (i === keys.length - 1) return colorOf(k1);
+  const k2 = keys[i + 1];
+  if (!k2) return colorOf(k1);
+  const c1 = parseHex(colorOf(k1));
+  const c2 = parseHex(colorOf(k2));
+  const t1 = k1.time ?? 0;
+  const t2 = k2.time ?? 0;
+  const out = c1.map((v, ch) => segmentValue(time, t1, v, t2, c2[ch] ?? v, k1.curve, ch));
+  return out.map(hexByte).join('');
+}
+
+/** Final rgba color per slot with color/alpha timelines applied at time t. */
+export function computeAnimatedColors(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const anim = data.animations[animationName];
+  if (!anim?.slots) return out;
+  for (const slot of data.slots) {
+    const timelines = anim.slots[slot.name];
+    if (!timelines?.rgba && !timelines?.alpha) continue;
+    let color = slot.color;
+    if (timelines.rgba) color = sampleColorTimeline(timelines.rgba, time, slot.color);
+    if (timelines.alpha) {
+      const alphaKeys: SpineValueKey[] = timelines.alpha;
+      const first = alphaKeys[0];
+      if (first) {
+        const a = sampleBoneTimeline(alphaKeys as SpineBoneKey[], time, 'value', 0, 1);
+        color = color.slice(0, 6) + hexByte(a);
+      }
+    }
+    out.set(slot.name, color);
+  }
+  return out;
+}
+
+/**
+ * Samples a deform timeline into a full offsets array of `length` floats.
+ * Keys store sparse vertex offsets (`offset` = start index); interpolation
+ * uses the segment's single curve as a blend factor.
+ */
+export function sampleDeform(
+  keys: SpineDeformKey[],
+  time: number,
+  length: number,
+): Float32Array | undefined {
+  const first = keys[0];
+  if (!first) return undefined;
+  const expand = (k: SpineDeformKey): Float32Array => {
+    const out = new Float32Array(length);
+    const verts = k.vertices ?? [];
+    const start = k.offset ?? 0;
+    for (let i = 0; i < verts.length && start + i < length; i++) out[start + i] = verts[i] ?? 0;
+    return out;
+  };
+  if (time <= (first.time ?? 0)) return expand(first);
+  let i = 0;
+  while (i < keys.length - 1 && (keys[i + 1]?.time ?? 0) <= time) i++;
+  const k1 = keys[i];
+  if (!k1) return undefined;
+  if (i === keys.length - 1) return expand(k1);
+  const k2 = keys[i + 1];
+  if (!k2) return expand(k1);
+  const factor = segmentValue(time, k1.time ?? 0, 0, k2.time ?? 0, 1, k1.curve, 0);
+  const v1 = expand(k1);
+  const v2 = expand(k2);
+  for (let j = 0; j < length; j++) v1[j] = (v1[j] ?? 0) + ((v2[j] ?? 0) - (v1[j] ?? 0)) * factor;
+  return v1;
+}
+
+/**
+ * Deform offset arrays per slot/attachment at time t. The needed array length
+ * comes from the mesh's vertices (weighted meshes deform the per-influence
+ * coordinates, matching Spine's layout).
+ */
+export function computeAnimatedDeforms(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): Map<string, Map<string, Float32Array>> {
+  const out = new Map<string, Map<string, Float32Array>>();
+  const anim = data.animations[animationName];
+  if (!anim?.attachments) return out;
+  for (const bySlot of Object.values(anim.attachments)) {
+    for (const [slotName, byAtt] of Object.entries(bySlot)) {
+      for (const [attName, timelines] of Object.entries(byAtt)) {
+        if (!timelines.deform?.length) continue;
+        let meshLength = 0;
+        for (const skin of data.skins) {
+          const att = skin.attachments?.[slotName]?.[attName];
+          if (att && att.type === 'mesh') {
+            // Unweighted: offsets match vertices; weighted: offsets cover the
+            // x,y coords per influence (vertices minus count+bone+weight slots).
+            meshLength =
+              att.vertices.length === att.uvs.length
+                ? att.vertices.length
+                : (att.vertices.length - att.uvs.length / 2) / 2;
+            break;
+          }
+        }
+        if (meshLength <= 0) continue;
+        const offsets = sampleDeform(timelines.deform, time, meshLength);
+        if (!offsets) continue;
+        let slotMap = out.get(slotName);
+        if (!slotMap) {
+          slotMap = new Map();
+          out.set(slotName, slotMap);
+        }
+        slotMap.set(attName, offsets);
+      }
+    }
+  }
+  return out;
+}
+
 /** Active attachment for a slot at time t (setup attachment before first key). */
 export function sampleAttachment(
   keys: SpineAttachmentKey[],
@@ -248,6 +392,8 @@ export interface AnimatedPose {
   locals: BoneData[];
   world: Map<string, Mat2D>;
   attachments: Map<string, string | null>;
+  colors: Map<string, string>;
+  deforms: Map<string, Map<string, Float32Array>>;
 }
 
 export function computeAnimatedPose(
@@ -260,5 +406,7 @@ export function computeAnimatedPose(
     locals,
     world: computePose(data, locals, computeAnimatedIk(data, animationName, time)),
     attachments: computeAnimatedAttachments(data, animationName, time),
+    colors: computeAnimatedColors(data, animationName, time),
+    deforms: computeAnimatedDeforms(data, animationName, time),
   };
 }
