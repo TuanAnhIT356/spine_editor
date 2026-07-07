@@ -76,7 +76,9 @@ spine_editor/
 - Unit test tương thích với các file mẫu (spineboy, raptor… từ tài liệu công khai).
 - ✅ Nghiệm thu: file xuất ra load được bằng Spine runtime chuẩn trong một project game test.
 
-### Phase 2 — Editor Setup Mode (rigging)
+### Phase 2 — Editor Setup Mode (rigging) ✅ Hoàn thành
+
+> Ghi chú thực hiện: panel dùng layout cố định (dockable để giai đoạn polish); scale chỉnh qua Properties panel (chưa có gizmo scale); lưu project bằng file JSON đơn (`project.spine-editor.json`, chưa dùng .zip) + autosave IndexedDB. Đã verify end-to-end bằng Chromium thật (`packages/editor/e2e/smoke.mjs`).
 
 - Shell UI: dockable panels, menu, toolbar, chuyển Setup/Animate.
 - Viewport PixiJS: pan/zoom, grid, chọn đối tượng, gizmo translate/rotate/scale.

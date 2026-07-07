@@ -12,4 +12,17 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
+  {
+    // Node scripts that also run code in the browser via page.evaluate.
+    files: ['**/e2e/**'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+      },
+    },
+  },
 );

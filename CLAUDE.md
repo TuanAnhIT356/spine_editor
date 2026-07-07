@@ -7,9 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A web-based 2D skeletal animation editor (Spine-like UI) that exports the Spine JSON format
 (target version **4.2**), with an MCP server + skills so AI agents can rig and animate.
 The full roadmap, architecture rationale, and phase breakdown live in `PLAN.md` — read it before
-starting work on a new phase. Current status: **Phase 1 done** (core document model, command
-system with undo/redo, Spine JSON 4.2 parser/serializer with round-trip tests); next is Phase 2
-(editor Setup mode: viewport, bone tools, hierarchy/properties panels).
+starting work on a new phase. Current status: **Phase 2 done** (Setup-mode editor: PixiJS
+viewport with select/translate/rotate/create-bone tools, hierarchy + properties panels, image
+import → region attachments, draw-order controls, IndexedDB autosave, project file save/open,
+validated JSON export); next is Phase 3 (Animate mode: evaluator, dopesheet, keyframes, playback).
+Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
+it drives the built editor in a real Chromium via `packages/editor/e2e/smoke.mjs`.
 
 ## Commands
 
