@@ -13,7 +13,8 @@ Chromium, not by unit tests.
 ```bash
 pnpm --filter @spine-editor/editor build
 (cd packages/editor && npx vite preview --port 4173 &)   # serve the built app
-node packages/editor/e2e/smoke.mjs <outDir>              # drive + screenshot
+node packages/editor/e2e/smoke.mjs <outDir>              # setup mode: rig + attach + export
+node packages/editor/e2e/anim.mjs <outDir>               # animate mode: keys + playback
 ```
 
 `packages/editor/e2e/smoke.mjs` uses playwright-core with the pre-installed

@@ -150,3 +150,45 @@ export class DeleteBoneKeyframe implements Command {
     if (this.before) data.animations[this.animation] = this.before;
   }
 }
+
+/** Moves a keyframe to a new time, keeping the timeline sorted. */
+export class MoveBoneKeyframe implements Command {
+  readonly label: string;
+  private before: SpineAnimation | undefined;
+
+  constructor(
+    private readonly animation: string,
+    private readonly bone: string,
+    private readonly timeline: SpineBoneTimelineName,
+    private readonly fromTime: number,
+    private readonly toTime: number,
+  ) {
+    this.label = `Move ${timeline} key on "${bone}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const anim = requireAnimation(data, this.animation);
+    const keys = anim.bones?.[this.bone]?.[this.timeline];
+    const idx =
+      keys?.findIndex((k) => Math.abs((k.time ?? 0) - this.fromTime) < TIME_EPSILON) ?? -1;
+    if (!keys || idx < 0) {
+      throw new Error(
+        `No ${this.timeline} key at time ${this.fromTime} on bone "${this.bone}" in animation "${this.animation}".`,
+      );
+    }
+    if (this.toTime < 0) throw new Error('Keyframe time must be >= 0.');
+    if (keys.some((k) => Math.abs((k.time ?? 0) - this.toTime) < TIME_EPSILON)) {
+      throw new Error(`A ${this.timeline} key already exists at time ${this.toTime}.`);
+    }
+    this.before = structuredClone(anim);
+    const key = keys[idx];
+    if (!key) return;
+    if (this.toTime === 0) delete key.time;
+    else key.time = this.toTime;
+    keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.before) data.animations[this.animation] = this.before;
+  }
+}

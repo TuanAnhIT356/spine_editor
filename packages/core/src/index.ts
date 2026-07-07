@@ -16,6 +16,7 @@ export * from './model/factories.js';
 export * from './validate.js';
 export * from './document.js';
 export * from './pose.js';
+export * from './evaluate.js';
 export * from './commands/history.js';
 export * from './commands/bones.js';
 export * from './commands/slots.js';

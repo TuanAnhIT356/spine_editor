@@ -23,6 +23,14 @@ export interface ImageAsset {
 export type Tool = 'select' | 'translate' | 'rotate' | 'create';
 export type Selection = { kind: 'bone' | 'slot'; name: string } | null;
 
+export interface AnimationUiState {
+  /** Currently edited animation, or null when none is selected. */
+  current: string | null;
+  time: number;
+  playing: boolean;
+  loop: boolean;
+}
+
 interface EditorState {
   doc: SpineDocument;
   /** Bumped after every document mutation so React re-renders. */
@@ -32,11 +40,16 @@ interface EditorState {
   selection: Selection;
   assets: Record<string, ImageAsset>;
   error: string | null;
+  anim: AnimationUiState;
 
   setTool(tool: Tool): void;
   setMode(mode: 'setup' | 'animate'): void;
   select(selection: Selection): void;
   setError(message: string | null): void;
+  setAnimation(name: string | null): void;
+  setAnimTime(time: number): void;
+  setPlaying(playing: boolean): void;
+  setLoop(loop: boolean): void;
   execute(command: Command): boolean;
   undo(): void;
   redo(): void;
@@ -62,17 +75,38 @@ export const useEditor = create<EditorState>()((set, get) => ({
   selection: null,
   assets: {},
   error: null,
+  anim: { current: null, time: 0, playing: false, loop: true },
 
   setTool: (tool) => set({ tool }),
-  setMode: (mode) => set({ mode }),
+  setMode: (mode) =>
+    set((s) => {
+      // Entering animate mode with nothing selected: pick the first animation.
+      const names = Object.keys(s.doc.data.animations);
+      const current =
+        mode === 'animate' && s.anim.current === null ? (names[0] ?? null) : s.anim.current;
+      return { mode, anim: { ...s.anim, current, playing: false } };
+    }),
   select: (selection) => set({ selection }),
   setError: (error) => set({ error }),
+  setAnimation: (name) =>
+    set((s) => ({ anim: { ...s.anim, current: name, time: 0, playing: false } })),
+  setAnimTime: (time) => set((s) => ({ anim: { ...s.anim, time: Math.max(0, time) } })),
+  setPlaying: (playing) => set((s) => ({ anim: { ...s.anim, playing } })),
+  setLoop: (loop) => set((s) => ({ anim: { ...s.anim, loop } })),
 
   execute: (command) => {
     const { doc } = get();
     try {
       doc.execute(command);
-      set((s) => ({ revision: s.revision + 1, error: null }));
+      set((s) => ({
+        revision: s.revision + 1,
+        error: null,
+        // The command may have removed/renamed the current animation.
+        anim:
+          s.anim.current !== null && !(s.anim.current in doc.data.animations)
+            ? { ...s.anim, current: null, playing: false }
+            : s.anim,
+      }));
       return true;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -132,6 +166,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       selection: null,
       error: null,
       revision: s.revision + 1,
+      anim: { current: null, time: 0, playing: false, loop: true },
     }));
     return issues;
   },

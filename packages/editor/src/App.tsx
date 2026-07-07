@@ -2,6 +2,7 @@ import { RemoveBone } from '@spine-editor/core';
 import { useEffect } from 'react';
 import { HierarchyPanel } from './components/HierarchyPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
+import { TimelinePanel } from './components/TimelinePanel.js';
 import { Toolbar } from './components/Toolbar.js';
 import { Viewport } from './components/Viewport.js';
 import { loadAutosave, saveAutosave } from './state/persistence.js';
@@ -9,6 +10,7 @@ import { useEditor } from './state/store.js';
 
 export function App() {
   const error = useEditor((s) => s.error);
+  const mode = useEditor((s) => s.mode);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -26,7 +28,10 @@ export function App() {
       else if (e.key === '2') s.setTool('translate');
       else if (e.key === '3') s.setTool('rotate');
       else if (e.key === '4') s.setTool('create');
-      else if (e.key === 'Delete' && s.selection) {
+      else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
+        e.preventDefault();
+        s.setPlaying(!s.anim.playing);
+      } else if (e.key === 'Delete' && s.selection) {
         if (s.selection.kind === 'bone') {
           if (s.execute(new RemoveBone(s.selection.name))) s.select(null);
         } else {
@@ -70,6 +75,7 @@ export function App() {
         <Viewport />
         <PropertiesPanel />
       </div>
+      {mode === 'animate' && <TimelinePanel />}
       {error && (
         <div className="error-banner" onClick={() => useEditor.getState().setError(null)}>
           {error} <span className="dismiss">(click to dismiss)</span>

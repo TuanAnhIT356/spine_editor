@@ -2,12 +2,16 @@ import {
   AddBone,
   IDENTITY,
   SetBoneTransform,
+  UpsertBoneKeyframe,
   applyLinear,
   applyMat,
+  computeAnimatedAttachments,
+  computeAnimatedLocals,
   createBone,
   invertMat,
   type BoneData,
   type Mat2D,
+  type SpineBoneKey,
 } from '@spine-editor/core';
 import { useEffect, useRef } from 'react';
 import { uniqueName, useEditor } from '../state/store.js';
@@ -15,6 +19,10 @@ import { SceneRenderer } from '../viewport/renderer.js';
 
 const RAD_DEG = 180 / Math.PI;
 const round2 = (v: number) => Math.round(v * 100) / 100;
+
+function makeKey(time: number, fields: Omit<SpineBoneKey, 'time'>): SpineBoneKey {
+  return time > 0 ? { time: round2(time), ...fields } : { ...fields };
+}
 
 type DragState =
   | { kind: 'pan'; lastX: number; lastY: number }
@@ -48,14 +56,33 @@ export function Viewport() {
   const revision = useEditor((s) => s.revision);
   const selection = useEditor((s) => s.selection);
   const assets = useEditor((s) => s.assets);
+  const mode = useEditor((s) => s.mode);
+  const animCurrent = useEditor((s) => s.anim.current);
+  const animTime = useEditor((s) => s.anim.time);
+
+  /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
+  function baseLocals(): BoneData[] {
+    const state = useEditor.getState();
+    const { doc, mode: m, anim } = state;
+    if (m === 'animate' && anim.current && doc.data.animations[anim.current]) {
+      return computeAnimatedLocals(doc.data, anim.current, anim.time);
+    }
+    return doc.data.bones;
+  }
 
   function redraw() {
     const r = rendererRef.current;
     if (!r?.ready) return;
     const state = useEditor.getState();
+    const animated =
+      state.mode === 'animate' && state.anim.current
+        ? computeAnimatedAttachments(state.doc.data, state.anim.current, state.anim.time)
+        : undefined;
+    const base = overrideRef.current ?? (state.mode === 'animate' ? baseLocals() : undefined);
     void r.render({
       data: state.doc.data,
-      bonesOverride: overrideRef.current,
+      bonesOverride: base,
+      slotAttachments: animated,
       assets: state.assets,
       selection: state.selection,
     });
@@ -81,7 +108,7 @@ export function Viewport() {
     };
   }, []);
 
-  useEffect(redraw, [revision, selection, assets]);
+  useEffect(redraw, [revision, selection, assets, mode, animCurrent, animTime]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
     const rect = hostRef.current!.getBoundingClientRect();
@@ -100,7 +127,7 @@ export function Viewport() {
     if (e.button !== 0) return;
 
     const state = useEditor.getState();
-    const data = state.doc.data;
+    const base = baseLocals();
     const hit = r.hitTest(p.x, p.y);
     const world = r.screenToWorld(p.x, p.y);
 
@@ -118,7 +145,7 @@ export function Viewport() {
         const name = hit ?? (state.selection?.kind === 'bone' ? state.selection.name : null);
         if (!name) return;
         state.select({ kind: 'bone', name });
-        const bone = data.bones.find((b) => b.name === name);
+        const bone = base.find((b) => b.name === name);
         if (!bone) return;
         if (state.tool === 'translate') {
           const parentWorld = bone.parent !== null ? r.getBoneWorld(bone.parent) : undefined;
@@ -143,14 +170,15 @@ export function Viewport() {
         return;
       }
       case 'create': {
+        if (state.mode === 'animate') return; // rig edits belong to setup mode
         const parentName =
           hit ?? (state.selection?.kind === 'bone' ? state.selection.name : 'root');
         const invParent = invertMat(r.getBoneWorld(parentName) ?? IDENTITY);
         const start = applyMat(invParent, world.x, world.y);
-        const name = uniqueName('bone', (n) => data.bones.some((b) => b.name === n));
+        const name = uniqueName('bone', (n) => state.doc.data.bones.some((b) => b.name === n));
         const temp = createBone(name, parentName, { x: start.x, y: start.y });
         dragRef.current = { kind: 'create', invParent, start, temp };
-        overrideRef.current = [...data.bones, temp];
+        overrideRef.current = [...state.doc.data.bones, temp];
         redraw();
         return;
       }
@@ -170,27 +198,27 @@ export function Viewport() {
       return;
     }
     const world = r.screenToWorld(p.x, p.y);
-    const data = useEditor.getState().doc.data;
+    const base = baseLocals();
     if (drag.kind === 'translate') {
       const d = applyLinear(
         drag.invParent,
         world.x - drag.startWorld.x,
         world.y - drag.startWorld.y,
       );
-      overrideRef.current = data.bones.map((b) =>
+      overrideRef.current = base.map((b) =>
         b.name === drag.bone ? { ...b, x: drag.startLocal.x + d.x, y: drag.startLocal.y + d.y } : b,
       );
     } else if (drag.kind === 'rotate') {
       const angle = Math.atan2(world.y - drag.origin.y, world.x - drag.origin.x);
       const rotation = drag.startRotation + (angle - drag.startAngle) * RAD_DEG;
-      overrideRef.current = data.bones.map((b) => (b.name === drag.bone ? { ...b, rotation } : b));
+      overrideRef.current = base.map((b) => (b.name === drag.bone ? { ...b, rotation } : b));
     } else {
       const lp = applyMat(drag.invParent, world.x, world.y);
       const dx = lp.x - drag.start.x;
       const dy = lp.y - drag.start.y;
       drag.temp.length = Math.hypot(dx, dy);
       drag.temp.rotation = Math.atan2(dy, dx) * RAD_DEG;
-      overrideRef.current = [...data.bones, { ...drag.temp }];
+      overrideRef.current = [...useEditor.getState().doc.data.bones, { ...drag.temp }];
     }
     redraw();
   }
@@ -202,12 +230,43 @@ export function Viewport() {
     overrideRef.current = undefined;
     if (!drag || drag.kind === 'pan') return;
     const state = useEditor.getState();
+    const animating = state.mode === 'animate' && state.anim.current !== null;
+
     if (drag.kind === 'translate' && override) {
       const b = override.find((x) => x.name === drag.bone);
-      if (b) state.execute(new SetBoneTransform(drag.bone, { x: round2(b.x), y: round2(b.y) }));
+      if (!b) return;
+      if (animating && state.anim.current) {
+        // Auto-key: timeline stores offsets from the setup pose.
+        const setup = state.doc.findBone(drag.bone);
+        if (!setup) return;
+        state.execute(
+          new UpsertBoneKeyframe(
+            state.anim.current,
+            drag.bone,
+            'translate',
+            makeKey(state.anim.time, { x: round2(b.x - setup.x), y: round2(b.y - setup.y) }),
+          ),
+        );
+      } else {
+        state.execute(new SetBoneTransform(drag.bone, { x: round2(b.x), y: round2(b.y) }));
+      }
     } else if (drag.kind === 'rotate' && override) {
       const b = override.find((x) => x.name === drag.bone);
-      if (b) state.execute(new SetBoneTransform(drag.bone, { rotation: round2(b.rotation) }));
+      if (!b) return;
+      if (animating && state.anim.current) {
+        const setup = state.doc.findBone(drag.bone);
+        if (!setup) return;
+        state.execute(
+          new UpsertBoneKeyframe(
+            state.anim.current,
+            drag.bone,
+            'rotate',
+            makeKey(state.anim.time, { value: round2(b.rotation - setup.rotation) }),
+          ),
+        );
+      } else {
+        state.execute(new SetBoneTransform(drag.bone, { rotation: round2(b.rotation) }));
+      }
     } else if (drag.kind === 'create') {
       if (drag.temp.length > 4) {
         const ok = state.execute(

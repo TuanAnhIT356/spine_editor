@@ -20,6 +20,8 @@ export interface RenderInput {
   data: SkeletonData;
   /** Replaces data.bones during tool drags (live preview without commands). */
   bonesOverride?: BoneData[];
+  /** Animated slot attachment overrides (animate mode). */
+  slotAttachments?: ReadonlyMap<string, string | null>;
   assets: Record<string, ImageAsset>;
   selection: Selection;
 }
@@ -161,12 +163,15 @@ export class SceneRenderer {
 
     this.spriteLayer.removeChildren();
     for (const slot of data.slots) {
-      if (!slot.attachment) continue;
-      const att = resolveAttachment(data, slot.name, slot.attachment);
+      const attachmentName = input.slotAttachments?.has(slot.name)
+        ? input.slotAttachments.get(slot.name)
+        : slot.attachment;
+      if (!attachmentName) continue;
+      const att = resolveAttachment(data, slot.name, attachmentName);
       if (!att || (att.type !== undefined && att.type !== 'region')) continue;
       const region = att as SpineRegionAttachment;
       const boneWorld = pose.get(slot.bone);
-      const asset = input.assets[region.path ?? slot.attachment];
+      const asset = input.assets[region.path ?? attachmentName];
       if (!boneWorld || !asset) continue;
       const texture = this.textures.get(asset.name);
       if (!texture) continue;

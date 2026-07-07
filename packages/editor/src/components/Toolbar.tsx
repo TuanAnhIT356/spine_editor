@@ -77,7 +77,8 @@ export function Toolbar() {
           <button
             key={t.id}
             className={tool === t.id ? 'active' : ''}
-            title={t.hint}
+            title={t.id === 'create' && mode === 'animate' ? 'Setup mode only' : t.hint}
+            disabled={t.id === 'create' && mode === 'animate'}
             onClick={() => useEditor.getState().setTool(t.id)}
           >
             {t.label}
@@ -110,8 +111,16 @@ export function Toolbar() {
         <button onClick={() => projectInput.current?.click()}>Open Project</button>
       </div>
       <div className="group modes">
-        <button className={mode === 'setup' ? 'active' : ''}>Setup</button>
-        <button disabled title="Arrives in Phase 3">
+        <button
+          className={mode === 'setup' ? 'active' : ''}
+          onClick={() => useEditor.getState().setMode('setup')}
+        >
+          Setup
+        </button>
+        <button
+          className={mode === 'animate' ? 'active' : ''}
+          onClick={() => useEditor.getState().setMode('animate')}
+        >
           Animate
         </button>
       </div>

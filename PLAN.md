@@ -88,7 +88,9 @@ spine_editor/
 - Lưu/mở project (IndexedDB + file `.zip`).
 - ✅ Nghiệm thu: rig được một nhân vật từ các ảnh rời và xuất JSON hợp lệ.
 
-### Phase 3 — Animate Mode (trọng tâm khó nhất)
+### Phase 3 — Animate Mode (trọng tâm khó nhất) ✅ Hoàn thành
+
+> Ghi chú thực hiện: evaluator hỗ trợ đủ bone timelines (rotate/translate/scale/shear + biến thể 1 trục) với curve linear/stepped/bezier, và slot attachment timeline; constraints/slot color/deform chưa được evaluate (chuyển sang Phase 4). Dopesheet: scrub, kéo key đổi time, xóa key, đổi curve linear/stepped per-key; curve editor bezier trực quan và copy-paste key để giai đoạn polish. Auto-key khi kéo bone bằng tool Translate/Rotate. Playback play/pause/loop (chưa có điều chỉnh tốc độ). Verify end-to-end bằng `packages/editor/e2e/anim.mjs`.
 
 - **Animation evaluator** trong `core`: pose skeleton tại thời điểm t (dùng cho cả playback lẫn MCP).
 - Timeline/Dopesheet: track theo bone/slot, đặt/di chuyển/xóa keyframe, auto-key, copy-paste key.
