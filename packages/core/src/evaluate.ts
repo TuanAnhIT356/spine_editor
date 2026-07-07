@@ -12,12 +12,13 @@
  */
 
 import type { BoneData, SkeletonData } from './model/types.js';
-import { computeSetupPose, type Mat2D } from './pose.js';
+import { computePose, type IkPoseValue, type Mat2D } from './pose.js';
 import type {
   SpineAnimation,
   SpineAttachmentKey,
   SpineBoneKey,
   SpineCurve,
+  SpineIkKey,
 } from './spine-json/types.js';
 
 function cubic(a: number, b: number, c: number, d: number, t: number): number {
@@ -110,6 +111,54 @@ export function sampleBoneTimeline(
     k1.curve,
     channel,
   );
+}
+
+/** Samples an IK timeline: mix interpolates, bendPositive holds per segment. */
+export function sampleIkTimeline(keys: SpineIkKey[], time: number): IkPoseValue {
+  const first = keys[0];
+  if (!first) return {};
+  const pick = (k: SpineIkKey): IkPoseValue => {
+    const v: IkPoseValue = {};
+    if (k.mix !== undefined) v.mix = k.mix;
+    if (k.bendPositive !== undefined) v.bendPositive = k.bendPositive;
+    return v;
+  };
+  if (time <= (first.time ?? 0)) return pick(first);
+  let i = 0;
+  while (i < keys.length - 1 && (keys[i + 1]?.time ?? 0) <= time) i++;
+  const k1 = keys[i];
+  if (!k1) return {};
+  if (i === keys.length - 1) return pick(k1);
+  const k2 = keys[i + 1];
+  if (!k2) return pick(k1);
+  const result = pick(k1);
+  if (k1.mix !== undefined || k2.mix !== undefined) {
+    result.mix = segmentValue(
+      time,
+      k1.time ?? 0,
+      k1.mix ?? 1,
+      k2.time ?? 0,
+      k2.mix ?? 1,
+      k1.curve,
+      0,
+    );
+  }
+  return result;
+}
+
+/** Per-constraint IK overrides sampled from the animation at time t. */
+export function computeAnimatedIk(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): Map<string, IkPoseValue> {
+  const out = new Map<string, IkPoseValue>();
+  const anim = data.animations[animationName];
+  if (!anim?.ik) return out;
+  for (const [name, keys] of Object.entries(anim.ik)) {
+    out.set(name, sampleIkTimeline(keys, time));
+  }
+  return out;
 }
 
 /** Active attachment for a slot at time t (setup attachment before first key). */
@@ -209,7 +258,7 @@ export function computeAnimatedPose(
   const locals = computeAnimatedLocals(data, animationName, time);
   return {
     locals,
-    world: computeSetupPose({ ...data, bones: locals }),
+    world: computePose(data, locals, computeAnimatedIk(data, animationName, time)),
     attachments: computeAnimatedAttachments(data, animationName, time),
   };
 }

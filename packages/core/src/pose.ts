@@ -74,15 +74,10 @@ export function applyLinear(m: Mat2D, x: number, y: number): { x: number; y: num
   return { x: m.a * x + m.b * y, y: m.c * x + m.d * y };
 }
 
-/**
- * World matrices for every bone in the setup pose. Bones must be ordered
- * parents-first (enforced by the validator). 'normal' and 'onlyTranslation'
- * inherit modes are exact; the remaining modes are approximated as 'normal'
- * until the full evaluator lands in Phase 3.
- */
-export function computeSetupPose(data: SkeletonData): Map<string, Mat2D> {
+/** World matrices from locals only — no constraints applied. */
+function computeWorldRaw(bones: BoneData[]): Map<string, Mat2D> {
   const out = new Map<string, Mat2D>();
-  for (const bone of data.bones) {
+  for (const bone of bones) {
     const local = boneLocalMatrix(bone);
     const parent = bone.parent !== null ? out.get(bone.parent) : undefined;
     if (!parent) {
@@ -97,4 +92,119 @@ export function computeSetupPose(data: SkeletonData): Map<string, Mat2D> {
     }
   }
   return out;
+}
+
+const RAD_DEG = 180 / Math.PI;
+
+function normalizeDeg(a: number): number {
+  a %= 360;
+  if (a > 180) a -= 360;
+  else if (a < -180) a += 360;
+  return a;
+}
+
+function lerpAngle(from: number, to: number, t: number): number {
+  return from + normalizeDeg(to - from) * t;
+}
+
+/** Per-constraint values that IK timelines can override at a point in time. */
+export interface IkPoseValue {
+  mix?: number;
+  bendPositive?: boolean;
+}
+
+/**
+ * Aims a single bone's +X axis at the target (in the bone's parent space).
+ * Assumes positive scale and no shear on the chain — a documented
+ * approximation of Spine's full solver.
+ */
+function applyIk1(bone: BoneData, parentWorld: Mat2D, targetWorld: Mat2D, mix: number): void {
+  const t = applyMat(invertMat(parentWorld), targetWorld.tx, targetWorld.ty);
+  const desired = Math.atan2(t.y - bone.y, t.x - bone.x) * RAD_DEG;
+  bone.rotation = lerpAngle(bone.rotation, desired, mix);
+}
+
+/**
+ * Two-bone IK: rotates parent+child so the child's tip (its `length` along
+ * +X) reaches the target, bending CCW when bendPositive. Requires the child
+ * to be a direct child of the parent bone.
+ */
+function applyIk2(
+  upper: BoneData,
+  lower: BoneData,
+  parentWorld: Mat2D,
+  targetWorld: Mat2D,
+  mix: number,
+  bendPositive: boolean,
+): void {
+  const l1 = Math.hypot(lower.x, lower.y);
+  const l2 = lower.length;
+  if (l1 === 0 || l2 === 0) {
+    applyIk1(upper, parentWorld, targetWorld, mix);
+    return;
+  }
+  const T = applyMat(invertMat(parentWorld), targetWorld.tx, targetWorld.ty);
+  const dx = T.x - upper.x;
+  const dy = T.y - upper.y;
+  const eps = 1e-6;
+  const d = Math.min(Math.max(Math.hypot(dx, dy), Math.abs(l1 - l2) + eps), l1 + l2 - eps);
+  const base = Math.atan2(dy, dx);
+  const cos0 = Math.min(1, Math.max(-1, (d * d + l1 * l1 - l2 * l2) / (2 * d * l1)));
+  const bendSign = bendPositive ? 1 : -1;
+  const upperDir = base + bendSign * Math.acos(cos0);
+  // The lower bone's origin sits at angle atan2(lower.y, lower.x) within the
+  // upper bone's frame; subtract it so the chain lands on upperDir.
+  const upperDesired = upperDir * RAD_DEG - Math.atan2(lower.y, lower.x) * RAD_DEG;
+  const lx = upper.x + Math.cos(upperDir) * l1;
+  const ly = upper.y + Math.sin(upperDir) * l1;
+  const lowerDesired = Math.atan2(T.y - ly, T.x - lx) * RAD_DEG - upperDesired;
+  upper.rotation = lerpAngle(upper.rotation, upperDesired, mix);
+  lower.rotation = lerpAngle(lower.rotation, lowerDesired, mix);
+}
+
+/**
+ * World matrices for every bone with IK constraints applied (in `order`).
+ * `locals` overrides the setup locals (animated pose); `ikOverrides` carries
+ * per-constraint timeline values. Bones must be ordered parents-first.
+ * 'normal' and 'onlyTranslation' inherit modes are exact; the remaining modes
+ * are approximated as 'normal'. Transform/path/physics constraints are not
+ * evaluated yet.
+ */
+export function computePose(
+  data: SkeletonData,
+  locals?: BoneData[],
+  ikOverrides?: ReadonlyMap<string, IkPoseValue>,
+): Map<string, Mat2D> {
+  const work = (locals ?? data.bones).map((b) => ({ ...b }));
+  let world = computeWorldRaw(work);
+  if (data.ik.length === 0) return world;
+
+  const constraints = [...data.ik].sort((a, b) => a.order - b.order);
+  for (const c of constraints) {
+    const override = ikOverrides?.get(c.name);
+    const mix = override?.mix ?? c.mix;
+    const bendPositive = override?.bendPositive ?? c.bendPositive;
+    if (mix === 0) continue;
+    const target = world.get(c.target);
+    if (!target) continue;
+    const first = work.find((b) => b.name === c.bones[0]);
+    if (!first) continue;
+    const parentWorld = first.parent !== null ? world.get(first.parent) : undefined;
+    if (c.bones.length === 1) {
+      applyIk1(first, parentWorld ?? IDENTITY, target, mix);
+    } else {
+      const second = work.find((b) => b.name === c.bones[1]);
+      if (!second || second.parent !== first.name) continue;
+      applyIk2(first, second, parentWorld ?? IDENTITY, target, mix, bendPositive);
+    }
+    world = computeWorldRaw(work);
+  }
+  return world;
+}
+
+/**
+ * World matrices for every bone in the setup pose, constraints included.
+ */
+export function computeSetupPose(data: SkeletonData): Map<string, Mat2D> {
+  return computePose(data);
 }

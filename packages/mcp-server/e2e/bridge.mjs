@@ -123,6 +123,29 @@ try {
 await call('undo'); // undoes the last keyframe
 const treeAfterUndo = await call('get_skeleton_tree');
 
+// 8. Atlas export: .atlas text + packed PNG.
+const atlasRes = await client.callTool({ name: 'export_atlas', arguments: {} });
+const atlasText = atlasRes.content?.find((c) => c.type === 'text')?.text ?? '';
+const atlasPng = atlasRes.content?.find((c) => c.type === 'image')?.data;
+if (atlasPng) fs.writeFileSync(`${OUT}/skeleton-atlas.png`, Buffer.from(atlasPng, 'base64'));
+fs.writeFileSync(`${OUT}/skeleton.atlas`, atlasText);
+
+// 9. IK evaluation: a 2-bone chain must bend to reach its target in the view.
+await call('new_project');
+await call('add_bone', { parent: 'root', name: 'upper', length: 50 });
+await call('add_bone', { parent: 'upper', name: 'lower', x: 50, length: 50 });
+await call('add_bone', { parent: 'root', name: 'ik-target', x: 70, y: 0 });
+await call('add_ik_constraint', { name: 'leg', bones: ['upper', 'lower'], target: 'ik-target' });
+const ikShot = await call('screenshot_viewport');
+fs.writeFileSync(`${OUT}/ik-bend.png`, Buffer.from(ikShot.image, 'base64'));
+
+// 10. Events through MCP land in the export.
+await call('set_event', { name: 'footstep', audio: 'step.wav' });
+await call('create_animation', { name: 'walk' });
+await call('set_event_keyframe', { animation: 'walk', name: 'footstep', time: 0.5, volume: 0.8 });
+const exported2 = await call('export_spine_json');
+const exportedEvents = JSON.parse(exported2.json);
+
 console.log(
   JSON.stringify(
     {
@@ -136,6 +159,9 @@ console.log(
       validationIssues: validation.issues,
       badBoneError,
       animationsAfterUndo: treeAfterUndo.animations,
+      atlasHasRegion: atlasText.includes('arm-img'),
+      eventDefs: exportedEvents.events,
+      eventKeys: exportedEvents.animations?.walk?.events,
     },
     null,
     2,

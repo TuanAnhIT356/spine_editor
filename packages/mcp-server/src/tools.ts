@@ -251,7 +251,61 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
   server.tool('redo', 'Redo the last undone edit.', {}, forward('redo'));
 
+  server.tool(
+    'set_event',
+    'Define (or redefine) a named event with default payload values.',
+    {
+      name: z.string(),
+      int: z.number().int().optional(),
+      float: z.number().optional(),
+      string: z.string().optional(),
+      audio: z.string().optional(),
+      volume: z.number().optional(),
+      balance: z.number().optional(),
+    },
+    forward('set_event'),
+  );
+
+  server.tool(
+    'set_event_keyframe',
+    'Fire a defined event at a time in an animation (payload fields override the defaults).',
+    {
+      animation: z.string(),
+      name: z.string(),
+      time: z.number().min(0),
+      int: z.number().int().optional(),
+      float: z.number().optional(),
+      string: z.string().optional(),
+      volume: z.number().optional(),
+      balance: z.number().optional(),
+    },
+    forward('set_event_keyframe'),
+  );
+
   // ---------------------------------------------------------------- export
+  server.tool(
+    'export_atlas',
+    'Pack all imported images into a texture atlas: returns the libgdx-format .atlas text and the packed skeleton.png. Region names match attachment names, so runtimes can load the export directly.',
+    {},
+    async (): Promise<ToolResult> => {
+      try {
+        const result = (await bridge.request('export_atlas')) as {
+          atlasText: string;
+          pngDataUrl: string;
+        };
+        const base64 = result.pngDataUrl.replace(/^data:image\/png;base64,/, '');
+        return {
+          content: [
+            { type: 'text', text: result.atlasText },
+            { type: 'image', data: base64, mimeType: 'image/png' },
+          ],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
   server.tool(
     'export_spine_json',
     "Serialize the document to Spine JSON 4.2 (returns the JSON text plus validation issues). Defaults equal to Spine's are omitted, matching official exports.",

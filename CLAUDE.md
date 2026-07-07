@@ -7,11 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A web-based 2D skeletal animation editor (Spine-like UI) that exports the Spine JSON format
 (target version **4.2**), with an MCP server + skills so AI agents can rig and animate.
 The full roadmap, architecture rationale, and phase breakdown live in `PLAN.md` — read it before
-starting work on a new phase. Current status: **Phase 5 done** (MCP server with ~24 tools over a
-WebSocket bridge to the running editor — rig/animate/preview/screenshot/export — plus AI skills
-in `skills/`; `.mcp.json` wires it up for Claude Code). Phase 3 evaluator limitation still holds:
-constraints, slot colors and deform are stored/exported but not evaluated. Next: **Phase 4**
-(mesh/weights, IK evaluation, events, atlas packer), then Phase 6 polish.
+starting work on a new phase. Current status: **Phases 0-5 done** (Phase 4 partially: IK
+evaluation with 1/2-bone solver + IK timelines, libgdx atlas packer + Export Atlas + MCP
+`export_atlas`, mesh rendering incl. weighted skinning, events commands/tools, Import Spine JSON.
+Still open from Phase 4: mesh creation/editing UI, weight painting, deform timeline evaluation,
+transform/path/physics constraint evaluation, slot color evaluation). Next: remaining Phase 4
+items and Phase 6 polish (dockable panels, curve editor UI, deploy).
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

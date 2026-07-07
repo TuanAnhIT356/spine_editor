@@ -1,6 +1,8 @@
-import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
+import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
 import { useRef } from 'react';
+import { buildAtlas } from '../state/atlas.js';
 import {
+  downloadDataUrl,
   downloadText,
   loadImageAsset,
   readFileAsText,
@@ -22,6 +24,7 @@ export function Toolbar() {
   const doc = useEditor((s) => s.doc);
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
+  const spineJsonInput = useRef<HTMLInputElement | null>(null);
   void revision; // subscribe so undo/redo enabled state stays fresh
 
   async function onImportImages(files: FileList | null) {
@@ -69,6 +72,35 @@ export function Toolbar() {
     useEditor.getState().replaceProject(serializeSpineJson(createEmptySkeleton()), []);
   }
 
+  async function onExportAtlas() {
+    const state = useEditor.getState();
+    try {
+      const built = await buildAtlas(Object.values(state.assets), 'skeleton.png');
+      downloadText('skeleton.atlas', built.atlasText, 'text/plain');
+      downloadDataUrl('skeleton.png', built.pngDataUrl);
+    } catch (err) {
+      state.setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function onImportSpineJson(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const state = useEditor.getState();
+    try {
+      const json = JSON.parse(await readFileAsText(file)) as SpineJson;
+      if (!json.skeleton) throw new Error('Not a Spine JSON file (missing "skeleton").');
+      // Keep imported images so same-named attachments keep rendering.
+      const issues = state.replaceProject(json, Object.values(state.assets));
+      const errors = issues.filter((i) => i.severity === 'error');
+      if (errors.length > 0) {
+        state.setError(`Imported with errors: ${errors.map((e) => e.message).join(' | ')}`);
+      }
+    } catch (err) {
+      state.setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <div className="toolbar">
       <span className="brand">Spine Editor</span>
@@ -103,7 +135,16 @@ export function Toolbar() {
       </div>
       <div className="group">
         <button onClick={() => imagesInput.current?.click()}>Import Images</button>
+        <button onClick={() => spineJsonInput.current?.click()} title="Load a Spine JSON skeleton">
+          Import JSON
+        </button>
         <button onClick={onExportJson}>Export JSON</button>
+        <button
+          onClick={() => void onExportAtlas()}
+          title="Pack images into skeleton.atlas + skeleton.png"
+        >
+          Export Atlas
+        </button>
       </div>
       <div className="group">
         <button onClick={onNewProject}>New</button>
@@ -142,6 +183,16 @@ export function Toolbar() {
         hidden
         onChange={(e) => {
           void onOpenProject(e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={spineJsonInput}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(e) => {
+          void onImportSpineJson(e.target.files);
           e.target.value = '';
         }}
       />

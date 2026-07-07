@@ -31,9 +31,10 @@ points down), so child bones sit at `x = parent.length`.
 4. `set_draw_order` — index 0 draws furthest behind. Typical order: far limbs,
    torso, near limbs, head.
 5. `add_ik_constraint` for legs/arms you want to pose by target (1-2 bone chain
-   - a target bone parented to root). NOTE: the editor's evaluator does not
-     apply IK yet — the constraint exports correctly for runtimes, but the
-     viewport/preview ignores it, so pose limbs with direct rotations for now.
+   plus a target bone parented to root). IK IS evaluated in the viewport: a
+   2-bone chain bends so the lower bone's tip reaches the target
+   (bendPositive picks the side); move the target bone to pose the limb.
+   softness/compress/stretch are exported but not applied in previews.
 6. **Look at your work**: `screenshot_viewport` after each stage. If bones sit
    in the wrong place, fix with `set_bone_transform` and screenshot again.
 7. Finish with `validate_project` — the issues array must be empty.

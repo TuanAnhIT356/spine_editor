@@ -24,3 +24,5 @@ export * from './commands/animations.js';
 export * from './commands/composite.js';
 export * from './commands/structure.js';
 export * from './commands/constraints.js';
+export * from './commands/events.js';
+export * from './atlas.js';

@@ -98,7 +98,9 @@ spine_editor/
 - Timeline cho slot attachment (frame-by-frame switching) và draw order.
 - ✅ Nghiệm thu: tạo animation walk/idle hoàn chỉnh, xuất JSON chạy đúng trên runtime chuẩn.
 
-### Phase 4 — Tính năng nâng cao
+### Phase 4 — Tính năng nâng cao ✅ Hoàn thành (một phần, xem ghi chú)
+
+> Ghi chú thực hiện: **Đã xong** — IK evaluation (solver 1-bone + 2-bone với bendPositive/mix, IK timeline; xấp xỉ: bỏ qua softness/stretch/scale trên chuỗi), texture atlas packer (shelf packing, format libgdx `.atlas` + PNG, nút Export Atlas + tool MCP `export_atlas`), render mesh attachment (unweighted + weighted skinning) trong viewport, events (commands + MCP tools `set_event`/`set_event_keyframe`), Import Spine JSON từ toolbar. **Chưa làm** — UI tạo/sửa mesh và weight painting, deform timeline evaluation, path/physics/transform constraint evaluation.
 
 - Mesh attachment: tạo lưới, chỉnh vertex, **weights** (bind bone, paint weight).
 - IK constraints + timeline IK.

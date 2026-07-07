@@ -16,8 +16,10 @@ import {
   ReorderSlot,
   ReparentBone,
   SetBoneTransform,
+  SetEventDef,
   SetSlotProperties,
   UpsertBoneKeyframe,
+  UpsertEventKeyframe,
   UpsertSlotAttachmentKeyframe,
   createBone,
   createEmptySkeleton,
@@ -31,6 +33,7 @@ import {
   type SpineBoneTimelineName,
   type SpineJson,
 } from '@spine-editor/core';
+import { buildAtlas } from '../state/atlas.js';
 import { uniqueName, useEditor, type ImageAsset } from '../state/store.js';
 import { bridgeRuntime } from './runtime.js';
 
@@ -374,6 +377,36 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
     case 'export_spine_json': {
       const s = state();
       return { json: s.doc.toJsonString(2), issues: s.doc.validate() };
+    }
+
+    case 'export_atlas': {
+      const built = await buildAtlas(Object.values(state().assets), 'skeleton.png');
+      return { atlasText: built.atlasText, pngDataUrl: built.pngDataUrl, pngName: 'skeleton.png' };
+    }
+
+    case 'set_event': {
+      const def: Record<string, unknown> = {};
+      for (const key of ['int', 'float', 'volume', 'balance'] as const) {
+        const v = optNum(params, key);
+        if (v !== undefined) def[key] = v;
+      }
+      if (typeof params['string'] === 'string') def['string'] = params['string'];
+      if (typeof params['audio'] === 'string') def['audio'] = params['audio'];
+      executeOrThrow(new SetEventDef(str(params, 'name'), def));
+      return { ok: true };
+    }
+
+    case 'set_event_keyframe': {
+      const key: Record<string, unknown> = { name: str(params, 'name') };
+      const time = optNum(params, 'time');
+      if (time !== undefined && time > 0) key['time'] = time;
+      for (const k of ['int', 'float', 'volume', 'balance'] as const) {
+        const v = optNum(params, k);
+        if (v !== undefined) key[k] = v;
+      }
+      if (typeof params['string'] === 'string') key['string'] = params['string'];
+      executeOrThrow(new UpsertEventKeyframe(str(params, 'animation'), key as { name: string }));
+      return { ok: true };
     }
 
     case 'validate':

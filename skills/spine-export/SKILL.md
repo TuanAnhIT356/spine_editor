@@ -16,12 +16,12 @@ description: Validate and export a Spine project to Spine JSON 4.2 via MCP tools
 ## Compatibility checklist
 
 - `skeleton.spine` is "4.2.x" — official runtimes check the major.minor.
-- Texture atlas export (`.atlas` + packed PNG) is NOT implemented yet
-  (Phase 4): runtimes need either an atlas whose region names match the
-  attachment names, or a loader configured for loose images. Say so when
-  delivering the export.
-- Images live in the editor project (IndexedDB / project file), not in the
-  Spine JSON — deliver source images alongside if the user needs them.
+- Call `export_atlas` for the texture atlas: it returns the libgdx `.atlas`
+  text (deliver as `skeleton.atlas`) and the packed `skeleton.png`. Region
+  names equal attachment names, so runtimes load the trio (json + atlas + png)
+  directly. Requires the images to be imported in the editor session.
+- Images also live in the editor project (IndexedDB / project file) — deliver
+  source images if the user wants to re-edit later.
 - Loading exported files in Spine Runtimes requires the user to hold a Spine
   license (their responsibility, not the editor's).
 

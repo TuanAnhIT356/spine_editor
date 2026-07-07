@@ -52,6 +52,13 @@ export function downloadText(filename: string, text: string, type = 'application
   URL.revokeObjectURL(url);
 }
 
+export function downloadDataUrl(filename: string, dataUrl: string): void {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
+}
+
 export function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

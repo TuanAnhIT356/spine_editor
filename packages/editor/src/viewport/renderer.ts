@@ -11,9 +11,19 @@ import {
   type BoneData,
   type Mat2D,
   type SkeletonData,
+  type SpineMeshAttachment,
   type SpineRegionAttachment,
 } from '@spine-editor/core';
-import { Application, Container, Graphics, Matrix, Rectangle, Sprite, Texture } from 'pixi.js';
+import {
+  Application,
+  Container,
+  Graphics,
+  Matrix,
+  MeshSimple,
+  Rectangle,
+  Sprite,
+  Texture,
+} from 'pixi.js';
 import type { ImageAsset, Selection } from '../state/store.js';
 
 export interface RenderInput {
@@ -32,6 +42,50 @@ const FLIP_Y: Mat2D = { a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 0 };
 function toPixiMatrix(m: Mat2D): Matrix {
   // Our convention: x' = a*x + b*y; Pixi's Matrix(a, b, c, d) uses x' = a*x + c*y.
   return new Matrix(m.a, m.c, m.b, m.d, m.tx, m.ty);
+}
+
+/**
+ * World-space positions for a mesh attachment's vertices. Unweighted meshes
+ * store x,y pairs in the slot bone's space; weighted meshes store
+ * [boneCount, (boneIndex, x, y, weight)…] per vertex with indices into the
+ * bones array.
+ */
+function meshWorldPositions(
+  att: SpineMeshAttachment,
+  boneWorld: Mat2D,
+  bones: BoneData[],
+  pose: Map<string, Mat2D>,
+): Float32Array {
+  const out = new Float32Array(att.uvs.length);
+  const v = att.vertices;
+  if (v.length === att.uvs.length) {
+    for (let i = 0; i < v.length; i += 2) {
+      const p = applyMat(boneWorld, v[i] ?? 0, v[i + 1] ?? 0);
+      out[i] = p.x;
+      out[i + 1] = p.y;
+    }
+    return out;
+  }
+  let vi = 0;
+  for (let oi = 0; oi < out.length; oi += 2) {
+    const count = v[vi++] ?? 0;
+    let x = 0;
+    let y = 0;
+    for (let b = 0; b < count; b++) {
+      const boneIdx = v[vi++] ?? 0;
+      const bx = v[vi++] ?? 0;
+      const by = v[vi++] ?? 0;
+      const w = v[vi++] ?? 0;
+      const m = pose.get(bones[boneIdx]?.name ?? '');
+      if (!m) continue;
+      const p = applyMat(m, bx, by);
+      x += p.x * w;
+      y += p.y * w;
+    }
+    out[oi] = x;
+    out[oi + 1] = y;
+  }
+  return out;
 }
 
 /** Finds an attachment for a slot, preferring the "default" skin. */
@@ -53,6 +107,7 @@ export class SceneRenderer {
   private spriteLayer = new Container();
   private boneLayer = new Graphics();
   private sprites = new Map<string, Sprite>();
+  private meshes = new Map<string, MeshSimple>();
   private textures = new Map<string, Texture>();
   private lastPose = new Map<string, Mat2D>();
   private disposed = false;
@@ -177,11 +232,36 @@ export class SceneRenderer {
         : slot.attachment;
       if (!attachmentName) continue;
       const att = resolveAttachment(data, slot.name, attachmentName);
-      if (!att || (att.type !== undefined && att.type !== 'region')) continue;
-      const region = att as SpineRegionAttachment;
+      if (!att) continue;
       const boneWorld = pose.get(slot.bone);
+      if (!boneWorld) continue;
+
+      if (att.type === 'mesh') {
+        const asset = input.assets[att.path ?? attachmentName];
+        const texture = asset ? this.textures.get(asset.name) : undefined;
+        if (!texture) continue;
+        const positions = meshWorldPositions(att, boneWorld, data.bones, pose);
+        let mesh = this.meshes.get(slot.name);
+        if (!mesh || mesh.texture !== texture || mesh.vertices.length !== positions.length) {
+          mesh?.destroy();
+          mesh = new MeshSimple({
+            texture,
+            vertices: positions,
+            uvs: new Float32Array(att.uvs),
+            indices: new Uint32Array(att.triangles),
+          });
+          this.meshes.set(slot.name, mesh);
+        } else {
+          mesh.vertices = positions;
+        }
+        this.spriteLayer.addChild(mesh);
+        continue;
+      }
+
+      if (att.type !== undefined && att.type !== 'region') continue;
+      const region = att as SpineRegionAttachment;
       const asset = input.assets[region.path ?? attachmentName];
-      if (!boneWorld || !asset) continue;
+      if (!asset) continue;
       const texture = this.textures.get(asset.name);
       if (!texture) continue;
 

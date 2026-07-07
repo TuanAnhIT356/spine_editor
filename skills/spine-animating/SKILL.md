@@ -49,7 +49,10 @@ and existing animations.
 
 - Keying the same bone/timeline/time again REPLACES that key (including its
   curve) — re-pass `curve` when updating a key.
-- The evaluator applies bone timelines and slot attachment timelines only; IK,
-  slot colors, deform and draw-order timelines are stored/exported but not yet
-  shown in previews.
+- The evaluator applies bone timelines, slot attachment timelines, and IK
+  (constraint solve + timeline mix/bendPositive). Animate a limb by keying
+  translate on its IK TARGET bone. Slot colors, deform and draw-order
+  timelines are stored/exported but not yet shown in previews.
+- Events: `set_event` to define, `set_event_keyframe` to fire at a time —
+  they export correctly; previews don't visualize them.
 - Undo works per keyframe; `delete_bone_keyframe` needs the exact key time.
