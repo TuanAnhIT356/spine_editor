@@ -53,23 +53,30 @@ await page.click('.timeline-header button:has-text("New")');
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/01-animate-mode.png` });
 
+// The timeline panel takes vertical space once Animate mode is active, so the
+// viewport (and the bone's screen position within it, anchored to the panel's
+// top-left) is shorter than it was in setup mode — re-measure before clicking
+// inside it, and keep the grab point comfortably within the shrunk bounds.
+const vpAnimate = await page.locator('.viewport').boundingBox();
+const originY = Math.min(cy, vpAnimate.y + vpAnimate.height - 20);
+
 // --- Key 1 at t=0: rotate the bone with the Rotate tool (auto-key)
 await page.click('button:has-text("Rotate")');
-const tip = { x: cx + 20, y: cy - 150 };
+const tip = { x: cx + 20, y: originY - 150 };
 await page.mouse.move(tip.x, tip.y - 10);
-// grab near the bone (hitTest picks the origin at cx,cy — click the bone origin)
-await page.mouse.move(cx + 2, cy - 2);
+// grab near the bone (hitTest picks the origin at cx,originY — click the bone origin)
+await page.mouse.move(cx + 2, originY - 2);
 await page.mouse.down();
-await page.mouse.move(cx + 120, cy - 60, { steps: 8 });
+await page.mouse.move(cx + 120, originY - 60, { steps: 8 });
 await page.mouse.up();
 await page.waitForTimeout(200);
 
 // --- Scrub to 0.5s by clicking the ruler, then key 2
 await page.locator('.ruler').click({ position: { x: 0.5 * 200, y: 10 } });
 await page.waitForTimeout(200);
-await page.mouse.move(cx + 2, cy - 2);
+await page.mouse.move(cx + 2, originY - 2);
 await page.mouse.down();
-await page.mouse.move(cx - 120, cy - 60, { steps: 8 });
+await page.mouse.move(cx - 120, originY - 60, { steps: 8 });
 await page.mouse.up();
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/02-two-keys.png` });

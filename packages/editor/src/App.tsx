@@ -1,29 +1,40 @@
 import { RemoveBone } from '@spine-editor/core';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { HierarchyPanel } from './components/HierarchyPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
+import { Resizer } from './components/Resizer.js';
+import { ShortcutsHelp } from './components/ShortcutsHelp.js';
 import { TimelinePanel } from './components/TimelinePanel.js';
 import { Toolbar } from './components/Toolbar.js';
 import { Viewport } from './components/Viewport.js';
+import { saveProjectFile } from './state/actions.js';
 import { loadAutosave, saveAutosave } from './state/persistence.js';
 import { useEditor } from './state/store.js';
 
 export function App() {
   const error = useEditor((s) => s.error);
   const mode = useEditor((s) => s.mode);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
       const s = useEditor.getState();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) s.redo();
         else s.undo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         s.redo();
+      } else if (mod && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveProjectFile();
+      } else if (mod && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        s.selectAllBones();
       } else if (e.key === '1') s.setTool('select');
       else if (e.key === '2') s.setTool('translate');
       else if (e.key === '3') s.setTool('rotate');
@@ -31,12 +42,23 @@ export function App() {
       else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
         e.preventDefault();
         s.setPlaying(!s.anim.playing);
-      } else if (e.key === 'Delete' && s.selection) {
-        if (s.selection.kind === 'bone') {
-          if (s.execute(new RemoveBone(s.selection.name))) s.select(null);
-        } else {
-          s.removeSlotCascade(s.selection.name);
-        }
+      } else if (e.key === 'Escape') {
+        s.select(null);
+      } else if (e.key === '?') {
+        setShowShortcuts((v) => !v);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selection.length > 0) {
+        e.preventDefault();
+        // Bones must be removed deepest-first (children before parents) so RemoveBone's
+        // "has children" guard doesn't reject a parent that's also being deleted.
+        const boneOrder = new Map(s.doc.data.bones.map((b, i) => [b.name, i]));
+        const bones = s.selection
+          .filter((sel) => sel.kind === 'bone')
+          .map((sel) => sel.name)
+          .sort((a, b) => (boneOrder.get(b) ?? 0) - (boneOrder.get(a) ?? 0));
+        const slots = s.selection.filter((sel) => sel.kind === 'slot').map((sel) => sel.name);
+        for (const slot of slots) s.removeSlotCascade(slot);
+        for (const bone of bones) s.execute(new RemoveBone(bone));
+        s.select(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -72,10 +94,25 @@ export function App() {
       <Toolbar />
       <div className="main">
         <HierarchyPanel />
+        <Resizer axis="x" onResize={(d) => useEditor.getState().resizeHierarchy(d)} />
         <Viewport />
+        <Resizer axis="x" onResize={(d) => useEditor.getState().resizeProperties(d)} />
         <PropertiesPanel />
       </div>
-      {mode === 'animate' && <TimelinePanel />}
+      {mode === 'animate' && (
+        <>
+          <Resizer axis="y" onResize={(d) => useEditor.getState().resizeTimeline(d)} />
+          <TimelinePanel />
+        </>
+      )}
+      {showShortcuts && <ShortcutsHelp onClose={() => setShowShortcuts(false)} />}
+      <button
+        className="shortcuts-toggle"
+        title="Keyboard shortcuts (?)"
+        onClick={() => setShowShortcuts((v) => !v)}
+      >
+        ?
+      </button>
       {error && (
         <div className="error-banner" onClick={() => useEditor.getState().setError(null)}>
           {error} <span className="dismiss">(click to dismiss)</span>

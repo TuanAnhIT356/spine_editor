@@ -38,7 +38,7 @@ import {
   type SpineJson,
 } from '@spine-editor/core';
 import { buildAtlas } from '../state/atlas.js';
-import { uniqueName, useEditor, type ImageAsset } from '../state/store.js';
+import { primarySelection, uniqueName, useEditor, type ImageAsset } from '../state/store.js';
 import { bridgeRuntime } from './runtime.js';
 
 type Params = Record<string, unknown>;
@@ -227,8 +227,8 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       s.attachAsset(assetName, str(params, 'bone'));
       const err = useEditor.getState().error;
       if (err) throw new Error(err);
-      const selection = useEditor.getState().selection;
-      return { slot: selection?.kind === 'slot' ? selection.name : null };
+      const primary = primarySelection(useEditor.getState().selection);
+      return { slot: primary?.kind === 'slot' ? primary.name : null };
     }
 
     case 'add_slot': {

@@ -7,7 +7,7 @@ import {
   type SpineBlendMode,
 } from '@spine-editor/core';
 import { useEffect, useState } from 'react';
-import { useEditor } from '../state/store.js';
+import { primarySelection, useEditor } from '../state/store.js';
 
 function NumField({
   label,
@@ -165,11 +165,17 @@ function SlotProperties({ name }: { name: string }) {
 
 export function PropertiesPanel() {
   const selection = useEditor((s) => s.selection);
+  const layout = useEditor((s) => s.layout);
+  const primary = primarySelection(selection);
+  const extraCount = selection.length > 1 ? selection.length - 1 : 0;
   return (
-    <div className="panel properties">
-      {!selection && <div className="empty">Select a bone or slot to edit its properties.</div>}
-      {selection?.kind === 'bone' && <BoneProperties name={selection.name} />}
-      {selection?.kind === 'slot' && <SlotProperties name={selection.name} />}
+    <div className="panel properties" style={{ width: layout.propertiesWidth }}>
+      {!primary && <div className="empty">Select a bone or slot to edit its properties.</div>}
+      {extraCount > 0 && (
+        <div className="selection-count">+{extraCount} more selected</div>
+      )}
+      {primary?.kind === 'bone' && <BoneProperties name={primary.name} />}
+      {primary?.kind === 'slot' && <SlotProperties name={primary.name} />}
     </div>
   );
 }
