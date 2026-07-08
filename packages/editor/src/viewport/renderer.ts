@@ -179,6 +179,10 @@ export class SceneRenderer {
     return { x: (sx - this.offsetX) / this.zoom, y: (this.offsetY - sy) / this.zoom };
   }
 
+  worldToScreen(wx: number, wy: number): { x: number; y: number } {
+    return { x: wx * this.zoom + this.offsetX, y: this.offsetY - wy * this.zoom };
+  }
+
   getBoneWorld(name: string): Mat2D | undefined {
     return this.lastPose.get(name);
   }
@@ -309,8 +313,8 @@ export class SceneRenderer {
       };
       sprite.setFromMatrix(toPixiMatrix(mulMat(mulMat(boneWorld, local), FLIP_Y)));
       sprite.tint = tint;
-      sprite.alpha =
-        alpha * (input.selection?.kind === 'slot' && input.selection.name === slot.name ? 1 : 0.95);
+      const slotIsSelected = input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
+      sprite.alpha = alpha * (slotIsSelected ? 1 : 0.9);
       this.spriteLayer.addChild(sprite);
     }
 
@@ -323,8 +327,8 @@ export class SceneRenderer {
     for (const bone of bones) {
       const m = pose.get(bone.name);
       if (!m) continue;
-      const selected = selection?.kind === 'bone' && selection.name === bone.name;
-      const color = selected ? 0xffa640 : 0x7fb2e5;
+      const selected = selection.some((s) => s.kind === 'bone' && s.name === bone.name);
+      const color = selected ? 0xffcc33 : 0x7fb2e5;
       const ox = m.tx;
       const oy = m.ty;
       if (bone.length > 0) {
@@ -337,10 +341,19 @@ export class SceneRenderer {
         const ny = (dx / len) * w;
         g.poly([ox + nx, oy + ny, tip.x, tip.y, ox - nx, oy - ny]).fill({
           color,
-          alpha: selected ? 0.95 : 0.6,
+          alpha: selected ? 1 : 0.6,
         });
       }
-      g.circle(ox, oy, (bone.parent === null ? 7 : 5) / this.zoom).fill({ color, alpha: 0.95 });
+      const radius = (bone.parent === null ? 7 : 5) / this.zoom;
+      if (selected) {
+        // Bright outer ring makes the selection pop even at low zoom.
+        g.circle(ox, oy, radius + 3 / this.zoom).stroke({
+          width: 2 / this.zoom,
+          color: 0xfff2c9,
+          alpha: 0.95,
+        });
+      }
+      g.circle(ox, oy, radius).fill({ color, alpha: 0.95 });
     }
   }
 }

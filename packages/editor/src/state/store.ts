@@ -21,7 +21,17 @@ export interface ImageAsset {
 }
 
 export type Tool = 'select' | 'translate' | 'rotate' | 'create';
-export type Selection = { kind: 'bone' | 'slot'; name: string } | null;
+export type SelectionItem = { kind: 'bone' | 'slot'; name: string };
+/** Zero or more selected items; the last entry is the "primary" one shown in the properties panel. */
+export type Selection = SelectionItem[];
+
+export function isSelected(selection: Selection, kind: SelectionItem['kind'], name: string): boolean {
+  return selection.some((s) => s.kind === kind && s.name === name);
+}
+
+export function primarySelection(selection: Selection): SelectionItem | null {
+  return selection.length > 0 ? (selection[selection.length - 1] ?? null) : null;
+}
 
 export interface AnimationUiState {
   /** Currently edited animation, or null when none is selected. */
@@ -31,6 +41,50 @@ export interface AnimationUiState {
   loop: boolean;
 }
 
+export interface LayoutState {
+  hierarchyWidth: number;
+  propertiesWidth: number;
+  timelineHeight: number;
+}
+
+const LAYOUT_STORAGE_KEY = 'spine-editor:layout';
+const DEFAULT_LAYOUT: LayoutState = { hierarchyWidth: 250, propertiesWidth: 250, timelineHeight: 190 };
+const LAYOUT_LIMITS = {
+  hierarchyWidth: [160, 520] as const,
+  propertiesWidth: [200, 520] as const,
+  timelineHeight: [120, 640] as const,
+};
+
+function clamp(v: number, [min, max]: readonly [number, number]): number {
+  return Math.min(max, Math.max(min, v));
+}
+
+function loadLayout(): LayoutState {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return DEFAULT_LAYOUT;
+    const parsed = JSON.parse(raw) as Partial<LayoutState>;
+    return {
+      hierarchyWidth: clamp(parsed.hierarchyWidth ?? DEFAULT_LAYOUT.hierarchyWidth, LAYOUT_LIMITS.hierarchyWidth),
+      propertiesWidth: clamp(
+        parsed.propertiesWidth ?? DEFAULT_LAYOUT.propertiesWidth,
+        LAYOUT_LIMITS.propertiesWidth,
+      ),
+      timelineHeight: clamp(parsed.timelineHeight ?? DEFAULT_LAYOUT.timelineHeight, LAYOUT_LIMITS.timelineHeight),
+    };
+  } catch {
+    return DEFAULT_LAYOUT;
+  }
+}
+
+function saveLayout(layout: LayoutState): void {
+  try {
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+  } catch {
+    // Storage may be unavailable (private browsing); layout just won't persist.
+  }
+}
+
 interface EditorState {
   doc: SpineDocument;
   /** Bumped after every document mutation so React re-renders. */
@@ -38,13 +92,20 @@ interface EditorState {
   tool: Tool;
   mode: 'setup' | 'animate';
   selection: Selection;
+  layout: LayoutState;
   assets: Record<string, ImageAsset>;
   error: string | null;
   anim: AnimationUiState;
 
   setTool(tool: Tool): void;
   setMode(mode: 'setup' | 'animate'): void;
-  select(selection: Selection): void;
+  select(item: SelectionItem | null): void;
+  toggleSelection(item: SelectionItem): void;
+  addToSelection(item: SelectionItem): void;
+  selectAllBones(): void;
+  resizeHierarchy(deltaPx: number): void;
+  resizeProperties(deltaPx: number): void;
+  resizeTimeline(deltaPx: number): void;
   setError(message: string | null): void;
   setAnimation(name: string | null): void;
   setAnimTime(time: number): void;
@@ -72,7 +133,8 @@ export const useEditor = create<EditorState>()((set, get) => ({
   revision: 0,
   tool: 'select',
   mode: 'setup',
-  selection: null,
+  selection: [],
+  layout: loadLayout(),
   assets: {},
   error: null,
   anim: { current: null, time: 0, playing: false, loop: true },
@@ -86,7 +148,53 @@ export const useEditor = create<EditorState>()((set, get) => ({
         mode === 'animate' && s.anim.current === null ? (names[0] ?? null) : s.anim.current;
       return { mode, anim: { ...s.anim, current, playing: false } };
     }),
-  select: (selection) => set({ selection }),
+  select: (item) => set({ selection: item ? [item] : [] }),
+  toggleSelection: (item) =>
+    set((s) => {
+      const exists = s.selection.some((sel) => sel.kind === item.kind && sel.name === item.name);
+      return {
+        selection: exists
+          ? s.selection.filter((sel) => !(sel.kind === item.kind && sel.name === item.name))
+          : [...s.selection, item],
+      };
+    }),
+  addToSelection: (item) =>
+    set((s) =>
+      s.selection.some((sel) => sel.kind === item.kind && sel.name === item.name)
+        ? s
+        : { selection: [...s.selection, item] },
+    ),
+  selectAllBones: () =>
+    set((s) => ({
+      selection: s.doc.data.bones.map((b) => ({ kind: 'bone' as const, name: b.name })),
+    })),
+  resizeHierarchy: (deltaPx) =>
+    set((s) => {
+      const layout = {
+        ...s.layout,
+        hierarchyWidth: clamp(s.layout.hierarchyWidth + deltaPx, LAYOUT_LIMITS.hierarchyWidth),
+      };
+      saveLayout(layout);
+      return { layout };
+    }),
+  resizeProperties: (deltaPx) =>
+    set((s) => {
+      const layout = {
+        ...s.layout,
+        propertiesWidth: clamp(s.layout.propertiesWidth - deltaPx, LAYOUT_LIMITS.propertiesWidth),
+      };
+      saveLayout(layout);
+      return { layout };
+    }),
+  resizeTimeline: (deltaPx) =>
+    set((s) => {
+      const layout = {
+        ...s.layout,
+        timelineHeight: clamp(s.layout.timelineHeight - deltaPx, LAYOUT_LIMITS.timelineHeight),
+      };
+      saveLayout(layout);
+      return { layout };
+    }),
   setError: (error) => set({ error }),
   setAnimation: (name) =>
     set((s) => ({ anim: { ...s.anim, current: name, time: 0, playing: false } })),
@@ -143,7 +251,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
         }),
       ]),
     );
-    if (ok) set({ selection: { kind: 'slot', name: slotName } });
+    if (ok) set({ selection: [{ kind: 'slot', name: slotName }] });
   },
 
   removeSlotCascade: (slotName) => {
@@ -155,7 +263,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
       }
     }
     commands.push(new RemoveSlot(slotName));
-    if (execute(new Composite(`Remove slot "${slotName}"`, commands))) set({ selection: null });
+    if (execute(new Composite(`Remove slot "${slotName}"`, commands))) {
+      set((s) => ({ selection: s.selection.filter((sel) => sel.name !== slotName) }));
+    }
   },
 
   replaceProject: (json, assets) => {
@@ -163,7 +273,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set((s) => ({
       doc: new SpineDocument(data),
       assets: Object.fromEntries(assets.map((a) => [a.name, a])),
-      selection: null,
+      selection: [],
       error: null,
       revision: s.revision + 1,
       anim: { current: null, time: 0, playing: false, loop: true },

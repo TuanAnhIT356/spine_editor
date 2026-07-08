@@ -1,6 +1,7 @@
 import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
 import { useRef } from 'react';
 import { buildAtlas } from '../state/atlas.js';
+import { saveProjectFile } from '../state/actions.js';
 import {
   downloadDataUrl,
   downloadText,
@@ -41,17 +42,6 @@ export function Toolbar() {
       return;
     }
     downloadText('skeleton.json', state.doc.toJsonString(2));
-  }
-
-  function onSaveProject() {
-    const state = useEditor.getState();
-    const payload: ProjectPayload = {
-      format: 'spine-editor-project',
-      version: 1,
-      spine: state.doc.toJson(),
-      assets: Object.values(state.assets),
-    };
-    downloadText('project.spine-editor.json', JSON.stringify(payload));
   }
 
   async function onOpenProject(files: FileList | null) {
@@ -148,7 +138,9 @@ export function Toolbar() {
       </div>
       <div className="group">
         <button onClick={onNewProject}>New</button>
-        <button onClick={onSaveProject}>Save Project</button>
+        <button onClick={saveProjectFile} title="Ctrl+S">
+          Save Project
+        </button>
         <button onClick={() => projectInput.current?.click()}>Open Project</button>
       </div>
       <div className="group modes">

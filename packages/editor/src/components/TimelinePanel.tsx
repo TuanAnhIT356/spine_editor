@@ -11,7 +11,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { uniqueName, useEditor } from '../state/store.js';
 
-const PPS = 200; // pixels per second
+const DEFAULT_PPS = 200; // pixels per second
+const MIN_PPS = 40;
+const MAX_PPS = 1200;
 const SNAP = 0.01;
 /** Left inset so the t=0 key is fully visible and clickable. */
 const PAD = 12;
@@ -37,14 +39,27 @@ interface KeyRef {
 
 const snap = (t: number) => Math.max(0, Math.round(t / SNAP) * SNAP);
 
+const TICK_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60];
+
+/** Ruler tick times, spaced so ticks stay ~60px apart regardless of zoom. */
+function tickTimes(span: number, pps: number): number[] {
+  const targetPx = 60;
+  const rawInterval = targetPx / pps;
+  const interval = TICK_STEPS.find((s) => s >= rawInterval) ?? TICK_STEPS[TICK_STEPS.length - 1]!;
+  const count = Math.floor(span / interval) + 1;
+  return Array.from({ length: count }, (_, i) => Math.round(i * interval * 100) / 100);
+}
+
 export function TimelinePanel() {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const anim = useEditor((s) => s.anim);
+  const layout = useEditor((s) => s.layout);
   void revision;
 
   const [selectedKey, setSelectedKey] = useState<KeyRef | null>(null);
   const [dragKey, setDragKey] = useState<(KeyRef & { toTime: number }) | null>(null);
+  const [pps, setPps] = useState(DEFAULT_PPS);
   const tracksRef = useRef<HTMLDivElement | null>(null);
   const scrubbing = useRef(false);
 
@@ -52,6 +67,35 @@ export function TimelinePanel() {
   const duration = animation ? getAnimationDuration(animation) : 0;
   const span = Math.max(duration, 1) + 0.5;
   const names = Object.keys(doc.data.animations);
+
+  /** Zooms the timeline, keeping the time under `anchorClientX` fixed on screen. */
+  function zoomBy(factor: number, anchorClientX?: number) {
+    const el = tracksRef.current;
+    setPps((prev) => {
+      const next = Math.min(MAX_PPS, Math.max(MIN_PPS, prev * factor));
+      if (el && anchorClientX !== undefined) {
+        const rect = el.getBoundingClientRect();
+        const anchorTime = (anchorClientX - rect.left + el.scrollLeft - PAD) / prev;
+        requestAnimationFrame(() => {
+          el.scrollLeft = anchorTime * next + PAD - (anchorClientX - rect.left);
+        });
+      }
+      return next;
+    });
+  }
+
+  // Ctrl/Cmd + scroll over the timeline zooms in/out instead of scrolling.
+  useEffect(() => {
+    const el = tracksRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [anim.current]);
 
   // Playback ticker.
   useEffect(() => {
@@ -84,7 +128,7 @@ export function TimelinePanel() {
     const el = tracksRef.current;
     if (!el) return 0;
     const rect = el.getBoundingClientRect();
-    return snap((e.clientX - rect.left + el.scrollLeft - PAD) / PPS);
+    return snap((e.clientX - rect.left + el.scrollLeft - PAD) / pps);
   }
 
   function onScrub(e: React.PointerEvent) {
@@ -188,7 +232,7 @@ export function TimelinePanel() {
       : undefined;
 
   return (
-    <div className="timeline">
+    <div className="timeline" style={{ height: layout.timelineHeight }}>
       <div className="timeline-header">
         <select
           value={anim.current ?? ''}
@@ -222,6 +266,16 @@ export function TimelinePanel() {
         <span className="time-display">
           {anim.time.toFixed(2)}s / {duration.toFixed(2)}s
         </span>
+        <span className="sep" />
+        <button onClick={() => zoomBy(1 / 1.2)} title="Zoom out (Ctrl/Cmd+Scroll)">
+          −
+        </button>
+        <button onClick={() => setPps(DEFAULT_PPS)} title="Reset zoom">
+          {Math.round((pps / DEFAULT_PPS) * 100)}%
+        </button>
+        <button onClick={() => zoomBy(1.2)} title="Zoom in (Ctrl/Cmd+Scroll)">
+          +
+        </button>
         {copiedKey && (
           <button
             onClick={pasteKeyAtPlayhead}
@@ -288,7 +342,7 @@ export function TimelinePanel() {
 
       {anim.current && (
         <div className="timeline-body" ref={tracksRef}>
-          <div className="tracks" style={{ width: span * PPS + 40 + PAD }}>
+          <div className="tracks" style={{ width: span * pps + 40 + PAD }}>
             <div
               className="ruler"
               onPointerDown={(e) => {
@@ -299,9 +353,9 @@ export function TimelinePanel() {
               onPointerMove={(e) => scrubbing.current && onScrub(e)}
               onPointerUp={() => (scrubbing.current = false)}
             >
-              {Array.from({ length: Math.floor(span * 2) + 1 }, (_, i) => i * 0.5).map((t) => (
-                <span key={t} className="tick" style={{ left: PAD + t * PPS }}>
-                  {t.toFixed(1)}
+              {tickTimes(span, pps).map((t) => (
+                <span key={t} className="tick" style={{ left: PAD + t * pps }}>
+                  {t.toFixed(2)}
                 </span>
               ))}
             </div>
@@ -321,7 +375,7 @@ export function TimelinePanel() {
                       dragKey.bone === boneName &&
                       dragKey.timeline === tl &&
                       Math.abs(dragKey.time - t) < 1e-6;
-                    const x = PAD + (isDragging ? dragKey.toTime : t) * PPS;
+                    const x = PAD + (isDragging ? dragKey.toTime : t) * pps;
                     return (
                       <span
                         key={t}
@@ -364,7 +418,7 @@ export function TimelinePanel() {
                 No keys yet — pose a bone with Translate/Rotate to auto-key at the playhead.
               </div>
             )}
-            <div className="playhead" style={{ left: PAD + anim.time * PPS }} />
+            <div className="playhead" style={{ left: PAD + anim.time * pps }} />
           </div>
         </div>
       )}

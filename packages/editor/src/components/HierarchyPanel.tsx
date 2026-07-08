@@ -1,10 +1,16 @@
 import { ReorderSlot, ReparentBone } from '@spine-editor/core';
-import { useEditor } from '../state/store.js';
+import { isSelected, primarySelection, useEditor, type SelectionItem } from '../state/store.js';
+
+function clickSelect(e: React.MouseEvent, item: SelectionItem) {
+  if (e.shiftKey || e.ctrlKey || e.metaKey) useEditor.getState().toggleSelection(item);
+  else useEditor.getState().select(item);
+}
 
 export function HierarchyPanel() {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
+  const layout = useEditor((s) => s.layout);
   const assets = useEditor((s) => s.assets);
   void revision;
 
@@ -14,7 +20,7 @@ export function HierarchyPanel() {
   const roots = bones.filter((b) => b.parent === null);
 
   function BoneRow({ name, depth }: { name: string; depth: number }) {
-    const selected = selection?.kind === 'bone' && selection.name === name;
+    const selected = isSelected(selection, 'bone', name);
     const boneSlots = slots
       .map((s, index) => ({ slot: s, index }))
       .filter(({ slot }) => slot.bone === name);
@@ -24,7 +30,7 @@ export function HierarchyPanel() {
           className={`row bone ${selected ? 'selected' : ''}`}
           style={{ paddingLeft: 8 + depth * 14 }}
           draggable={name !== 'root'}
-          onClick={() => useEditor.getState().select({ kind: 'bone', name })}
+          onClick={(e) => clickSelect(e, { kind: 'bone', name })}
           onDragStart={(e) => e.dataTransfer.setData('text/bone', name)}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -38,13 +44,13 @@ export function HierarchyPanel() {
           <span className="icon">◆</span> {name}
         </div>
         {boneSlots.map(({ slot, index }) => {
-          const slotSelected = selection?.kind === 'slot' && selection.name === slot.name;
+          const slotSelected = isSelected(selection, 'slot', slot.name);
           return (
             <div
               key={slot.name}
               className={`row slot ${slotSelected ? 'selected' : ''}`}
               style={{ paddingLeft: 22 + depth * 14 }}
-              onClick={() => useEditor.getState().select({ kind: 'slot', name: slot.name })}
+              onClick={(e) => clickSelect(e, { kind: 'slot', name: slot.name })}
             >
               <span className="icon">▣</span> {slot.name}
               {slotSelected && (
@@ -81,11 +87,16 @@ export function HierarchyPanel() {
     );
   }
 
-  const selectedBone = selection?.kind === 'bone' ? selection.name : null;
+  const primary = primarySelection(selection);
+  const selectedBone = primary?.kind === 'bone' ? primary.name : null;
+  const extraCount = selection.length > 1 ? selection.length - 1 : 0;
 
   return (
-    <div className="panel hierarchy">
-      <div className="panel-title">Hierarchy</div>
+    <div className="panel hierarchy" style={{ width: layout.hierarchyWidth }}>
+      <div className="panel-title">
+        Hierarchy
+        {extraCount > 0 && <span className="selection-count"> · {selection.length} selected</span>}
+      </div>
       <div className="tree">
         {roots.map((b) => (
           <BoneRow key={b.name} name={b.name} depth={0} />
