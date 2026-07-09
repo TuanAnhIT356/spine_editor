@@ -7,11 +7,12 @@
 import {
   applyMat,
   boneWeightPerVertex,
-  computeSetupPose,
+  computePose,
   computeVertexWorldPositions,
   mulMat,
   type BoneData,
   type Mat2D,
+  type PathPoseValue,
   type SkeletonData,
   type SpineAttachment,
   type SpineMeshAttachment,
@@ -43,6 +44,8 @@ export interface RenderInput {
   slotOrder?: string[];
   /** Onion-skin bone poses drawn faintly under the scene (animate mode). */
   ghosts?: { bones: BoneData[]; color: number }[];
+  /** Path-constraint timeline values at the playhead (animate mode). */
+  pathOverrides?: ReadonlyMap<string, PathPoseValue>;
   /** Attachment being vertex-edited: draws handles (and a weight heatmap). */
   editTarget?: {
     slot: string;
@@ -280,7 +283,7 @@ export class SceneRenderer {
   async render(input: RenderInput): Promise<void> {
     if (!this.ready) return;
     const data = input.bonesOverride ? { ...input.data, bones: input.bonesOverride } : input.data;
-    const pose = computeSetupPose(data);
+    const pose = computePose(data, undefined, undefined, input.pathOverrides);
     this.lastPose = pose;
 
     await Promise.all(Object.values(input.assets).map((a) => this.ensureTexture(a)));
@@ -450,6 +453,17 @@ export class SceneRenderer {
             .stroke({ width: 1.5 / this.zoom, color: 0xcc66cc, alpha: 0.9 });
           continue;
         }
+        if (att.type === 'path') {
+          const verts = computeVertexWorldPositions(
+            att.vertices,
+            att.vertexCount,
+            boneWorld,
+            data.bones,
+            pose,
+          );
+          this.drawPathSpline(verts, att.closed ?? false, isActive);
+          continue;
+        }
         if (att.type !== 'boundingbox' && att.type !== 'clipping') continue;
         const verts = computeVertexWorldPositions(
           att.vertices,
@@ -515,7 +529,7 @@ export class SceneRenderer {
     g.clear();
     if (!ghosts?.length) return;
     for (const ghost of ghosts) {
-      const pose = computeSetupPose({ ...data, bones: ghost.bones });
+      const pose = computePose({ ...data, bones: ghost.bones });
       for (const bone of ghost.bones) {
         const m = pose.get(bone.name);
         if (!m) continue;
@@ -527,6 +541,42 @@ export class SceneRenderer {
         }
         g.circle(m.tx, m.ty, 3 / this.zoom).fill({ color: ghost.color, alpha: 0.35 });
       }
+    }
+  }
+
+  /**
+   * Composite bezier curve of a path attachment: anchors as squares, handles
+   * as dots with stems. Vertex layout per point: in-handle, anchor, out-handle.
+   */
+  private drawPathSpline(verts: Float32Array, closed: boolean, isActive: boolean): void {
+    const g = this.overlayLayer;
+    const points = Math.floor(verts.length / 6);
+    if (points < 2) return;
+    const alpha = isActive ? 0.95 : 0.5;
+    const color = 0xe0a86c;
+    const anchor = (i: number) => ({ x: verts[i * 6 + 2]!, y: verts[i * 6 + 3]! });
+    const inH = (i: number) => ({ x: verts[i * 6]!, y: verts[i * 6 + 1]! });
+    const outH = (i: number) => ({ x: verts[i * 6 + 4]!, y: verts[i * 6 + 5]! });
+    const segCount = closed ? points : points - 1;
+    for (let i = 0; i < segCount; i++) {
+      const a = anchor(i);
+      const b = anchor((i + 1) % points);
+      const c1 = outH(i);
+      const c2 = inH((i + 1) % points);
+      g.moveTo(a.x, a.y)
+        .bezierCurveTo(c1.x, c1.y, c2.x, c2.y, b.x, b.y)
+        .stroke({ width: 2 / this.zoom, color, alpha });
+    }
+    for (let i = 0; i < points; i++) {
+      const a = anchor(i);
+      for (const h of [inH(i), outH(i)]) {
+        g.moveTo(a.x, a.y)
+          .lineTo(h.x, h.y)
+          .stroke({ width: 1 / this.zoom, color, alpha: alpha * 0.5 });
+        g.circle(h.x, h.y, 2.5 / this.zoom).fill({ color, alpha: alpha * 0.7 });
+      }
+      const r = 4 / this.zoom;
+      g.rect(a.x - r, a.y - r, r * 2, r * 2).fill({ color, alpha });
     }
   }
 

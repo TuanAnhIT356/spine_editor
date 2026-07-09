@@ -120,7 +120,7 @@ function BoneProperties({ name }: { name: string }) {
 
 const BLEND_MODES: SpineBlendMode[] = ['normal', 'additive', 'multiply', 'screen'];
 
-const VERTEX_TYPES = new Set(['mesh', 'boundingbox', 'clipping']);
+const VERTEX_TYPES = new Set(['mesh', 'boundingbox', 'clipping', 'path']);
 
 /** Unique bone indices influencing a weighted vertex array. */
 function influenceBoneIndices(vertices: number[]): number[] {
@@ -244,16 +244,23 @@ function AttachmentsSection({ slotName }: { slotName: string }) {
   const bySlot = doc.data.skins.find((s) => s.name === 'default')?.attachments?.[slotName] ?? {};
   const state = () => useEditor.getState();
 
-  function addAttachment(kind: 'boundingbox' | 'point') {
-    const name = uniqueName(`${slotName}-${kind === 'point' ? 'point' : 'bbox'}`, (n) =>
-      Object.keys(bySlot).includes(n),
-    );
+  function addAttachment(kind: 'boundingbox' | 'point' | 'path') {
+    const suffix = kind === 'point' ? 'point' : kind === 'path' ? 'path' : 'bbox';
+    const name = uniqueName(`${slotName}-${suffix}`, (n) => Object.keys(bySlot).includes(n));
     const att: SpineAttachment =
       kind === 'point'
         ? { type: 'point', x: 0, y: 0 }
-        : { type: 'boundingbox', vertexCount: 4, vertices: [-40, -40, 40, -40, 40, 40, -40, 40] };
+        : kind === 'path'
+          ? {
+              type: 'path',
+              vertexCount: 6,
+              // Two points: in-handle, anchor, out-handle each (smooth line).
+              vertices: [-40, 0, 0, 0, 40, 0, 60, 0, 100, 0, 140, 0],
+              lengths: [100],
+            }
+          : { type: 'boundingbox', vertexCount: 4, vertices: [-40, -40, 40, -40, 40, 40, -40, 40] };
     if (state().execute(new AddSkinAttachment('default', slotName, name, att))) {
-      if (kind === 'boundingbox') state().startMeshEdit(slotName, name);
+      if (kind !== 'point') state().startMeshEdit(slotName, name);
     }
   }
 
@@ -327,6 +334,12 @@ function AttachmentsSection({ slotName }: { slotName: string }) {
       <div className="attachment-actions">
         <button onClick={() => addAttachment('boundingbox')}>+ Bounding Box</button>
         <button onClick={() => addAttachment('point')}>+ Point</button>
+        <button
+          title="Composite bezier spline (target it with a path constraint)"
+          onClick={() => addAttachment('path')}
+        >
+          + Path
+        </button>
         <button
           title="Adds a clipping slot just before this slot in the draw order"
           onClick={addClippingSlot}
