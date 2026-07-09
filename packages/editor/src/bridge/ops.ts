@@ -8,6 +8,7 @@ import {
   AddBone,
   AddIkConstraint,
   AddSlot,
+  Composite,
   CreateAnimation,
   DeleteBoneKeyframe,
   DeleteDrawOrderKeyframe,
@@ -18,6 +19,7 @@ import {
   RenameBone,
   ReorderSlot,
   ReparentBone,
+  SetAttachmentVertices,
   SetBoneTransform,
   SetEventDef,
   SetSlotProperties,
@@ -28,6 +30,7 @@ import {
   UpsertEventKeyframe,
   UpsertSlotAttachmentKeyframe,
   UpsertSlotColorKeyframe,
+  autoWeightVertices,
   buildGridMeshAttachment,
   createBone,
   createEmptySkeleton,
@@ -489,6 +492,125 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       if (typeof params['string'] === 'string') key['string'] = params['string'];
       executeOrThrow(new UpsertEventKeyframe(str(params, 'animation'), key as { name: string }));
       return { ok: true };
+    }
+
+    case 'set_mesh_vertices': {
+      const s = state();
+      const slotName = str(params, 'slot');
+      const vertices = params['vertices'];
+      if (!Array.isArray(vertices) || !vertices.every((v) => typeof v === 'number')) {
+        throw new Error('Param "vertices" must be an array of numbers.');
+      }
+      const attName =
+        typeof params['attachment'] === 'string'
+          ? params['attachment']
+          : (s.doc.findSlot(slotName)?.attachment ?? undefined);
+      if (!attName) throw new Error(`Slot "${slotName}" has no active attachment; pass one.`);
+      executeOrThrow(new SetAttachmentVertices('default', slotName, attName, vertices));
+      return { ok: true };
+    }
+
+    case 'bind_weights': {
+      const s = state();
+      const slotName = str(params, 'slot');
+      const boneNames = params['bones'];
+      if (!Array.isArray(boneNames) || !boneNames.every((b) => typeof b === 'string')) {
+        throw new Error('Param "bones" must be an array of bone names.');
+      }
+      const attName =
+        typeof params['attachment'] === 'string'
+          ? params['attachment']
+          : (s.doc.findSlot(slotName)?.attachment ?? undefined);
+      if (!attName) throw new Error(`Slot "${slotName}" has no active attachment; pass one.`);
+      const att = s.doc.data.skins.find((sk) => sk.name === 'default')?.attachments?.[slotName]?.[
+        attName
+      ];
+      if (!att || att.type !== 'mesh') {
+        throw new Error(`Attachment "${attName}" is not a mesh (create_mesh first).`);
+      }
+      if (att.vertices.length !== att.uvs.length) {
+        throw new Error('Mesh is already weighted.');
+      }
+      const weighted = autoWeightVertices(
+        s.doc.data,
+        slotName,
+        att.vertices,
+        boneNames as string[],
+      );
+      executeOrThrow(new SetAttachmentVertices('default', slotName, attName, weighted));
+      return { ok: true, influences: boneNames };
+    }
+
+    case 'add_clipping': {
+      // Creates a clipping slot just before `slot` in the draw order, masking
+      // everything from there until (and including) `end` (default: slot).
+      const s = state();
+      const slotName = str(params, 'slot');
+      const target = s.doc.findSlot(slotName);
+      if (!target) throw new Error(`Slot "${slotName}" does not exist.`);
+      const slotIdx = s.doc.data.slots.findIndex((sl) => sl.name === slotName);
+      const clipSlot = uniqueName(`${slotName}-clip`, (n) =>
+        s.doc.data.slots.some((sl) => sl.name === n),
+      );
+      const vertices =
+        Array.isArray(params['vertices']) &&
+        params['vertices'].every((v: unknown) => typeof v === 'number') &&
+        params['vertices'].length >= 6
+          ? (params['vertices'] as number[])
+          : [-50, -50, 50, -50, 50, 50, -50, 50];
+      executeOrThrow(
+        new Composite(`Add clipping slot "${clipSlot}"`, [
+          new AddSlot(createSlot(clipSlot, target.bone)),
+          new AddSkinAttachment('default', clipSlot, 'clip', {
+            type: 'clipping',
+            end: typeof params['end'] === 'string' ? params['end'] : slotName,
+            vertexCount: vertices.length / 2,
+            vertices,
+          }),
+          new SetSlotProperties(clipSlot, { attachment: 'clip' }),
+          new ReorderSlot(clipSlot, slotIdx),
+        ]),
+      );
+      return { slot: clipSlot };
+    }
+
+    case 'add_bounding_box': {
+      const slotName = str(params, 'slot');
+      const name =
+        typeof params['name'] === 'string' && params['name'] !== ''
+          ? params['name']
+          : `${slotName}-bbox`;
+      const vertices =
+        Array.isArray(params['vertices']) &&
+        params['vertices'].every((v: unknown) => typeof v === 'number') &&
+        params['vertices'].length >= 6
+          ? (params['vertices'] as number[])
+          : [-40, -40, 40, -40, 40, 40, -40, 40];
+      executeOrThrow(
+        new AddSkinAttachment('default', slotName, name, {
+          type: 'boundingbox',
+          vertexCount: vertices.length / 2,
+          vertices,
+        }),
+      );
+      return { attachment: name };
+    }
+
+    case 'add_point': {
+      const slotName = str(params, 'slot');
+      const name =
+        typeof params['name'] === 'string' && params['name'] !== ''
+          ? params['name']
+          : `${slotName}-point`;
+      executeOrThrow(
+        new AddSkinAttachment('default', slotName, name, {
+          type: 'point',
+          x: optNum(params, 'x') ?? 0,
+          y: optNum(params, 'y') ?? 0,
+          rotation: optNum(params, 'rotation') ?? 0,
+        }),
+      );
+      return { attachment: name };
     }
 
     case 'set_playback_speed': {

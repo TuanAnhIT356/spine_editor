@@ -50,7 +50,8 @@ export function App() {
         e.preventDefault();
         s.stepFrame(e.key === 'ArrowLeft' ? -1 : 1);
       } else if (e.key === 'Escape') {
-        s.select(null);
+        if (s.meshEdit) s.endMeshEdit();
+        else s.select(null);
       } else if (e.key === '?') {
         setShowShortcuts((v) => !v);
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selection.length > 0) {

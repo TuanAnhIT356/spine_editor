@@ -56,6 +56,15 @@ export interface LayoutState {
   timelineHeight: number;
 }
 
+/** Vertex-editing session for a mesh/clipping/boundingbox attachment. */
+export interface MeshEditState {
+  slot: string;
+  attachment: string;
+  mode: 'vertices' | 'weights';
+  /** Bone whose weights are shown/painted in weights mode. */
+  paintBone: string | null;
+}
+
 const LAYOUT_STORAGE_KEY = 'spine-editor:layout';
 const DEFAULT_LAYOUT: LayoutState = {
   hierarchyWidth: 250,
@@ -112,6 +121,7 @@ interface EditorState {
   mode: 'setup' | 'animate';
   selection: Selection;
   layout: LayoutState;
+  meshEdit: MeshEditState | null;
   assets: Record<string, ImageAsset>;
   error: string | null;
   anim: AnimationUiState;
@@ -122,6 +132,10 @@ interface EditorState {
   toggleSelection(item: SelectionItem): void;
   addToSelection(item: SelectionItem): void;
   selectAllBones(): void;
+  startMeshEdit(slot: string, attachment: string): void;
+  endMeshEdit(): void;
+  setMeshEditMode(mode: MeshEditState['mode']): void;
+  setPaintBone(bone: string | null): void;
   resizeHierarchy(deltaPx: number): void;
   resizeProperties(deltaPx: number): void;
   resizeTimeline(deltaPx: number): void;
@@ -158,6 +172,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   mode: 'setup',
   selection: [],
   layout: loadLayout(),
+  meshEdit: null,
   assets: {},
   error: null,
   anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
@@ -191,6 +206,15 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set((s) => ({
       selection: s.doc.data.bones.map((b) => ({ kind: 'bone' as const, name: b.name })),
     })),
+  startMeshEdit: (slot, attachment) =>
+    set({
+      meshEdit: { slot, attachment, mode: 'vertices', paintBone: null },
+      selection: [{ kind: 'slot', name: slot }],
+    }),
+  endMeshEdit: () => set({ meshEdit: null }),
+  setMeshEditMode: (mode) => set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, mode } } : s)),
+  setPaintBone: (bone) =>
+    set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, paintBone: bone } } : s)),
   resizeHierarchy: (deltaPx) =>
     set((s) => {
       const layout = {
@@ -302,7 +326,10 @@ export const useEditor = create<EditorState>()((set, get) => ({
     }
     commands.push(new RemoveSlot(slotName));
     if (execute(new Composite(`Remove slot "${slotName}"`, commands))) {
-      set((s) => ({ selection: s.selection.filter((sel) => sel.name !== slotName) }));
+      set((s) => ({
+        selection: s.selection.filter((sel) => sel.name !== slotName),
+        meshEdit: s.meshEdit?.slot === slotName ? null : s.meshEdit,
+      }));
     }
   },
 
@@ -312,6 +339,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       doc: new SpineDocument(data),
       assets: Object.fromEntries(assets.map((a) => [a.name, a])),
       selection: [],
+      meshEdit: null,
       error: null,
       revision: s.revision + 1,
       anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },

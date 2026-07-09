@@ -144,6 +144,70 @@ export class AddSkinAttachment implements Command {
   }
 }
 
+/**
+ * Replaces the vertex array of a vertex-based attachment (mesh, boundingbox,
+ * clipping, path). Accepts either the unweighted layout (x,y pairs matching
+ * the attachment's vertex count) or the weighted layout (bone count +
+ * boneIndex,x,y,weight per influence).
+ */
+export class SetAttachmentVertices implements Command {
+  readonly label: string;
+  private before: SpineSkin | undefined;
+
+  constructor(
+    private readonly skinName: string,
+    private readonly slotName: string,
+    private readonly attachmentName: string,
+    private readonly vertices: number[],
+  ) {
+    this.label = `Edit vertices of "${attachmentName}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const skin = data.skins.find((s) => s.name === this.skinName);
+    if (!skin) throw new Error(`Skin "${this.skinName}" does not exist.`);
+    const att = skin.attachments?.[this.slotName]?.[this.attachmentName];
+    if (!att) {
+      throw new Error(
+        `Attachment "${this.attachmentName}" does not exist on slot "${this.slotName}" in skin "${this.skinName}".`,
+      );
+    }
+    let count: number;
+    if (att.type === 'mesh') count = att.uvs.length / 2;
+    else if (att.type === 'boundingbox' || att.type === 'clipping' || att.type === 'path') {
+      count = att.vertexCount;
+    } else {
+      throw new Error(
+        `Attachment "${this.attachmentName}" (${att.type ?? 'region'}) has no vertices.`,
+      );
+    }
+    if (this.vertices.length !== count * 2) {
+      // Weighted layout: walk bone-count blocks and check vertex tally.
+      let vi = 0;
+      let seen = 0;
+      while (vi < this.vertices.length) {
+        const n = this.vertices[vi];
+        if (typeof n !== 'number' || n < 1 || !Number.isInteger(n)) break;
+        vi += 1 + n * 4;
+        seen++;
+      }
+      if (vi !== this.vertices.length || seen !== count) {
+        throw new Error(
+          `Vertex array does not match ${count} vertices (unweighted x,y pairs or weighted layout).`,
+        );
+      }
+    }
+    this.before = structuredClone(skin);
+    att.vertices = [...this.vertices];
+  }
+
+  undo(data: SkeletonData): void {
+    if (!this.before) return;
+    const idx = data.skins.findIndex((s) => s.name === this.skinName);
+    if (idx >= 0) data.skins[idx] = this.before;
+  }
+}
+
 export class RemoveSkinAttachment implements Command {
   readonly label: string;
   private before: SpineSkin | undefined;

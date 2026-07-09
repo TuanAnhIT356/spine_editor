@@ -13,7 +13,7 @@ export const SHORTCUTS: ShortcutEntry[] = [
   { keys: 'Ctrl/Cmd + A', description: 'Select all bones' },
   { keys: 'Delete / Backspace', description: 'Delete selected keys (timeline) or bones/slots' },
   { keys: 'Drag empty dopesheet area', description: 'Box-select keyframes' },
-  { keys: 'Escape', description: 'Clear the selection' },
+  { keys: 'Escape', description: 'Exit mesh editing, or clear the selection' },
   { keys: 'Shift/Ctrl + Click (bone)', description: 'Add or remove a bone from the selection' },
   { keys: 'Drag empty viewport (Select tool)', description: 'Marquee-select bones' },
   { keys: 'Ctrl/Cmd + Scroll (Timeline)', description: 'Zoom the timeline ruler' },

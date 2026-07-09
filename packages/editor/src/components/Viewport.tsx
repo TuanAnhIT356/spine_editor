@@ -2,8 +2,11 @@ import {
   AddBone,
   Composite,
   IDENTITY,
+  SetAttachmentVertices,
   SetBoneTransform,
   UpsertBoneKeyframe,
+  UpsertDeformKeyframe,
+  adjustVertexWeight,
   applyLinear,
   applyMat,
   computeAnimatedAttachments,
@@ -11,18 +14,21 @@ import {
   computeAnimatedDeforms,
   computeAnimatedDrawOrder,
   computeAnimatedLocals,
+  computeVertexWorldPositions,
   createBone,
   getAnimationDuration,
   invertMat,
+  isWeightedVertices,
   type BoneData,
   type Command,
   type Mat2D,
   type SpineBoneKey,
+  type SpineDeformKey,
 } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
 import { bridgeRuntime } from '../bridge/runtime.js';
 import { primarySelection, uniqueName, useEditor, type SelectionItem } from '../state/store.js';
-import { SceneRenderer, type RenderInput } from '../viewport/renderer.js';
+import { SceneRenderer, attachmentVertexCount, type RenderInput } from '../viewport/renderer.js';
 
 const RAD_DEG = 180 / Math.PI;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -33,6 +39,8 @@ function makeKey(time: number, fields: Omit<SpineBoneKey, 'time'>): SpineBoneKey
 
 type DragState =
   | { kind: 'pan'; lastX: number; lastY: number }
+  | { kind: 'vertex'; index: number }
+  | { kind: 'paint' }
   | {
       kind: 'marquee';
       startX: number;
@@ -74,12 +82,15 @@ export function Viewport() {
   const rendererRef = useRef<SceneRenderer | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const overrideRef = useRef<BoneData[] | undefined>(undefined);
+  /** Uncommitted vertex array during a mesh-edit drag or paint stroke. */
+  const editVertsRef = useRef<number[] | null>(null);
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
 
   const revision = useEditor((s) => s.revision);
   const selection = useEditor((s) => s.selection);
   const assets = useEditor((s) => s.assets);
   const mode = useEditor((s) => s.mode);
+  const meshEdit = useEditor((s) => s.meshEdit);
   const animCurrent = useEditor((s) => s.anim.current);
   const animTime = useEditor((s) => s.anim.time);
   const animGhost = useEditor((s) => s.anim.ghost);
@@ -135,6 +146,14 @@ export function Viewport() {
         ? computeAnimatedDrawOrder(state.doc.data, state.anim.current!, state.anim.time)
         : undefined,
       ghosts: animating ? buildGhosts() : undefined,
+      editTarget: state.meshEdit
+        ? {
+            slot: state.meshEdit.slot,
+            attachment: state.meshEdit.attachment,
+            overrideVertices: editVertsRef.current ?? undefined,
+            weightBone: state.meshEdit.mode === 'weights' ? state.meshEdit.paintBone : null,
+          }
+        : undefined,
       assets: state.assets,
       selection: state.selection,
     };
@@ -172,11 +191,105 @@ export function Viewport() {
     };
   }, []);
 
-  useEffect(redraw, [revision, selection, assets, mode, animCurrent, animTime, animGhost]);
+  useEffect(redraw, [
+    revision,
+    selection,
+    assets,
+    mode,
+    meshEdit,
+    animCurrent,
+    animTime,
+    animGhost,
+  ]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
     const rect = hostRef.current!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  /** Attachment/pose context for the active mesh-edit session, or null. */
+  function editContext() {
+    const state = useEditor.getState();
+    const r = rendererRef.current;
+    const edit = state.meshEdit;
+    if (!edit || !r) return null;
+    const slot = state.doc.findSlot(edit.slot);
+    const att = state.doc.data.skins.find((s) => s.name === 'default')?.attachments?.[edit.slot]?.[
+      edit.attachment
+    ];
+    const boneWorld = slot ? r.getBoneWorld(slot.bone) : undefined;
+    if (!slot || !att || !boneWorld) return null;
+    const count = attachmentVertexCount(att);
+    if (count === null) return null;
+    const vertices = (att as { vertices: number[] }).vertices;
+    return {
+      edit,
+      slot,
+      att,
+      count,
+      vertices,
+      boneWorld,
+      weighted: isWeightedVertices(vertices, count),
+      renderer: r,
+    };
+  }
+
+  /** Deform offsets active at the playhead for the edit target (animate mode). */
+  function currentDeform(
+    ctx: NonNullable<ReturnType<typeof editContext>>,
+  ): Float32Array | undefined {
+    const state = useEditor.getState();
+    if (ctx.att.type !== 'mesh' || state.mode !== 'animate' || !state.anim.current) {
+      return undefined;
+    }
+    return computeAnimatedDeforms(state.doc.data, state.anim.current, state.anim.time)
+      .get(ctx.edit.slot)
+      ?.get(ctx.edit.attachment);
+  }
+
+  /** World x,y per vertex for the edit target (uses the working copy if any). */
+  function editWorldPositions(ctx: NonNullable<ReturnType<typeof editContext>>): Float32Array {
+    const state = useEditor.getState();
+    return computeVertexWorldPositions(
+      editVertsRef.current ?? ctx.vertices,
+      ctx.count,
+      ctx.boneWorld,
+      state.doc.data.bones,
+      // Renderer's last pose matches what's on screen (incl. animation).
+      new Map(state.doc.data.bones.map((b) => [b.name, ctx.renderer.getBoneWorld(b.name)!])),
+      currentDeform(ctx),
+    );
+  }
+
+  /** One weight-brush dab at screen point p (radius 30px, falloff to edge). */
+  function paintDab(ctx: NonNullable<ReturnType<typeof editContext>>, p: { x: number; y: number }) {
+    const state = useEditor.getState();
+    const boneName = ctx.edit.paintBone;
+    if (!boneName) return;
+    const boneIndex = state.doc.data.bones.findIndex((b) => b.name === boneName);
+    const paintBoneWorld = ctx.renderer.getBoneWorld(boneName);
+    if (boneIndex < 0 || !paintBoneWorld) return;
+    const invPaint = invertMat(paintBoneWorld);
+    const radius = 30;
+    let working = editVertsRef.current ?? [...ctx.vertices];
+    const positions = editWorldPositions(ctx);
+    for (let v = 0; v < ctx.count; v++) {
+      const s = ctx.renderer.worldToScreen(positions[v * 2]!, positions[v * 2 + 1]!);
+      const d = Math.hypot(s.x - p.x, s.y - p.y);
+      if (d > radius) continue;
+      const delta = 0.2 * (1 - d / radius);
+      const local = applyMat(invPaint, positions[v * 2]!, positions[v * 2 + 1]!);
+      try {
+        working = adjustVertexWeight(working, ctx.count, v, boneIndex, delta, {
+          x: Math.round(local.x * 100) / 100,
+          y: Math.round(local.y * 100) / 100,
+        });
+      } catch {
+        return; // unweighted — Properties panel guides the user to bind first
+      }
+    }
+    editVertsRef.current = working;
+    redraw();
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -191,6 +304,47 @@ export function Viewport() {
     if (e.button !== 0) return;
 
     const state = useEditor.getState();
+
+    // Mesh-edit session: vertex dragging / weight painting replaces the tools.
+    const ctx = editContext();
+    if (ctx) {
+      if (ctx.edit.mode === 'weights') {
+        if (!ctx.weighted) {
+          state.setError('Bind bones first (Weights section in the Properties panel).');
+          return;
+        }
+        if (!ctx.edit.paintBone) {
+          state.setError('Pick a bone to paint in the Properties panel.');
+          return;
+        }
+        dragRef.current = { kind: 'paint' };
+        paintDab(ctx, p);
+        return;
+      }
+      // Vertices mode: grab the nearest handle within 12px.
+      const positions = editWorldPositions(ctx);
+      let best = -1;
+      let bestDist = 12;
+      for (let v = 0; v < ctx.count; v++) {
+        const s = r.worldToScreen(positions[v * 2]!, positions[v * 2 + 1]!);
+        const d = Math.hypot(s.x - p.x, s.y - p.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = v;
+        }
+      }
+      if (best < 0) return;
+      if (ctx.weighted) {
+        state.setError(
+          'Weighted vertices follow their bones — switch to Weights mode to adjust influence.',
+        );
+        return;
+      }
+      dragRef.current = { kind: 'vertex', index: best };
+      editVertsRef.current = [...ctx.vertices];
+      return;
+    }
+
     const base = baseLocals();
     const hit = r.hitTest(p.x, p.y);
     const world = r.screenToWorld(p.x, p.y);
@@ -303,6 +457,26 @@ export function Viewport() {
       });
       return;
     }
+    if (drag.kind === 'vertex') {
+      const ctx = editContext();
+      const working = editVertsRef.current;
+      if (!ctx || !working) return;
+      const world = r.screenToWorld(p.x, p.y);
+      const local = applyMat(invertMat(ctx.boneWorld), world.x, world.y);
+      // The overlay adds the current deform on top of the working copy, so
+      // store the handle position minus the deform to keep it under the cursor.
+      const deform = currentDeform(ctx);
+      const i = drag.index * 2;
+      working[i] = Math.round((local.x - (deform?.[i] ?? 0)) * 100) / 100;
+      working[i + 1] = Math.round((local.y - (deform?.[i + 1] ?? 0)) * 100) / 100;
+      redraw();
+      return;
+    }
+    if (drag.kind === 'paint') {
+      const ctx = editContext();
+      if (ctx) paintDab(ctx, p);
+      return;
+    }
     const world = r.screenToWorld(p.x, p.y);
     const base = baseLocals();
     if (drag.kind === 'translate') {
@@ -341,6 +515,42 @@ export function Viewport() {
     if (!drag || drag.kind === 'pan') return;
     const state = useEditor.getState();
     const animating = state.mode === 'animate' && state.anim.current !== null;
+
+    if (drag.kind === 'vertex' || drag.kind === 'paint') {
+      const ctx = editContext();
+      const working = editVertsRef.current;
+      editVertsRef.current = null;
+      if (!ctx || !working) {
+        redraw();
+        return;
+      }
+      if (drag.kind === 'vertex' && animating && state.anim.current && ctx.att.type === 'mesh') {
+        // Auto-key: deform offsets are relative to the setup vertices; the
+        // working copy excludes the sampled deform, so add it back in.
+        const deform = currentDeform(ctx);
+        const offsets = working.map(
+          (v, i) => Math.round((v + (deform?.[i] ?? 0) - (ctx.vertices[i] ?? 0)) * 100) / 100,
+        );
+        const time = Math.round(state.anim.time * 100) / 100;
+        const key: SpineDeformKey = { vertices: offsets };
+        if (time > 0) key.time = time;
+        state.execute(
+          new UpsertDeformKeyframe(
+            state.anim.current,
+            'default',
+            ctx.edit.slot,
+            ctx.edit.attachment,
+            key,
+          ),
+        );
+      } else {
+        state.execute(
+          new SetAttachmentVertices('default', ctx.edit.slot, ctx.edit.attachment, working),
+        );
+      }
+      redraw();
+      return;
+    }
 
     if (drag.kind === 'marquee') {
       const r = rendererRef.current;
