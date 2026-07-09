@@ -10,8 +10,11 @@ The full roadmap, architecture rationale, and phase breakdown live in `PLAN.md` 
 starting work on a new phase. Current status: **Phases 0-6 done** (evaluator covers bone/IK/
 transform-constraint/slot-color/attachment/deform timelines; grid-mesh creation + deform/color
 keyframing via MCP; atlas packer; curve presets + copy/paste keys in the dopesheet; Pages deploy
-workflow). Known gaps, tracked in PLAN.md: mesh vertex-editing/weight-painting UI, path/physics
-constraint evaluation (data round-trips), visual bezier curve editor, dockable panels.
+workflow; resizable panels, multi-select, timeline zoom, keyboard-shortcut system). Known gaps
+and the feature-gap analysis vs. official Spine live in PLAN.md §6 (Phases 7-10): graph editor,
+ghosting, draw-order timeline evaluation, mesh vertex-editing/weight-painting UI, clipping
+rendering, path/physics constraint evaluation (data round-trips), skins UI, atlas import,
+GIF/video export, dockable panels.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

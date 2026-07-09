@@ -25,7 +25,11 @@ export type SelectionItem = { kind: 'bone' | 'slot'; name: string };
 /** Zero or more selected items; the last entry is the "primary" one shown in the properties panel. */
 export type Selection = SelectionItem[];
 
-export function isSelected(selection: Selection, kind: SelectionItem['kind'], name: string): boolean {
+export function isSelected(
+  selection: Selection,
+  kind: SelectionItem['kind'],
+  name: string,
+): boolean {
   return selection.some((s) => s.kind === kind && s.name === name);
 }
 
@@ -48,7 +52,11 @@ export interface LayoutState {
 }
 
 const LAYOUT_STORAGE_KEY = 'spine-editor:layout';
-const DEFAULT_LAYOUT: LayoutState = { hierarchyWidth: 250, propertiesWidth: 250, timelineHeight: 190 };
+const DEFAULT_LAYOUT: LayoutState = {
+  hierarchyWidth: 250,
+  propertiesWidth: 250,
+  timelineHeight: 190,
+};
 const LAYOUT_LIMITS = {
   hierarchyWidth: [160, 520] as const,
   propertiesWidth: [200, 520] as const,
@@ -65,12 +73,18 @@ function loadLayout(): LayoutState {
     if (!raw) return DEFAULT_LAYOUT;
     const parsed = JSON.parse(raw) as Partial<LayoutState>;
     return {
-      hierarchyWidth: clamp(parsed.hierarchyWidth ?? DEFAULT_LAYOUT.hierarchyWidth, LAYOUT_LIMITS.hierarchyWidth),
+      hierarchyWidth: clamp(
+        parsed.hierarchyWidth ?? DEFAULT_LAYOUT.hierarchyWidth,
+        LAYOUT_LIMITS.hierarchyWidth,
+      ),
       propertiesWidth: clamp(
         parsed.propertiesWidth ?? DEFAULT_LAYOUT.propertiesWidth,
         LAYOUT_LIMITS.propertiesWidth,
       ),
-      timelineHeight: clamp(parsed.timelineHeight ?? DEFAULT_LAYOUT.timelineHeight, LAYOUT_LIMITS.timelineHeight),
+      timelineHeight: clamp(
+        parsed.timelineHeight ?? DEFAULT_LAYOUT.timelineHeight,
+        LAYOUT_LIMITS.timelineHeight,
+      ),
     };
   } catch {
     return DEFAULT_LAYOUT;

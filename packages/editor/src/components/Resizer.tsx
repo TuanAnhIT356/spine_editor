@@ -1,7 +1,13 @@
 import { useRef } from 'react';
 
 /** Draggable divider that reports pointer movement deltas along one axis. */
-export function Resizer({ axis, onResize }: { axis: 'x' | 'y'; onResize: (deltaPx: number) => void }) {
+export function Resizer({
+  axis,
+  onResize,
+}: {
+  axis: 'x' | 'y';
+  onResize: (deltaPx: number) => void;
+}) {
   const lastPos = useRef<number | null>(null);
 
   function onPointerDown(e: React.PointerEvent) {

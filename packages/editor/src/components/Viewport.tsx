@@ -176,7 +176,14 @@ export function Viewport() {
           else state.select({ kind: 'bone', name: hit });
         } else {
           if (!additive) state.select(null);
-          dragRef.current = { kind: 'marquee', startX: p.x, startY: p.y, endX: p.x, endY: p.y, additive };
+          dragRef.current = {
+            kind: 'marquee',
+            startX: p.x,
+            startY: p.y,
+            endX: p.x,
+            endY: p.y,
+            additive,
+          };
         }
         return;
       }
@@ -321,7 +328,8 @@ export function Viewport() {
         const w = r.getBoneWorld(bone.name);
         if (!w) continue;
         const s = r.worldToScreen(w.tx, w.ty);
-        if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1) hits.push({ kind: 'bone', name: bone.name });
+        if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1)
+          hits.push({ kind: 'bone', name: bone.name });
       }
       if (hits.length === 0) return;
       if (drag.additive) {
@@ -358,7 +366,8 @@ export function Viewport() {
         }
       }
       if (commands.length === 1) state.execute(commands[0]!);
-      else if (commands.length > 1) state.execute(new Composite(`Move ${commands.length} bones`, commands));
+      else if (commands.length > 1)
+        state.execute(new Composite(`Move ${commands.length} bones`, commands));
     } else if (drag.kind === 'rotate' && override) {
       const commands: Command[] = [];
       for (const boneName of drag.bones) {
@@ -380,7 +389,8 @@ export function Viewport() {
         }
       }
       if (commands.length === 1) state.execute(commands[0]!);
-      else if (commands.length > 1) state.execute(new Composite(`Rotate ${commands.length} bones`, commands));
+      else if (commands.length > 1)
+        state.execute(new Composite(`Rotate ${commands.length} bones`, commands));
     } else if (drag.kind === 'create') {
       if (drag.temp.length > 4) {
         const ok = state.execute(
