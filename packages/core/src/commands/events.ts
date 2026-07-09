@@ -91,3 +91,39 @@ export class UpsertEventKeyframe implements Command {
     if (this.before) data.animations[this.animation] = this.before;
   }
 }
+
+/** Deletes an event key matched by event name AND time. */
+export class DeleteEventKeyframe implements Command {
+  readonly label: string;
+  private before: SpineAnimation | undefined;
+
+  constructor(
+    private readonly animation: string,
+    private readonly name: string,
+    private readonly time: number,
+  ) {
+    this.label = `Delete event key "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const anim = data.animations[this.animation];
+    if (!anim) throw new Error(`Animation "${this.animation}" does not exist.`);
+    const keys = anim.events;
+    const idx =
+      keys?.findIndex(
+        (k) => k.name === this.name && Math.abs((k.time ?? 0) - this.time) < TIME_EPSILON,
+      ) ?? -1;
+    if (!keys || idx < 0) {
+      throw new Error(
+        `No event key "${this.name}" at time ${this.time} in animation "${this.animation}".`,
+      );
+    }
+    this.before = structuredClone(anim);
+    keys.splice(idx, 1);
+    if (keys.length === 0) delete anim.events;
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.before) data.animations[this.animation] = this.before;
+  }
+}

@@ -20,6 +20,7 @@ import type {
   SpineColorKey,
   SpineCurve,
   SpineDeformKey,
+  SpineDrawOrderKey,
   SpineIkKey,
   SpineValueKey,
 } from './spine-json/types.js';
@@ -317,6 +318,71 @@ export function sampleAttachment(
     result = key.name ?? null;
   }
   return result;
+}
+
+/**
+ * Slot draw order (slot names, back to front) at time t, or undefined when
+ * the setup order applies (no timeline, before the first key, or an active
+ * key with no offsets). Draw order keys are stepped — no interpolation.
+ *
+ * Reconstruction matches the runtime: each offset entry places its slot at
+ * `setupIndex + offset`; unkeyed slots fill the remaining positions in setup
+ * order.
+ */
+export function computeAnimatedDrawOrder(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): string[] | undefined {
+  const keys = data.animations[animationName]?.drawOrder;
+  if (!keys?.length) return undefined;
+  let active: SpineDrawOrderKey | undefined;
+  for (const key of keys) {
+    if ((key.time ?? 0) > time) break;
+    active = key;
+  }
+  if (!active?.offsets?.length) return undefined;
+  const n = data.slots.length;
+  const setupIndex = new Map(data.slots.map((s, i) => [s.name, i]));
+  const entries = active.offsets
+    .filter((o) => setupIndex.has(o.slot))
+    .sort((a, b) => setupIndex.get(a.slot)! - setupIndex.get(b.slot)!);
+  const order = new Array<number>(n).fill(-1);
+  const unchanged: number[] = [];
+  let originalIndex = 0;
+  for (const { slot, offset } of entries) {
+    const slotIndex = setupIndex.get(slot)!;
+    while (originalIndex < slotIndex) unchanged.push(originalIndex++);
+    const target = originalIndex + offset;
+    if (target >= 0 && target < n) order[target] = originalIndex;
+    else unchanged.push(originalIndex);
+    originalIndex++;
+  }
+  while (originalIndex < n) unchanged.push(originalIndex++);
+  for (let i = n - 1; i >= 0; i--) {
+    if (order[i] === -1) order[i] = unchanged.pop() ?? -1;
+  }
+  return order.map((idx) => data.slots[idx]!.name);
+}
+
+/**
+ * Offsets entry list describing `targetOrder` relative to `setupOrder`
+ * (both are slot-name arrays over the same set). Only slots whose position
+ * changed are listed, sorted by setup index — the inverse of
+ * `computeAnimatedDrawOrder`'s reconstruction for permutations where unkeyed
+ * slots keep their relative order.
+ */
+export function computeDrawOrderOffsets(
+  setupOrder: string[],
+  targetOrder: string[],
+): { slot: string; offset: number }[] {
+  const targetIndex = new Map(targetOrder.map((s, i) => [s, i]));
+  const offsets: { slot: string; offset: number }[] = [];
+  setupOrder.forEach((slot, i) => {
+    const t = targetIndex.get(slot);
+    if (t !== undefined && t !== i) offsets.push({ slot, offset: t - i });
+  });
+  return offsets;
 }
 
 /** Highest key time reachable anywhere in the animation. */

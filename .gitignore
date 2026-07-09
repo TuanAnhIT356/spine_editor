@@ -4,3 +4,5 @@ coverage/
 *.local
 .DS_Store
 *.log
+# e2e verification output (screenshots, exported JSON)
+e2e-out/

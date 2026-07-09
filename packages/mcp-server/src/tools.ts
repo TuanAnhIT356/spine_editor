@@ -323,6 +323,52 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
     forward('set_event_keyframe'),
   );
 
+  server.tool(
+    'delete_event_keyframe',
+    'Remove an event key (matched by event name and time).',
+    { animation: z.string(), name: z.string(), time: z.number().optional() },
+    forward('delete_event_keyframe'),
+  );
+
+  server.tool(
+    'set_draw_order_keyframe',
+    'Key the slot draw order at a time. Offsets move slots from their setup index (offset = targetIndex - setupIndex); pass an empty array to key a reset to the setup order. Draw order keys are stepped (no interpolation).',
+    {
+      animation: z.string(),
+      time: z.number().optional(),
+      offsets: z.array(z.object({ slot: z.string(), offset: z.number() })),
+    },
+    forward('set_draw_order_keyframe'),
+  );
+
+  server.tool(
+    'delete_draw_order_keyframe',
+    'Remove the draw order key at a time.',
+    { animation: z.string(), time: z.number().optional() },
+    forward('delete_draw_order_keyframe'),
+  );
+
+  server.tool(
+    'shift_keys',
+    "Retime bone keys in one undo step: t' = pivot + (t - pivot) * scale + offset. Filters: bone (one bone only), timeline (one timeline only). Bezier handles move with their keys. Fails if the retime would collide two keys.",
+    {
+      animation: z.string(),
+      bone: z.string().optional(),
+      timeline: z.string().optional(),
+      offset: z.number().optional(),
+      scale: z.number().optional(),
+      pivot: z.number().optional(),
+    },
+    forward('shift_keys'),
+  );
+
+  server.tool(
+    'set_playback_speed',
+    'Set the editor playback rate multiplier (0.1–4; 1 = realtime).',
+    { speed: z.number() },
+    forward('set_playback_speed'),
+  );
+
   // ---------------------------------------------------------------- export
   server.tool(
     'export_atlas',

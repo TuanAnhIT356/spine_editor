@@ -45,15 +45,28 @@ and existing animations.
 - Prefer easing (bezier) over linear for organic motion; keep linear for
   mechanical things.
 
+## Retiming & draw order
+
+- `shift_keys` retimes bone keys in one undo step
+  (`t' = pivot + (t - pivot) * scale + offset`); bezier handles move with the
+  keys. Use it to slide a whole animation later (`offset`) or stretch its
+  timing (`scale` + `pivot: 0`). Filter with `bone`/`timeline`.
+- `set_draw_order_keyframe` re-orders slots during an animation (e.g. a hand
+  passing in front of the body). Offsets are `targetIndex - setupIndex` per
+  moved slot; empty `offsets` keys a reset to setup order. Keys are stepped and
+  ARE previewed by the evaluator/renderer.
+- `set_playback_speed` slows/speeds editor playback for human review only —
+  exported data is unaffected.
+
 ## Gotchas
 
 - Keying the same bone/timeline/time again REPLACES that key (including its
   curve) — re-pass `curve` when updating a key.
 - The evaluator applies bone timelines, slot attachment timelines, IK
   (solve + timeline mix/bendPositive), transform constraints, slot colors
-  (`set_slot_color_keyframe`, rgba+alpha) and mesh deform. Animate a limb by
-  keying translate on its IK TARGET bone. Draw-order timelines and
-  path/physics constraints are stored/exported but not previewed.
+  (`set_slot_color_keyframe`, rgba+alpha), mesh deform and draw-order
+  timelines. Animate a limb by keying translate on its IK TARGET bone.
+  Path/physics constraints are stored/exported but not previewed.
 - Squash/flags/hair: `create_mesh` turns a slot's image into a grid mesh,
   then `set_deform_keyframe` moves vertices (x,y offsets, bone-local).
 - Events: `set_event` to define, `set_event_keyframe` to fire at a time —

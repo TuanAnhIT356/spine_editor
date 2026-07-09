@@ -161,43 +161,56 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
 
 ### 6.1. Bảng đối chiếu
 
-| Nhóm        | Feature của Spine                                             | Hiện trạng | Ghi chú                                                                   |
-| ----------- | ------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
-| Rigging     | Bones, hierarchy, re-parent, length                           | ✅         |                                                                           |
-| Rigging     | Bone `inherit` modes (5 chế độ)                               | 🟡         | `normal`/`onlyTranslation` chính xác; 3 chế độ còn lại xấp xỉ (`pose.ts`) |
-| Rigging     | Region attachments                                            | ✅         |                                                                           |
-| Rigging     | Meshes (tạo lưới, chỉnh vertex, edit UV)                      | 🟡         | Tạo grid mesh qua MCP; **chưa có UI kéo vertex**                          |
-| Rigging     | Weights + weight painting                                     | 🟡         | Render weighted mesh ✅; **chưa có bind/paint UI**, chỉnh qua JSON/MCP    |
-| Rigging     | Linked meshes                                                 | 📦         |                                                                           |
-| Rigging     | Clipping attachments                                          | 📦         | Chưa render mask, chưa có UI vẽ polygon                                   |
-| Rigging     | Bounding box / Point attachments                              | 📦         | Chưa hiển thị/tạo trong viewport                                          |
-| Rigging     | Path attachments (composite bezier)                           | 📦         | Chưa vẽ/hiển thị spline                                                   |
-| Rigging     | Skins (tạo, đổi skin, preview)                                | 📦         | Renderer chỉ ưu tiên skin `default`; chưa có UI skins                     |
-| Rigging     | Import PSD (script Photoshop)                                 | ❌         | Web thay thế bằng import PSD trực tiếp (`ag-psd`)                         |
-| Constraints | IK (mix, bend, 1–2 bone)                                      | 🟡         | Solver ✅; **bỏ qua softness/stretch/compress**                           |
-| Constraints | Transform constraints                                         | ✅         | mixRotate/X/Y/Scale, local/relative                                       |
-| Constraints | Path constraints (evaluation)                                 | 📦         | Cần spline sampling + modes position/spacing/rotate                       |
-| Constraints | Physics constraints (evaluation)                              | 📦         | Cần mô phỏng spring-damper stateful, deterministic                        |
-| Animate     | Dopesheet (scrub, kéo key, curve preset, copy/paste 1 key)    | ✅         |                                                                           |
-| Animate     | Chọn nhiều key / kéo nhóm key / scale time                    | ❌         | Dopesheet mới thao tác từng key một                                       |
-| Animate     | Graph editor (kéo bezier control points)                      | ❌         | Hiện chỉ có preset ease qua dropdown                                      |
-| Animate     | Ghosting (onion skinning)                                     | ❌         |                                                                           |
-| Animate     | Playback speed + bước từng frame                              | ❌         | Mới có play/pause/loop                                                    |
-| Animate     | Draw order timeline                                           | 📦         | Có types + validation; **chưa evaluate + chưa có UI key**                 |
-| Animate     | Slot attachment/color/deform/IK/transform timelines           | ✅         | Evaluator + auto-key (bone) đầy đủ                                        |
-| Animate     | Event timeline                                                | 🟡         | Đặt qua MCP ✅; chưa có UI track event trong dopesheet                    |
-| Animate     | Preview view riêng (cửa sổ playback)                          | ❌         | Playback dùng chung viewport                                              |
-| Workflow    | Undo/redo, autosave, multi-select, phím tắt, resizable panels | ✅         | Sau đợt nâng cấp UI 07/2026                                               |
-| Workflow    | Dockable panels                                               | ❌         | Layout cố định (đã resizable)                                             |
-| Workflow    | Tìm kiếm/lọc trong Hierarchy                                  | ❌         |                                                                           |
-| Workflow    | Texture packing                                               | 🟡         | Shelf packing ✅; chưa có polygon packing, rotation, strip whitespace     |
-| Export      | Spine JSON 4.2                                                | ✅         |                                                                           |
-| Export      | Binary `.skel`                                                | ❌         |                                                                           |
-| Export      | GIF / video / PNG sequence                                    | ❌         |                                                                           |
-| Import      | Spine JSON                                                    | ✅         |                                                                           |
-| Import      | Atlas (`.atlas` + PNG → cắt lại region rời)                   | ❌         | Gap đã gặp với sample goblins                                             |
+| Nhóm        | Feature của Spine                                             | Hiện trạng | Ghi chú                                                                      |
+| ----------- | ------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| Rigging     | Bones, hierarchy, re-parent, length                           | ✅         |                                                                              |
+| Rigging     | Bone `inherit` modes (5 chế độ)                               | 🟡         | `normal`/`onlyTranslation` chính xác; 3 chế độ còn lại xấp xỉ (`pose.ts`)    |
+| Rigging     | Region attachments                                            | ✅         |                                                                              |
+| Rigging     | Meshes (tạo lưới, chỉnh vertex, edit UV)                      | 🟡         | Tạo grid mesh qua MCP; **chưa có UI kéo vertex**                             |
+| Rigging     | Weights + weight painting                                     | 🟡         | Render weighted mesh ✅; **chưa có bind/paint UI**, chỉnh qua JSON/MCP       |
+| Rigging     | Linked meshes                                                 | 📦         |                                                                              |
+| Rigging     | Clipping attachments                                          | 📦         | Chưa render mask, chưa có UI vẽ polygon                                      |
+| Rigging     | Bounding box / Point attachments                              | 📦         | Chưa hiển thị/tạo trong viewport                                             |
+| Rigging     | Path attachments (composite bezier)                           | 📦         | Chưa vẽ/hiển thị spline                                                      |
+| Rigging     | Skins (tạo, đổi skin, preview)                                | 📦         | Renderer chỉ ưu tiên skin `default`; chưa có UI skins                        |
+| Rigging     | Import PSD (script Photoshop)                                 | ❌         | Web thay thế bằng import PSD trực tiếp (`ag-psd`)                            |
+| Constraints | IK (mix, bend, 1–2 bone)                                      | 🟡         | Solver ✅; **bỏ qua softness/stretch/compress**                              |
+| Constraints | Transform constraints                                         | ✅         | mixRotate/X/Y/Scale, local/relative                                          |
+| Constraints | Path constraints (evaluation)                                 | 📦         | Cần spline sampling + modes position/spacing/rotate                          |
+| Constraints | Physics constraints (evaluation)                              | 📦         | Cần mô phỏng spring-damper stateful, deterministic                           |
+| Animate     | Dopesheet (scrub, kéo key, curve preset, copy/paste 1 key)    | ✅         |                                                                              |
+| Animate     | Chọn nhiều key / kéo nhóm key / scale time                    | ✅         | Phase 7: box-select, kéo nhóm, copy/paste nhiều key, scale quanh pivot       |
+| Animate     | Graph editor (kéo bezier control points)                      | ✅         | Phase 7: nút Curve mở panel kéo 2 control point per channel                  |
+| Animate     | Ghosting (onion skinning)                                     | ✅         | Phase 7: nút Ghost — 2 pose trước (xanh dương) + 2 sau (xanh lá)             |
+| Animate     | Playback speed + bước từng frame                              | ✅         | Phase 7: 0.1×–2×, nút ⏴/⏵ + phím ←/→ (frame 1/30s)                           |
+| Animate     | Draw order timeline                                           | ✅         | Phase 7: evaluate + render; nút ↑/↓ slot trong animate mode key tại playhead |
+| Animate     | Slot attachment/color/deform/IK/transform timelines           | ✅         | Evaluator + auto-key (bone) đầy đủ                                           |
+| Animate     | Event timeline                                                | ✅         | Phase 7: track events trong dopesheet, nút + Event tại playhead              |
+| Animate     | Preview view riêng (cửa sổ playback)                          | ❌         | Playback dùng chung viewport                                                 |
+| Workflow    | Undo/redo, autosave, multi-select, phím tắt, resizable panels | ✅         | Sau đợt nâng cấp UI 07/2026                                                  |
+| Workflow    | Dockable panels                                               | ❌         | Layout cố định (đã resizable)                                                |
+| Workflow    | Tìm kiếm/lọc trong Hierarchy                                  | ❌         |                                                                              |
+| Workflow    | Texture packing                                               | 🟡         | Shelf packing ✅; chưa có polygon packing, rotation, strip whitespace        |
+| Export      | Spine JSON 4.2                                                | ✅         |                                                                              |
+| Export      | Binary `.skel`                                                | ❌         |                                                                              |
+| Export      | GIF / video / PNG sequence                                    | ❌         |                                                                              |
+| Import      | Spine JSON                                                    | ✅         |                                                                              |
+| Import      | Atlas (`.atlas` + PNG → cắt lại region rời)                   | ❌         | Gap đã gặp với sample goblins                                                |
 
-### 6.2. Phase 7 — Công cụ animation chuyên nghiệp _(ưu tiên cao nhất: giá trị/công sức tốt nhất)_
+### 6.2. Phase 7 — Công cụ animation chuyên nghiệp ✅ Hoàn thành (07/2026)
+
+> Ghi chú thực hiện: core thêm `computeAnimatedDrawOrder`/`computeDrawOrderOffsets`,
+> commands `UpsertDrawOrderKeyframe`/`DeleteDrawOrderKeyframe`/`DeleteEventKeyframe`/
+> `TransformBoneKeys` (retime nhóm key `t' = pivot + (t-pivot)·scale + offset`, dịch cả
+> bezier handles, 1 bước undo). Dopesheet: box-select, kéo nhóm key, xóa/copy/paste nhiều
+> key, scale timing quanh key sớm nhất; track draw order (tím) + events (xanh lá).
+> Graph editor (nút Curve) kéo control point trực tiếp, tự nới chiều cao panel.
+> Playback speed 0.1×–2×, bước frame ⏴/⏵ + phím ←/→ (1/30s), hiển thị số frame.
+> Ghosting 2 pose trước/sau. Nút ↑/↓ của slot trong animate mode key draw order tại
+> playhead thay vì sửa setup. Renderer áp dụng thứ tự slot động. MCP thêm 5 tool:
+> `shift_keys`, `set_draw_order_keyframe`, `delete_draw_order_keyframe`,
+> `delete_event_keyframe`, `set_playback_speed`. Chưa làm: chọn key qua click track
+> label; kéo/di chuyển key trên track draw order/event (mới chọn + xóa được).
 
 1. **Graph editor**: view curve dưới dopesheet, vẽ đường cong giữa 2 key của track đang chọn,
    kéo 2 control point bezier trực tiếp (ghi `curve: [cx1,cy1,cx2,cy2,…]` per channel).

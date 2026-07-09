@@ -42,6 +42,13 @@ export function App() {
       else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
         e.preventDefault();
         s.setPlaying(!s.anim.playing);
+      } else if (
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+        s.mode === 'animate' &&
+        s.anim.current
+      ) {
+        e.preventDefault();
+        s.stepFrame(e.key === 'ArrowLeft' ? -1 : 1);
       } else if (e.key === 'Escape') {
         s.select(null);
       } else if (e.key === '?') {

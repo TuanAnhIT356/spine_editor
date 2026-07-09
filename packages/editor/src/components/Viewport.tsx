@@ -9,8 +9,10 @@ import {
   computeAnimatedAttachments,
   computeAnimatedColors,
   computeAnimatedDeforms,
+  computeAnimatedDrawOrder,
   computeAnimatedLocals,
   createBone,
+  getAnimationDuration,
   invertMat,
   type BoneData,
   type Command,
@@ -80,6 +82,7 @@ export function Viewport() {
   const mode = useEditor((s) => s.mode);
   const animCurrent = useEditor((s) => s.anim.current);
   const animTime = useEditor((s) => s.anim.time);
+  const animGhost = useEditor((s) => s.anim.ghost);
 
   /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
   function baseLocals(): BoneData[] {
@@ -89,6 +92,27 @@ export function Viewport() {
       return computeAnimatedLocals(doc.data, anim.current, anim.time);
     }
     return doc.data.bones;
+  }
+
+  /** Onion-skin poses around the playhead: 2 past (blue) + 2 future (green). */
+  function buildGhosts(): RenderInput['ghosts'] {
+    const state = useEditor.getState();
+    const { doc, anim } = state;
+    if (!anim.ghost || !anim.current) return undefined;
+    const animation = doc.getAnimation(anim.current);
+    if (!animation) return undefined;
+    const duration = getAnimationDuration(animation);
+    const spacing = Math.max(duration / 12, 1 / 30);
+    const ghosts: NonNullable<RenderInput['ghosts']> = [];
+    for (const step of [-2, -1, 1, 2]) {
+      const t = anim.time + step * spacing;
+      if (t < 0 || t > duration || Math.abs(t - anim.time) < 1e-6) continue;
+      ghosts.push({
+        bones: computeAnimatedLocals(doc.data, anim.current, t),
+        color: step < 0 ? 0x5b87b5 : 0x5bb587,
+      });
+    }
+    return ghosts.length > 0 ? ghosts : undefined;
   }
 
   function buildRenderInput(): RenderInput {
@@ -107,6 +131,10 @@ export function Viewport() {
       deforms: animating
         ? computeAnimatedDeforms(state.doc.data, state.anim.current!, state.anim.time)
         : undefined,
+      slotOrder: animating
+        ? computeAnimatedDrawOrder(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
+      ghosts: animating ? buildGhosts() : undefined,
       assets: state.assets,
       selection: state.selection,
     };
@@ -144,7 +172,7 @@ export function Viewport() {
     };
   }, []);
 
-  useEffect(redraw, [revision, selection, assets, mode, animCurrent, animTime]);
+  useEffect(redraw, [revision, selection, assets, mode, animCurrent, animTime, animGhost]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
     const rect = hostRef.current!.getBoundingClientRect();

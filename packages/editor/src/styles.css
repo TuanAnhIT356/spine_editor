@@ -391,6 +391,87 @@ button.danger {
   border-color: #ffb020;
 }
 
+.key.draworder {
+  background: #8a6cc9;
+  border-color: #5f3fa0;
+}
+
+.key.event {
+  background: #6cc98a;
+  border-color: #3fa05f;
+}
+
+.key.draworder.selected,
+.key.event.selected {
+  background: #ffd48a;
+  border-color: #ffb020;
+}
+
+.track.special {
+  background: #232328;
+}
+
+.box-select {
+  position: absolute;
+  border: 1px solid #ffcc33;
+  background: rgba(255, 204, 51, 0.12);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.key-tools .scale-input {
+  width: 44px;
+  background: #17171a;
+  color: #d6d6dc;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.graph-editor {
+  border-top: 1px solid #131316;
+  background: #1d1d21;
+  flex-shrink: 0;
+}
+
+.graph-editor.empty {
+  color: #77777f;
+  padding: 10px;
+}
+
+.graph-editor canvas {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+
+.graph-title {
+  font-size: 11px;
+  color: #c9a76a;
+}
+
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #9a9aa3;
+}
+
+.graph-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 .playhead {
   position: absolute;
   top: 0;
