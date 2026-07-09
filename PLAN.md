@@ -172,7 +172,7 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
 | Rigging     | Clipping attachments                                          | ✅         | Phase 8: + Clipping tạo slot mask, render mask thật, kéo polygon, chọn end slot                                  |
 | Rigging     | Bounding box / Point attachments                              | ✅         | Phase 8: tạo từ Properties, outline viewport, kéo vertex bbox, sửa x/y/rotation point                            |
 | Rigging     | Path attachments (composite bezier)                           | ✅         | Phase 9: + Path tạo spline, render curve + anchor/handle, kéo điểm bằng vertex editor                            |
-| Rigging     | Skins (tạo, đổi skin, preview)                                | 📦         | Renderer chỉ ưu tiên skin `default`; chưa có UI skins                                                            |
+| Rigging     | Skins (tạo, đổi skin, preview)                                | ✅         | Phase 10: section Skins (tạo/nhân bản/xóa, chọn active), renderer resolve active→default, attach vào active skin |
 | Rigging     | Import PSD (script Photoshop)                                 | ❌         | Web thay thế bằng import PSD trực tiếp (`ag-psd`)                                                                |
 | Constraints | IK (mix, bend, 1–2 bone)                                      | ✅         | Phase 9: softness (soft IK), stretch, compress, uniform                                                          |
 | Constraints | Transform constraints                                         | ✅         | mixRotate/X/Y/Scale, local/relative                                                                              |
@@ -189,13 +189,13 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
 | Animate     | Preview view riêng (cửa sổ playback)                          | ❌         | Playback dùng chung viewport                                                                                     |
 | Workflow    | Undo/redo, autosave, multi-select, phím tắt, resizable panels | ✅         | Sau đợt nâng cấp UI 07/2026                                                                                      |
 | Workflow    | Dockable panels                                               | ❌         | Layout cố định (đã resizable)                                                                                    |
-| Workflow    | Tìm kiếm/lọc trong Hierarchy                                  | ❌         |                                                                                                                  |
+| Workflow    | Tìm kiếm/lọc trong Hierarchy                                  | ✅         | Phase 10: ô search lọc bone/slot                                                                                 |
 | Workflow    | Texture packing                                               | 🟡         | Shelf packing ✅; chưa có polygon packing, rotation, strip whitespace                                            |
 | Export      | Spine JSON 4.2                                                | ✅         |                                                                                                                  |
 | Export      | Binary `.skel`                                                | ❌         |                                                                                                                  |
-| Export      | GIF / video / PNG sequence                                    | ❌         |                                                                                                                  |
+| Export      | GIF / video / PNG sequence                                    | 🟡         | Phase 10: xuất GIF (gifenc, 20fps, khung viewport); video/PNG sequence chưa làm                                  |
 | Import      | Spine JSON                                                    | ✅         |                                                                                                                  |
-| Import      | Atlas (`.atlas` + PNG → cắt lại region rời)                   | ❌         | Gap đã gặp với sample goblins                                                                                    |
+| Import      | Atlas (`.atlas` + PNG → cắt lại region rời)                   | ✅         | Phase 10: parse cả 2 format libgdx, hỗ trợ rotate + whitespace-strip; goblins render đủ 2 skin                   |
 
 ### 6.2. Phase 7 — Công cụ animation chuyên nghiệp ✅ Hoàn thành (07/2026)
 
@@ -275,7 +275,19 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
 5. **Bone inherit**: 3 chế độ còn lại đúng theo runtime chuẩn (noRotationOrReflection, noScale, noScaleOrReflection).
 6. Nghiệm thu: fixture JSON có path/physics từ tài liệu công khai round-trip + pose khớp số liệu kỳ vọng.
 
-### 6.5. Phase 10 — Skins, Import/Export & Workflow
+### 6.5. Phase 10 — Skins, Import/Export & Workflow ✅ Hoàn thành (một phần, 07/2026)
+
+> Ghi chú thực hiện: **Đã xong** — commands CreateSkin (kèm copyFrom nhân bản)/RemoveSkin;
+> `activeSkin` trong store, renderer resolve attachment theo active skin → default → skin khác
+> (kể cả trường `name` của attachment như "goblin/left-foot"); section Skins trong Hierarchy;
+> attach ảnh vào skin đang active. `parseAtlas` (core) đọc cả format libgdx cũ (xy/size/orig/
+> offset) lẫn Spine 4.x (bounds/offsets), `sliceAtlas` (editor) cắt region qua canvas hỗ trợ
+> rotate 90° + whitespace-strip; nút Import Atlas (chọn .atlas + PNG cùng lúc); nghiệm thu
+> bằng goblins: import atlas → đổi skin goblin/goblingirl render đầy đủ. Xuất **GIF** qua
+> gifenc (20fps, khung viewport, playhead khôi phục sau khi xuất). Ô search lọc bone/slot
+> trong Hierarchy. MCP thêm 3 tool: `create_skin`, `switch_skin`, `import_atlas` (47 tools).
+> **Chưa làm** — binary `.skel`, import PSD, xuất video/PNG sequence, dockable panels,
+> texture packer nâng cấp (rotation/strip), bone color/icon.
 
 1. **Skins UI**: panel Skins (tạo/xóa/nhân bản), chọn active skin để render + đặt attachment
    theo skin; renderer resolve theo active skin thay vì chỉ `default`.

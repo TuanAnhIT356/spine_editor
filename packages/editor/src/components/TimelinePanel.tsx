@@ -15,6 +15,7 @@ import {
   type SpineBoneTimelineName,
 } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
+import { exportGif } from '../state/gif-export.js';
 import { uniqueName, useEditor } from '../state/store.js';
 import { GraphEditor } from './GraphEditor.js';
 
@@ -89,6 +90,7 @@ export function TimelinePanel() {
   const [pps, setPps] = useState(DEFAULT_PPS);
   const [showGraph, setShowGraph] = useState(false);
   const [scaleText, setScaleText] = useState('1.5');
+  const [exporting, setExporting] = useState(false);
   const tracksRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const scrubbing = useRef(false);
@@ -551,6 +553,20 @@ export function TimelinePanel() {
         </button>
         <button disabled={!anim.current} onClick={onAddEvent} title="Key an event at the playhead">
           + Event
+        </button>
+        <button
+          disabled={!anim.current || exporting}
+          title="Export the current animation as an animated GIF (20fps, viewport framing)"
+          onClick={() => {
+            setExporting(true);
+            exportGif()
+              .catch((err) =>
+                useEditor.getState().setError(err instanceof Error ? err.message : String(err)),
+              )
+              .finally(() => setExporting(false));
+          }}
+        >
+          {exporting ? 'Exporting…' : 'GIF'}
         </button>
         {copiedKeys.length > 0 && (
           <button

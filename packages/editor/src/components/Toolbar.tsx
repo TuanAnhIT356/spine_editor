@@ -1,11 +1,13 @@
 import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
 import { useRef } from 'react';
 import { buildAtlas } from '../state/atlas.js';
+import { sliceAtlas } from '../state/atlas-slice.js';
 import { saveProjectFile } from '../state/actions.js';
 import {
   downloadDataUrl,
   downloadText,
   loadImageAsset,
+  readFileAsDataUrl,
   readFileAsText,
   type ProjectPayload,
 } from '../state/persistence.js';
@@ -26,12 +28,33 @@ export function Toolbar() {
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
+  const atlasInput = useRef<HTMLInputElement | null>(null);
   void revision; // subscribe so undo/redo enabled state stays fresh
 
   async function onImportImages(files: FileList | null) {
     if (!files || files.length === 0) return;
     const assets = await Promise.all([...files].map(loadImageAsset));
     useEditor.getState().addAssets(assets);
+  }
+
+  /** Select the .atlas file together with its page PNG(s) in one pick. */
+  async function onImportAtlas(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const state = useEditor.getState();
+    try {
+      const list = [...files];
+      const atlasFile = list.find((f) => f.name.endsWith('.atlas') || f.name.endsWith('.txt'));
+      if (!atlasFile) throw new Error('Pick the .atlas file together with its PNG page(s).');
+      const pngs = list.filter((f) => f !== atlasFile);
+      if (pngs.length === 0) throw new Error('Pick the atlas PNG page(s) together with .atlas.');
+      const atlasText = await readFileAsText(atlasFile);
+      const pages = new Map<string, string>();
+      for (const png of pngs) pages.set(png.name, await readFileAsDataUrl(png));
+      const assets = await sliceAtlas(atlasText, pages);
+      state.addAssets(assets);
+    } catch (err) {
+      state.setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   function onExportJson() {
@@ -128,6 +151,12 @@ export function Toolbar() {
         <button onClick={() => spineJsonInput.current?.click()} title="Load a Spine JSON skeleton">
           Import JSON
         </button>
+        <button
+          onClick={() => atlasInput.current?.click()}
+          title="Pick a .atlas file plus its PNG page(s) — regions become separate images"
+        >
+          Import Atlas
+        </button>
         <button onClick={onExportJson}>Export JSON</button>
         <button
           onClick={() => void onExportAtlas()}
@@ -185,6 +214,17 @@ export function Toolbar() {
         hidden
         onChange={(e) => {
           void onImportSpineJson(e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={atlasInput}
+        type="file"
+        accept=".atlas,.txt,image/png"
+        multiple
+        hidden
+        onChange={(e) => {
+          void onImportAtlas(e.target.files);
           e.target.value = '';
         }}
       />

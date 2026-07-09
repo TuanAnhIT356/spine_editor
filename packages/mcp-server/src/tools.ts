@@ -489,6 +489,30 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
 
   server.tool(
+    'create_skin',
+    "Create a skin (optionally deep-copying another skin's attachments) and make it active in the viewport.",
+    { name: z.string(), copyFrom: z.string().optional() },
+    forward('create_skin'),
+  );
+
+  server.tool(
+    'switch_skin',
+    'Set the skin used to resolve attachments in the viewport (the "default" skin always backs it up). Affects previews/screenshots, not the exported data.',
+    { name: z.string() },
+    forward('switch_skin'),
+  );
+
+  server.tool(
+    'import_atlas',
+    'Import a packed texture atlas: pass the .atlas text plus each page image as a data URL. Regions are sliced back into separate images (rotation and whitespace-strip offsets honored) so existing attachments referencing them render.',
+    {
+      atlas: z.string().describe('The .atlas file text (libgdx format).'),
+      pages: z.array(z.object({ name: z.string(), dataUrl: z.string() })),
+    },
+    forward('import_atlas'),
+  );
+
+  server.tool(
     'add_transform_constraint',
     "Constrain bones to copy a target bone's transform, blended by mixRotate/mixX/mixY/mixScaleX/mixScaleY (0-1). rotation/x/y/scaleX/scaleY are offsets added to the target.",
     {

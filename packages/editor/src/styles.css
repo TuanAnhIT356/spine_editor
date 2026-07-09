@@ -227,6 +227,51 @@ button.danger {
   font-size: 11px;
 }
 
+.tree-filter {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 0 8px 6px;
+  background: #17171a;
+  color: #d6d6dc;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.skins .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.skins .row.selected {
+  background: #2b2b31;
+}
+
+.skins .skin-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skins .row-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.skins .row-actions button {
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.skins .new-skin {
+  margin: 4px 10px;
+  font-size: 11px;
+}
+
 .assets .asset-row {
   display: flex;
   align-items: center;

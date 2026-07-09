@@ -69,6 +69,17 @@ points down), so child bones sit at `x = parent.length`.
   muzzles/hands) attach game metadata to slots; both render as outlines in the
   editor and round-trip to the exported JSON.
 
+## Skins & packed atlases
+
+- `create_skin` (optionally `copyFrom` to duplicate) + `switch_skin` change
+  which skin resolves attachments in the viewport — build character variants
+  by putting alternative images in each skin. Screenshots follow the active
+  skin; the export always contains all skins.
+- `import_atlas` unpacks an existing `.atlas` + page PNG (pass the atlas text
+  and each page as a data URL) back into separate images, honoring rotated
+  regions and whitespace-strip offsets — use it to load skeletons that ship
+  only with packed textures.
+
 ## Checks and gotchas
 
 - Every mutation is undoable: a wrong step is one `undo` away.

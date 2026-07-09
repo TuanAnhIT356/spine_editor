@@ -106,6 +106,58 @@ function requireSkin(data: SkeletonData, name: string): SpineSkin {
   return skin;
 }
 
+/** Creates a skin, optionally deep-copying another skin's attachments. */
+export class CreateSkin implements Command {
+  readonly label: string;
+
+  constructor(
+    private readonly name: string,
+    private readonly copyFrom?: string,
+  ) {
+    this.label = `Create skin "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    if (data.skins.some((s) => s.name === this.name)) {
+      throw new Error(`Skin "${this.name}" already exists.`);
+    }
+    const skin: SpineSkin = { name: this.name };
+    if (this.copyFrom !== undefined) {
+      const source = requireSkin(data, this.copyFrom);
+      if (source.attachments) skin.attachments = structuredClone(source.attachments);
+    }
+    data.skins.push(skin);
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.skins.findIndex((s) => s.name === this.name);
+    if (idx >= 0) data.skins.splice(idx, 1);
+  }
+}
+
+export class RemoveSkin implements Command {
+  readonly label: string;
+  private removed: SpineSkin | undefined;
+  private removedIndex = -1;
+
+  constructor(private readonly name: string) {
+    this.label = `Remove skin "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    if (this.name === 'default') throw new Error('The default skin cannot be removed.');
+    const idx = data.skins.findIndex((s) => s.name === this.name);
+    if (idx < 0) throw new Error(`Skin "${this.name}" does not exist.`);
+    this.removed = data.skins[idx];
+    this.removedIndex = idx;
+    data.skins.splice(idx, 1);
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.removed) data.skins.splice(this.removedIndex, 0, this.removed);
+  }
+}
+
 export class AddSkinAttachment implements Command {
   readonly label: string;
   private before: SpineSkin | undefined;

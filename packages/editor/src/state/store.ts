@@ -122,6 +122,8 @@ interface EditorState {
   selection: Selection;
   layout: LayoutState;
   meshEdit: MeshEditState | null;
+  /** Skin used to resolve attachments in the viewport ('default' built-in). */
+  activeSkin: string;
   assets: Record<string, ImageAsset>;
   error: string | null;
   anim: AnimationUiState;
@@ -136,6 +138,7 @@ interface EditorState {
   endMeshEdit(): void;
   setMeshEditMode(mode: MeshEditState['mode']): void;
   setPaintBone(bone: string | null): void;
+  setActiveSkin(name: string): void;
   resizeHierarchy(deltaPx: number): void;
   resizeProperties(deltaPx: number): void;
   resizeTimeline(deltaPx: number): void;
@@ -173,6 +176,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   selection: [],
   layout: loadLayout(),
   meshEdit: null,
+  activeSkin: 'default',
   assets: {},
   error: null,
   anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
@@ -215,6 +219,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setMeshEditMode: (mode) => set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, mode } } : s)),
   setPaintBone: (bone) =>
     set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, paintBone: bone } } : s)),
+  setActiveSkin: (name) => set({ activeSkin: name }),
   resizeHierarchy: (deltaPx) =>
     set((s) => {
       const layout = {
@@ -300,14 +305,18 @@ export const useEditor = create<EditorState>()((set, get) => ({
     }),
 
   attachAsset: (assetName, boneName) => {
-    const { doc, assets, execute } = get();
+    const { doc, assets, execute, activeSkin } = get();
     const asset = assets[assetName];
     if (!asset) return;
+    // If a slot with a same-named attachment placeholder exists, add the image
+    // to the ACTIVE skin for that slot (skin variants); otherwise create a new
+    // slot with the attachment in the active skin.
+    const skinName = doc.data.skins.some((s) => s.name === activeSkin) ? activeSkin : 'default';
     const slotName = uniqueName(asset.name, (n) => doc.data.slots.some((s) => s.name === n));
     const ok = execute(
       new Composite(`Attach "${asset.name}"`, [
         new AddSlot(createSlot(slotName, boneName, { attachment: asset.name })),
-        new AddSkinAttachment('default', slotName, asset.name, {
+        new AddSkinAttachment(skinName, slotName, asset.name, {
           width: asset.width,
           height: asset.height,
         }),

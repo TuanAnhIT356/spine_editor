@@ -13,6 +13,7 @@ import {
   AddTransformConstraint,
   Composite,
   CreateAnimation,
+  CreateSkin,
   DeleteBoneKeyframe,
   DeleteDrawOrderKeyframe,
   DeleteEventKeyframe,
@@ -49,6 +50,7 @@ import {
   type SpineJson,
 } from '@spine-editor/core';
 import { buildAtlas } from '../state/atlas.js';
+import { sliceAtlas } from '../state/atlas-slice.js';
 import { primarySelection, uniqueName, useEditor, type ImageAsset } from '../state/store.js';
 import { bridgeRuntime } from './runtime.js';
 
@@ -731,6 +733,49 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
         }),
       );
       return { attachment: name };
+    }
+
+    case 'create_skin': {
+      const name = str(params, 'name');
+      const copyFrom = typeof params['copyFrom'] === 'string' ? params['copyFrom'] : undefined;
+      executeOrThrow(new CreateSkin(name, copyFrom));
+      state().setActiveSkin(name);
+      return { ok: true, activeSkin: name };
+    }
+
+    case 'switch_skin': {
+      const s = state();
+      const name = str(params, 'name');
+      if (!s.doc.data.skins.some((sk) => sk.name === name)) {
+        throw new Error(`Skin "${name}" does not exist.`);
+      }
+      s.setActiveSkin(name);
+      return { ok: true, activeSkin: name };
+    }
+
+    case 'import_atlas': {
+      const atlasText = str(params, 'atlas');
+      const pagesParam = params['pages'];
+      if (
+        !Array.isArray(pagesParam) ||
+        !pagesParam.every(
+          (p) =>
+            typeof p === 'object' &&
+            p !== null &&
+            typeof (p as { name?: unknown }).name === 'string' &&
+            typeof (p as { dataUrl?: unknown }).dataUrl === 'string',
+        )
+      ) {
+        throw new Error('Param "pages" must be an array of { name, dataUrl }.');
+      }
+      const pageMap = new Map(
+        (pagesParam as { name: string; dataUrl: string }[]).map((p) => [p.name, p.dataUrl]),
+      );
+      const assets = await sliceAtlas(atlasText, pageMap);
+      state().addAssets(assets);
+      return {
+        imported: assets.map((a) => ({ name: a.name, width: a.width, height: a.height })),
+      };
     }
 
     case 'set_playback_speed': {
