@@ -150,3 +150,118 @@ Skills (`skills/`):
 ## 5. Phạm vi MVP đề xuất
 
 **MVP (Phase 0 → 3 + tool MCP cơ bản)**: rig nhân vật bằng bones + region attachments, tạo animation keyframe với curve, playback, xuất Spine JSON 4.2 hợp lệ, AI tạo được animation đơn giản qua MCP. Mesh/weights, IK, atlas packer nằm ở giai đoạn sau.
+
+## 6. Gap analysis so với Spine chính thức (spine-in-depth) & lộ trình Phase 7–10
+
+So sánh feature-by-feature với trang [Spine: In Depth](https://esotericsoftware.com/spine-in-depth)
+(bộ tính năng editor chính thức của Esoteric Software), đối chiếu với code hiện tại
+(sau đợt nâng cấp UI: resizable panels, multi-select, timeline zoom, phím tắt).
+
+Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu round-trip được nhưng chưa evaluate/render/edit.
+
+### 6.1. Bảng đối chiếu
+
+| Nhóm        | Feature của Spine                                             | Hiện trạng | Ghi chú                                                                      |
+| ----------- | ------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| Rigging     | Bones, hierarchy, re-parent, length                           | ✅         |                                                                              |
+| Rigging     | Bone `inherit` modes (5 chế độ)                               | 🟡         | `normal`/`onlyTranslation` chính xác; 3 chế độ còn lại xấp xỉ (`pose.ts`)    |
+| Rigging     | Region attachments                                            | ✅         |                                                                              |
+| Rigging     | Meshes (tạo lưới, chỉnh vertex, edit UV)                      | 🟡         | Tạo grid mesh qua MCP; **chưa có UI kéo vertex**                             |
+| Rigging     | Weights + weight painting                                     | 🟡         | Render weighted mesh ✅; **chưa có bind/paint UI**, chỉnh qua JSON/MCP       |
+| Rigging     | Linked meshes                                                 | 📦         |                                                                              |
+| Rigging     | Clipping attachments                                          | 📦         | Chưa render mask, chưa có UI vẽ polygon                                      |
+| Rigging     | Bounding box / Point attachments                              | 📦         | Chưa hiển thị/tạo trong viewport                                             |
+| Rigging     | Path attachments (composite bezier)                           | 📦         | Chưa vẽ/hiển thị spline                                                      |
+| Rigging     | Skins (tạo, đổi skin, preview)                                | 📦         | Renderer chỉ ưu tiên skin `default`; chưa có UI skins                        |
+| Rigging     | Import PSD (script Photoshop)                                 | ❌         | Web thay thế bằng import PSD trực tiếp (`ag-psd`)                            |
+| Constraints | IK (mix, bend, 1–2 bone)                                      | 🟡         | Solver ✅; **bỏ qua softness/stretch/compress**                              |
+| Constraints | Transform constraints                                         | ✅         | mixRotate/X/Y/Scale, local/relative                                          |
+| Constraints | Path constraints (evaluation)                                 | 📦         | Cần spline sampling + modes position/spacing/rotate                          |
+| Constraints | Physics constraints (evaluation)                              | 📦         | Cần mô phỏng spring-damper stateful, deterministic                           |
+| Animate     | Dopesheet (scrub, kéo key, curve preset, copy/paste 1 key)    | ✅         |                                                                              |
+| Animate     | Chọn nhiều key / kéo nhóm key / scale time                    | ✅         | Phase 7: box-select, kéo nhóm, copy/paste nhiều key, scale quanh pivot       |
+| Animate     | Graph editor (kéo bezier control points)                      | ✅         | Phase 7: nút Curve mở panel kéo 2 control point per channel                  |
+| Animate     | Ghosting (onion skinning)                                     | ✅         | Phase 7: nút Ghost — 2 pose trước (xanh dương) + 2 sau (xanh lá)             |
+| Animate     | Playback speed + bước từng frame                              | ✅         | Phase 7: 0.1×–2×, nút ⏴/⏵ + phím ←/→ (frame 1/30s)                           |
+| Animate     | Draw order timeline                                           | ✅         | Phase 7: evaluate + render; nút ↑/↓ slot trong animate mode key tại playhead |
+| Animate     | Slot attachment/color/deform/IK/transform timelines           | ✅         | Evaluator + auto-key (bone) đầy đủ                                           |
+| Animate     | Event timeline                                                | ✅         | Phase 7: track events trong dopesheet, nút + Event tại playhead              |
+| Animate     | Preview view riêng (cửa sổ playback)                          | ❌         | Playback dùng chung viewport                                                 |
+| Workflow    | Undo/redo, autosave, multi-select, phím tắt, resizable panels | ✅         | Sau đợt nâng cấp UI 07/2026                                                  |
+| Workflow    | Dockable panels                                               | ❌         | Layout cố định (đã resizable)                                                |
+| Workflow    | Tìm kiếm/lọc trong Hierarchy                                  | ❌         |                                                                              |
+| Workflow    | Texture packing                                               | 🟡         | Shelf packing ✅; chưa có polygon packing, rotation, strip whitespace        |
+| Export      | Spine JSON 4.2                                                | ✅         |                                                                              |
+| Export      | Binary `.skel`                                                | ❌         |                                                                              |
+| Export      | GIF / video / PNG sequence                                    | ❌         |                                                                              |
+| Import      | Spine JSON                                                    | ✅         |                                                                              |
+| Import      | Atlas (`.atlas` + PNG → cắt lại region rời)                   | ❌         | Gap đã gặp với sample goblins                                                |
+
+### 6.2. Phase 7 — Công cụ animation chuyên nghiệp ✅ Hoàn thành (07/2026)
+
+> Ghi chú thực hiện: core thêm `computeAnimatedDrawOrder`/`computeDrawOrderOffsets`,
+> commands `UpsertDrawOrderKeyframe`/`DeleteDrawOrderKeyframe`/`DeleteEventKeyframe`/
+> `TransformBoneKeys` (retime nhóm key `t' = pivot + (t-pivot)·scale + offset`, dịch cả
+> bezier handles, 1 bước undo). Dopesheet: box-select, kéo nhóm key, xóa/copy/paste nhiều
+> key, scale timing quanh key sớm nhất; track draw order (tím) + events (xanh lá).
+> Graph editor (nút Curve) kéo control point trực tiếp, tự nới chiều cao panel.
+> Playback speed 0.1×–2×, bước frame ⏴/⏵ + phím ←/→ (1/30s), hiển thị số frame.
+> Ghosting 2 pose trước/sau. Nút ↑/↓ của slot trong animate mode key draw order tại
+> playhead thay vì sửa setup. Renderer áp dụng thứ tự slot động. MCP thêm 5 tool:
+> `shift_keys`, `set_draw_order_keyframe`, `delete_draw_order_keyframe`,
+> `delete_event_keyframe`, `set_playback_speed`. Chưa làm: chọn key qua click track
+> label; kéo/di chuyển key trên track draw order/event (mới chọn + xóa được).
+
+1. **Graph editor**: view curve dưới dopesheet, vẽ đường cong giữa 2 key của track đang chọn,
+   kéo 2 control point bezier trực tiếp (ghi `curve: [cx1,cy1,cx2,cy2,…]` per channel).
+2. **Dopesheet nâng cao**: box-select key, kéo nhóm key, xóa/copy/paste nhiều key,
+   scale time cả nhóm (co giãn timing), chọn key qua click track label (cả hàng).
+3. **Playback**: chỉnh tốc độ (0.1×–2×), bước ←/→ từng frame (theo snap 0.01s), hiển thị FPS/frame.
+4. **Ghosting**: render pose tại t±n bước với alpha thấp (tận dụng `computeAnimatedLocals` sẵn có).
+5. **Draw order timeline**: `computeAnimatedDrawOrder` trong evaluator + key trong dopesheet + UI offset.
+6. **Event track trong dopesheet**: hiển thị + đặt/xóa event key trực tiếp.
+7. MCP: `set_curve_bezier`, `shift_keys`, `set_playback_speed`; cập nhật skill spine-animating.
+
+### 6.3. Phase 8 — Mesh & Weights UI _(khó nhất về UI, giá trị rigging lớn nhất)_
+
+1. **Vertex editing tool**: chế độ Edit Mesh trong viewport — chọn/kéo vertex (setup mode sửa
+   `vertices`, animate mode auto-key deform), thêm/xóa vertex + retriangulate (thư viện earcut).
+2. **Weights view**: bind bones vào mesh, auto-weights theo khoảng cách, brush paint weight
+   (tăng/giảm/smooth), hiển thị heatmap màu theo bone đang chọn.
+3. **Clipping**: vẽ polygon clipping trong viewport + render bằng Pixi mask/stencil.
+4. **Bounding box & point attachments**: vẽ/hiển thị (outline màu), tạo từ Properties panel.
+5. MCP: `set_mesh_vertices`, `set_weights`, `add_clipping`; skill spine-rigging bổ sung quy trình mesh.
+
+### 6.4. Phase 9 — Constraints đầy đủ + độ chính xác evaluator
+
+1. **Path attachments UI**: vẽ composite bezier spline (thêm/kéo điểm, handle đối xứng), closed path.
+2. **Path constraint evaluation**: sample spline theo arc-length; modes `position/spacing/rotate`
+   (fixed/percent/length), chain bones bám theo path — đối chiếu kết quả với runtime chuẩn bằng fixture.
+3. **Physics constraint evaluation**: spring-damper cho x/y/rotate/scale/shear
+   (inertia, strength, damping, gravity, wind, limit); bước mô phỏng cố định (deterministic)
+   để preview ổn định; reset state khi scrub ngược.
+4. **IK chính xác hoàn toàn**: softness, stretch, compress, uniform.
+5. **Bone inherit**: 3 chế độ còn lại đúng theo runtime chuẩn (noRotationOrReflection, noScale, noScaleOrReflection).
+6. Nghiệm thu: fixture JSON có path/physics từ tài liệu công khai round-trip + pose khớp số liệu kỳ vọng.
+
+### 6.5. Phase 10 — Skins, Import/Export & Workflow
+
+1. **Skins UI**: panel Skins (tạo/xóa/nhân bản), chọn active skin để render + đặt attachment
+   theo skin; renderer resolve theo active skin thay vì chỉ `default`.
+2. **Atlas import**: đọc `.atlas` (libgdx format) + PNG → cắt về texture rời theo region
+   (giải quyết việc load sample chỉ có atlas như goblins).
+3. **Export ảnh/video**: PNG sequence từ evaluator + đóng gói GIF (gifenc) / WebM (MediaRecorder).
+4. **Binary `.skel` 4.2**: writer + reader (spec công khai) — ưu tiên sau JSON vì runtime đọc được JSON.
+5. **Import PSD**: `ag-psd`, mỗi layer → image asset + vị trí ban đầu theo layer offset.
+6. **Workflow**: search/filter Hierarchy, bone color/icon, dockable panels (flexlayout-react),
+   texture packer nâng cấp (rotation, strip whitespace, max size, padding config).
+7. MCP: `switch_skin`, `import_atlas`, `export_gif`, `import_psd`.
+
+### 6.6. Nguyên tắc thực hiện chung
+
+- Mỗi feature đi kèm: command undoable trong `core` → UI editor → MCP tool → cập nhật SKILL.md
+  → unit test + verify Chromium thật (pattern các phase trước).
+- Không nhúng Spine Runtimes; mọi evaluation tự viết, đối chiếu bằng fixture tự tay + số liệu
+  từ tài liệu format công khai.
+- Ưu tiên đề xuất: **7 → 8 → 9 → 10** (giá trị animation trước, rigging nâng cao sau,
+  cuối cùng là hệ sinh thái import/export). Trong từng phase, mục nào độc lập có thể làm song song.

@@ -6,6 +6,7 @@ import {
   RemoveSlot,
   SpineDocument,
   createSlot,
+  getAnimationDuration,
   parseSpineJson,
   type Command,
   type SpineJson,
@@ -25,7 +26,11 @@ export type SelectionItem = { kind: 'bone' | 'slot'; name: string };
 /** Zero or more selected items; the last entry is the "primary" one shown in the properties panel. */
 export type Selection = SelectionItem[];
 
-export function isSelected(selection: Selection, kind: SelectionItem['kind'], name: string): boolean {
+export function isSelected(
+  selection: Selection,
+  kind: SelectionItem['kind'],
+  name: string,
+): boolean {
   return selection.some((s) => s.kind === kind && s.name === name);
 }
 
@@ -39,6 +44,10 @@ export interface AnimationUiState {
   time: number;
   playing: boolean;
   loop: boolean;
+  /** Playback rate multiplier (1 = realtime). */
+  speed: number;
+  /** Onion-skin ghosting of nearby frames while animating. */
+  ghost: boolean;
 }
 
 export interface LayoutState {
@@ -48,7 +57,11 @@ export interface LayoutState {
 }
 
 const LAYOUT_STORAGE_KEY = 'spine-editor:layout';
-const DEFAULT_LAYOUT: LayoutState = { hierarchyWidth: 250, propertiesWidth: 250, timelineHeight: 190 };
+const DEFAULT_LAYOUT: LayoutState = {
+  hierarchyWidth: 250,
+  propertiesWidth: 250,
+  timelineHeight: 190,
+};
 const LAYOUT_LIMITS = {
   hierarchyWidth: [160, 520] as const,
   propertiesWidth: [200, 520] as const,
@@ -65,12 +78,18 @@ function loadLayout(): LayoutState {
     if (!raw) return DEFAULT_LAYOUT;
     const parsed = JSON.parse(raw) as Partial<LayoutState>;
     return {
-      hierarchyWidth: clamp(parsed.hierarchyWidth ?? DEFAULT_LAYOUT.hierarchyWidth, LAYOUT_LIMITS.hierarchyWidth),
+      hierarchyWidth: clamp(
+        parsed.hierarchyWidth ?? DEFAULT_LAYOUT.hierarchyWidth,
+        LAYOUT_LIMITS.hierarchyWidth,
+      ),
       propertiesWidth: clamp(
         parsed.propertiesWidth ?? DEFAULT_LAYOUT.propertiesWidth,
         LAYOUT_LIMITS.propertiesWidth,
       ),
-      timelineHeight: clamp(parsed.timelineHeight ?? DEFAULT_LAYOUT.timelineHeight, LAYOUT_LIMITS.timelineHeight),
+      timelineHeight: clamp(
+        parsed.timelineHeight ?? DEFAULT_LAYOUT.timelineHeight,
+        LAYOUT_LIMITS.timelineHeight,
+      ),
     };
   } catch {
     return DEFAULT_LAYOUT;
@@ -111,6 +130,10 @@ interface EditorState {
   setAnimTime(time: number): void;
   setPlaying(playing: boolean): void;
   setLoop(loop: boolean): void;
+  setSpeed(speed: number): void;
+  setGhost(ghost: boolean): void;
+  /** Steps the playhead by `frames` at 30fps, clamped to [0, duration]. */
+  stepFrame(frames: number): void;
   execute(command: Command): boolean;
   undo(): void;
   redo(): void;
@@ -137,7 +160,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   layout: loadLayout(),
   assets: {},
   error: null,
-  anim: { current: null, time: 0, playing: false, loop: true },
+  anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
 
   setTool: (tool) => set({ tool }),
   setMode: (mode) =>
@@ -201,6 +224,21 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setAnimTime: (time) => set((s) => ({ anim: { ...s.anim, time: Math.max(0, time) } })),
   setPlaying: (playing) => set((s) => ({ anim: { ...s.anim, playing } })),
   setLoop: (loop) => set((s) => ({ anim: { ...s.anim, loop } })),
+  setSpeed: (speed) =>
+    set((s) => ({ anim: { ...s.anim, speed: Math.min(4, Math.max(0.1, speed)) } })),
+  setGhost: (ghost) => set((s) => ({ anim: { ...s.anim, ghost } })),
+  stepFrame: (frames) =>
+    set((s) => {
+      const anim = s.anim.current ? s.doc.getAnimation(s.anim.current) : undefined;
+      if (!anim) return s;
+      const duration = getAnimationDuration(anim);
+      const step = 1 / 30;
+      const time = Math.min(
+        duration,
+        Math.max(0, Math.round((s.anim.time + frames * step) / step) * step),
+      );
+      return { anim: { ...s.anim, time, playing: false } };
+    }),
 
   execute: (command) => {
     const { doc } = get();
@@ -276,7 +314,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       selection: [],
       error: null,
       revision: s.revision + 1,
-      anim: { current: null, time: 0, playing: false, loop: true },
+      anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
     }));
     return issues;
   },

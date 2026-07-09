@@ -36,6 +36,10 @@ export interface RenderInput {
   slotColors?: ReadonlyMap<string, string>;
   /** Animated deform offsets per slot → attachment (animate mode). */
   deforms?: ReadonlyMap<string, ReadonlyMap<string, Float32Array>>;
+  /** Slot names back-to-front when a draw order key is active (animate mode). */
+  slotOrder?: string[];
+  /** Onion-skin bone poses drawn faintly under the scene (animate mode). */
+  ghosts?: { bones: BoneData[]; color: number }[];
   assets: Record<string, ImageAsset>;
   selection: Selection;
 }
@@ -121,6 +125,7 @@ export class SceneRenderer {
   private app = new Application();
   private world = new Container();
   private grid = new Graphics();
+  private ghostLayer = new Graphics();
   private spriteLayer = new Container();
   private boneLayer = new Graphics();
   private sprites = new Map<string, Sprite>();
@@ -142,7 +147,7 @@ export class SceneRenderer {
     }
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
-    this.world.addChild(this.grid, this.spriteLayer, this.boneLayer);
+    this.world.addChild(this.grid, this.ghostLayer, this.spriteLayer, this.boneLayer);
     this.app.stage.addChild(this.world);
     this.offsetX = host.clientWidth / 2;
     this.offsetY = host.clientHeight * 0.75;
@@ -246,8 +251,16 @@ export class SceneRenderer {
     await Promise.all(Object.values(input.assets).map((a) => this.ensureTexture(a)));
     if (!this.ready) return;
 
+    this.drawGhosts(data, input.ghosts);
+
+    const slotsInOrder = input.slotOrder
+      ? input.slotOrder
+          .map((name) => data.slots.find((s) => s.name === name))
+          .filter((s): s is (typeof data.slots)[number] => s !== undefined)
+      : data.slots;
+
     this.spriteLayer.removeChildren();
-    for (const slot of data.slots) {
+    for (const slot of slotsInOrder) {
       const attachmentName = input.slotAttachments?.has(slot.name)
         ? input.slotAttachments.get(slot.name)
         : slot.attachment;
@@ -319,6 +332,27 @@ export class SceneRenderer {
     }
 
     this.drawBones(data.bones, pose, input.selection);
+  }
+
+  /** Faint skeleton outlines for onion skinning (bones only, cheap to draw). */
+  private drawGhosts(data: SkeletonData, ghosts: RenderInput['ghosts']): void {
+    const g = this.ghostLayer;
+    g.clear();
+    if (!ghosts?.length) return;
+    for (const ghost of ghosts) {
+      const pose = computeSetupPose({ ...data, bones: ghost.bones });
+      for (const bone of ghost.bones) {
+        const m = pose.get(bone.name);
+        if (!m) continue;
+        if (bone.length > 0) {
+          const tip = applyMat(m, bone.length, 0);
+          g.moveTo(m.tx, m.ty)
+            .lineTo(tip.x, tip.y)
+            .stroke({ width: 2 / this.zoom, color: ghost.color, alpha: 0.35 });
+        }
+        g.circle(m.tx, m.ty, 3 / this.zoom).fill({ color: ghost.color, alpha: 0.35 });
+      }
+    }
   }
 
   private drawBones(bones: BoneData[], pose: Map<string, Mat2D>, selection: Selection): void {

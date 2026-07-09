@@ -171,9 +171,7 @@ export function PropertiesPanel() {
   return (
     <div className="panel properties" style={{ width: layout.propertiesWidth }}>
       {!primary && <div className="empty">Select a bone or slot to edit its properties.</div>}
-      {extraCount > 0 && (
-        <div className="selection-count">+{extraCount} more selected</div>
-      )}
+      {extraCount > 0 && <div className="selection-count">+{extraCount} more selected</div>}
       {primary?.kind === 'bone' && <BoneProperties name={primary.name} />}
       {primary?.kind === 'slot' && <SlotProperties name={primary.name} />}
     </div>

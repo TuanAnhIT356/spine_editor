@@ -10,6 +10,8 @@ import {
   AddSlot,
   CreateAnimation,
   DeleteBoneKeyframe,
+  DeleteDrawOrderKeyframe,
+  DeleteEventKeyframe,
   RemoveAnimation,
   RemoveBone,
   AddSkinAttachment,
@@ -19,8 +21,10 @@ import {
   SetBoneTransform,
   SetEventDef,
   SetSlotProperties,
+  TransformBoneKeys,
   UpsertBoneKeyframe,
   UpsertDeformKeyframe,
+  UpsertDrawOrderKeyframe,
   UpsertEventKeyframe,
   UpsertSlotAttachmentKeyframe,
   UpsertSlotColorKeyframe,
@@ -30,6 +34,7 @@ import {
   createSlot,
   getAnimationDuration,
   serializeSpineJson,
+  type BoneKeyRef,
   type BoneTransformPatch,
   type SlotData,
   type SpineAttachmentKey,
@@ -484,6 +489,88 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       if (typeof params['string'] === 'string') key['string'] = params['string'];
       executeOrThrow(new UpsertEventKeyframe(str(params, 'animation'), key as { name: string }));
       return { ok: true };
+    }
+
+    case 'set_playback_speed': {
+      const speed = optNum(params, 'speed');
+      if (speed === undefined) throw new Error('Missing number param "speed".');
+      state().setSpeed(speed);
+      return { speed: useEditor.getState().anim.speed };
+    }
+
+    case 'set_draw_order_keyframe': {
+      const offsets = params['offsets'];
+      if (
+        !Array.isArray(offsets) ||
+        !offsets.every(
+          (o) =>
+            typeof o === 'object' &&
+            o !== null &&
+            typeof (o as { slot?: unknown }).slot === 'string' &&
+            typeof (o as { offset?: unknown }).offset === 'number',
+        )
+      ) {
+        throw new Error('Param "offsets" must be an array of { slot, offset }.');
+      }
+      const key: { time?: number; offsets?: { slot: string; offset: number }[] } = {
+        offsets: offsets as { slot: string; offset: number }[],
+      };
+      const time = optNum(params, 'time');
+      if (time !== undefined && time > 0) key.time = time;
+      executeOrThrow(new UpsertDrawOrderKeyframe(str(params, 'animation'), key));
+      return { ok: true };
+    }
+
+    case 'delete_draw_order_keyframe':
+      executeOrThrow(
+        new DeleteDrawOrderKeyframe(str(params, 'animation'), optNum(params, 'time') ?? 0),
+      );
+      return { ok: true };
+
+    case 'delete_event_keyframe':
+      executeOrThrow(
+        new DeleteEventKeyframe(
+          str(params, 'animation'),
+          str(params, 'name'),
+          optNum(params, 'time') ?? 0,
+        ),
+      );
+      return { ok: true };
+
+    case 'shift_keys': {
+      // Retimes bone keys: t' = pivot + (t - pivot) * scale + offset.
+      const s = state();
+      const animation = str(params, 'animation');
+      const anim = s.doc.getAnimation(animation);
+      if (!anim) throw new Error(`Animation "${animation}" does not exist.`);
+      const boneFilter = typeof params['bone'] === 'string' ? params['bone'] : undefined;
+      const timelineFilter =
+        typeof params['timeline'] === 'string'
+          ? (params['timeline'] as SpineBoneTimelineName)
+          : undefined;
+      const refs: BoneKeyRef[] = [];
+      for (const [boneName, timelines] of Object.entries(anim.bones ?? {})) {
+        if (boneFilter && boneName !== boneFilter) continue;
+        for (const [tl, keys] of Object.entries(timelines)) {
+          if (timelineFilter && tl !== timelineFilter) continue;
+          for (const key of keys ?? []) {
+            refs.push({
+              bone: boneName,
+              timeline: tl as SpineBoneTimelineName,
+              time: key.time ?? 0,
+            });
+          }
+        }
+      }
+      if (refs.length === 0) return { moved: 0 };
+      executeOrThrow(
+        new TransformBoneKeys(animation, refs, {
+          offset: optNum(params, 'offset') ?? 0,
+          scale: optNum(params, 'scale') ?? 1,
+          pivot: optNum(params, 'pivot') ?? 0,
+        }),
+      );
+      return { moved: refs.length };
     }
 
     case 'validate':
