@@ -7,15 +7,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A web-based 2D skeletal animation editor (Spine-like UI) that exports the Spine JSON format
 (target version **4.2**), with an MCP server + skills so AI agents can rig and animate.
 The full roadmap, architecture rationale, and phase breakdown live in `PLAN.md` — read it before
-starting work on a new phase. Current status: **Phases 0-7 done** (evaluator covers bone/IK/
-transform-constraint/slot-color/attachment/deform/draw-order timelines; grid-mesh creation +
-deform/color keyframing via MCP; atlas packer; Pages deploy workflow; resizable panels,
-multi-select, timeline zoom, keyboard-shortcut system; Phase 7 pro animation tools: graph
-editor with draggable bezier handles, dopesheet box-select/group-drag/multi-copy-paste/
-time-scaling, playback speed + frame stepping, ghosting, draw-order + event tracks). Known
-gaps and the feature-gap analysis vs. official Spine live in PLAN.md §6 (Phases 8-10): mesh
-vertex-editing/weight-painting UI, clipping rendering, path/physics constraint evaluation
-(data round-trips), skins UI, atlas import, GIF/video export, dockable panels.
+starting work on a new phase. Current status: **Phases 0-8 done** (evaluator covers bone/IK/
+transform-constraint/slot-color/attachment/deform/draw-order timelines; atlas packer; Pages
+deploy workflow; resizable panels, multi-select, timeline zoom, keyboard shortcuts; Phase 7
+pro animation tools: graph editor with draggable bezier handles, dopesheet box-select/
+group-drag/time-scaling, playback speed + frame stepping, ghosting, draw-order + event
+tracks; Phase 8 mesh & weights UI: viewport vertex editing with deform auto-key, bind +
+auto weights + heatmap + brush painting, real clipping mask rendering, bounding-box/point
+attachments). Known gaps and the feature-gap analysis vs. official Spine live in PLAN.md §6
+(Phases 9-10): path/physics constraint evaluation (data round-trips), IK softness/stretch,
+skins UI, atlas import, GIF/video export, PSD import, add/remove mesh vertices, dockable
+panels.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

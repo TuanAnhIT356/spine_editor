@@ -177,6 +177,18 @@ const meshShot = await call('screenshot_viewport');
 fs.writeFileSync(`${OUT}/mesh-deform.png`, Buffer.from(meshShot.image, 'base64'));
 const meshExport = JSON.parse((await call('export_spine_json')).json);
 
+// 9c. Weights + clipping + hit-test metadata (Phase 8 tools).
+const bindRes = await call('bind_weights', { slot: flagSlot.slot, bones: ['mast', 'root'] });
+const clipRes = await call('add_clipping', { slot: flagSlot.slot });
+await call('add_bounding_box', { slot: flagSlot.slot, vertices: [-30, -20, 30, -20, 0, 25] });
+await call('add_point', { slot: flagSlot.slot, name: 'flag-tip', x: 30, y: 20, rotation: 45 });
+const phase8Export = JSON.parse((await call('export_spine_json')).json);
+const flagAtts = phase8Export.skins?.[0]?.attachments?.[flagSlot.slot] ?? {};
+const clipAtt = phase8Export.skins?.[0]?.attachments?.[clipRes.slot]?.clip;
+const weightedFlag = flagAtts.flag?.vertices?.length !== flagAtts.flag?.uvs?.length;
+const clipShot = await call('screenshot_viewport');
+fs.writeFileSync(`${OUT}/clipping.png`, Buffer.from(clipShot.image, 'base64'));
+
 // 10. Events through MCP land in the export.
 await call('set_event', { name: 'footstep', audio: 'step.wav' });
 await call('create_animation', { name: 'walk' });
@@ -203,6 +215,12 @@ console.log(
       deformKeys:
         meshExport.animations?.flutter?.attachments?.default?.[flagSlot.slot]?.flag?.deform?.length,
       colorKeys: meshExport.animations?.flutter?.slots?.[flagSlot.slot]?.rgba?.length,
+      bindRes,
+      weightedFlag,
+      clipSlot: clipRes.slot,
+      clipEnd: clipAtt?.end,
+      bboxVerts: flagAtts[`${flagSlot.slot}-bbox`]?.vertexCount,
+      pointAtt: flagAtts['flag-tip'],
       eventDefs: exportedEvents.events,
       eventKeys: exportedEvents.animations?.walk?.events,
     },

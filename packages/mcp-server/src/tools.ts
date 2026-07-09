@@ -369,6 +369,66 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
     forward('set_playback_speed'),
   );
 
+  server.tool(
+    'set_mesh_vertices',
+    "Replace a vertex-based attachment's vertices (mesh/boundingbox/clipping). Unweighted: x,y pairs in the slot bone's space matching the vertex count. Weighted meshes accept the full influence layout (boneCount, then boneIndex,x,y,weight per influence).",
+    {
+      slot: z.string(),
+      attachment: z.string().optional().describe("Defaults to the slot's active attachment."),
+      vertices: z.array(z.number()),
+    },
+    forward('set_mesh_vertices'),
+  );
+
+  server.tool(
+    'bind_weights',
+    'Convert an unweighted mesh to bone weights: each vertex gets distance-based weights over the given bones (max 4 influences, normalized). After binding, bones deform the mesh automatically.',
+    {
+      slot: z.string(),
+      attachment: z.string().optional(),
+      bones: z.array(z.string()).describe('Bone names to bind (e.g. a limb chain).'),
+    },
+    forward('bind_weights'),
+  );
+
+  server.tool(
+    'add_clipping',
+    'Create a clipping slot just before `slot` in the draw order. Its polygon (slot-bone space) masks all slots from there until `end` (default: slot itself). Returns the created slot name.',
+    {
+      slot: z.string(),
+      end: z.string().optional(),
+      vertices: z
+        .array(z.number())
+        .optional()
+        .describe('Polygon x,y pairs; default 100×100 square.'),
+    },
+    forward('add_clipping'),
+  );
+
+  server.tool(
+    'add_bounding_box',
+    'Add a bounding box attachment (polygon for game-side hit testing) to a slot.',
+    {
+      slot: z.string(),
+      name: z.string().optional(),
+      vertices: z.array(z.number()).optional().describe('Polygon x,y pairs; default 80×80 square.'),
+    },
+    forward('add_bounding_box'),
+  );
+
+  server.tool(
+    'add_point',
+    'Add a point attachment (named position + rotation, e.g. a muzzle or hand anchor) to a slot.',
+    {
+      slot: z.string(),
+      name: z.string().optional(),
+      x: z.number().optional(),
+      y: z.number().optional(),
+      rotation: z.number().optional(),
+    },
+    forward('add_point'),
+  );
+
   // ---------------------------------------------------------------- export
   server.tool(
     'export_atlas',

@@ -6,11 +6,14 @@
 
 import {
   applyMat,
+  boneWeightPerVertex,
   computeSetupPose,
+  computeVertexWorldPositions,
   mulMat,
   type BoneData,
   type Mat2D,
   type SkeletonData,
+  type SpineAttachment,
   type SpineMeshAttachment,
   type SpineRegionAttachment,
 } from '@spine-editor/core';
@@ -40,8 +43,26 @@ export interface RenderInput {
   slotOrder?: string[];
   /** Onion-skin bone poses drawn faintly under the scene (animate mode). */
   ghosts?: { bones: BoneData[]; color: number }[];
+  /** Attachment being vertex-edited: draws handles (and a weight heatmap). */
+  editTarget?: {
+    slot: string;
+    attachment: string;
+    /** Uncommitted vertices during a drag/paint stroke. */
+    overrideVertices?: number[];
+    /** Bone name whose weights color the handles blue→red. */
+    weightBone?: string | null;
+  };
   assets: Record<string, ImageAsset>;
   selection: Selection;
+}
+
+/** Vertex count for any vertex-based attachment, or null for other types. */
+export function attachmentVertexCount(att: SpineAttachment): number | null {
+  if (att.type === 'mesh') return att.uvs.length / 2;
+  if (att.type === 'boundingbox' || att.type === 'clipping' || att.type === 'path') {
+    return att.vertexCount;
+  }
+  return null;
 }
 
 function tintOf(color: string): { tint: number; alpha: number } {
@@ -52,6 +73,11 @@ function tintOf(color: string): { tint: number; alpha: number } {
 
 const DEG_RAD = Math.PI / 180;
 const FLIP_Y: Mat2D = { a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 0 };
+
+/** World rotation (degrees) of a matrix's +X axis. */
+function rotationOf(m: Mat2D): number {
+  return Math.atan2(m.c, m.a) / DEG_RAD;
+}
 
 function toPixiMatrix(m: Mat2D): Matrix {
   // Our convention: x' = a*x + b*y; Pixi's Matrix(a, b, c, d) uses x' = a*x + c*y.
@@ -128,6 +154,9 @@ export class SceneRenderer {
   private ghostLayer = new Graphics();
   private spriteLayer = new Container();
   private boneLayer = new Graphics();
+  private overlayLayer = new Graphics();
+  /** Per-frame clip containers/masks destroyed at the start of the next render. */
+  private clipGarbage: Container[] = [];
   private sprites = new Map<string, Sprite>();
   private meshes = new Map<string, MeshSimple>();
   private textures = new Map<string, Texture>();
@@ -147,7 +176,13 @@ export class SceneRenderer {
     }
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
-    this.world.addChild(this.grid, this.ghostLayer, this.spriteLayer, this.boneLayer);
+    this.world.addChild(
+      this.grid,
+      this.ghostLayer,
+      this.spriteLayer,
+      this.boneLayer,
+      this.overlayLayer,
+    );
     this.app.stage.addChild(this.world);
     this.offsetX = host.clientWidth / 2;
     this.offsetY = host.clientHeight * 0.75;
@@ -260,15 +295,53 @@ export class SceneRenderer {
       : data.slots;
 
     this.spriteLayer.removeChildren();
+    for (const junk of this.clipGarbage) junk.destroy({ children: false });
+    this.clipGarbage = [];
+
+    /** Sprites land here while a clipping attachment is active. */
+    let clip: { end: string | undefined; container: Container } | null = null;
+    const addDrawable = (child: Container) => {
+      (clip ? clip.container : this.spriteLayer).addChild(child);
+    };
+    const endClipAfter = (slotName: string) => {
+      if (clip && clip.end === slotName) clip = null;
+    };
+
     for (const slot of slotsInOrder) {
       const attachmentName = input.slotAttachments?.has(slot.name)
         ? input.slotAttachments.get(slot.name)
         : slot.attachment;
-      if (!attachmentName) continue;
+      if (!attachmentName) {
+        endClipAfter(slot.name);
+        continue;
+      }
       const att = resolveAttachment(data, slot.name, attachmentName);
-      if (!att) continue;
       const boneWorld = pose.get(slot.bone);
-      if (!boneWorld) continue;
+      if (!att || !boneWorld) {
+        endClipAfter(slot.name);
+        continue;
+      }
+
+      if (att.type === 'clipping') {
+        // Start clipping: subsequent slots render inside a masked container
+        // until (and including) the end slot.
+        const verts = computeVertexWorldPositions(
+          att.vertices,
+          att.vertexCount,
+          boneWorld,
+          data.bones,
+          pose,
+        );
+        if (verts.length >= 6) {
+          const mask = new Graphics().poly(Array.from(verts)).fill(0xffffff);
+          const container = new Container();
+          container.mask = mask;
+          this.spriteLayer.addChild(container, mask);
+          this.clipGarbage.push(container, mask);
+          clip = { end: att.end, container };
+        }
+        continue;
+      }
 
       const animColor = input.slotColors?.get(slot.name) ?? slot.color;
       const { tint, alpha } = tintOf(animColor);
@@ -276,7 +349,10 @@ export class SceneRenderer {
       if (att.type === 'mesh') {
         const asset = input.assets[att.path ?? attachmentName];
         const texture = asset ? this.textures.get(asset.name) : undefined;
-        if (!texture) continue;
+        if (!texture) {
+          endClipAfter(slot.name);
+          continue;
+        }
         const deform = input.deforms?.get(slot.name)?.get(attachmentName);
         const positions = meshWorldPositions(att, boneWorld, data.bones, pose, deform);
         let mesh = this.meshes.get(slot.name);
@@ -294,16 +370,26 @@ export class SceneRenderer {
         }
         mesh.tint = tint;
         mesh.alpha = alpha;
-        this.spriteLayer.addChild(mesh);
+        addDrawable(mesh);
+        endClipAfter(slot.name);
         continue;
       }
 
-      if (att.type !== undefined && att.type !== 'region') continue;
+      if (att.type !== undefined && att.type !== 'region') {
+        endClipAfter(slot.name);
+        continue;
+      }
       const region = att as SpineRegionAttachment;
       const asset = input.assets[region.path ?? attachmentName];
-      if (!asset) continue;
+      if (!asset) {
+        endClipAfter(slot.name);
+        continue;
+      }
       const texture = this.textures.get(asset.name);
-      if (!texture) continue;
+      if (!texture) {
+        endClipAfter(slot.name);
+        continue;
+      }
 
       let sprite = this.sprites.get(slot.name);
       if (!sprite) {
@@ -328,10 +414,99 @@ export class SceneRenderer {
       sprite.tint = tint;
       const slotIsSelected = input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
       sprite.alpha = alpha * (slotIsSelected ? 1 : 0.9);
-      this.spriteLayer.addChild(sprite);
+      addDrawable(sprite);
+      endClipAfter(slot.name);
     }
 
     this.drawBones(data.bones, pose, input.selection);
+    this.drawOverlays(data, pose, input);
+  }
+
+  /**
+   * Outlines for non-drawable attachments (clipping red, bounding box cyan,
+   * point magenta) plus vertex handles for the attachment being edited —
+   * colored blue→red by bone weight when a heatmap bone is set.
+   */
+  private drawOverlays(data: SkeletonData, pose: Map<string, Mat2D>, input: RenderInput): void {
+    const g = this.overlayLayer;
+    g.clear();
+    for (const slot of data.slots) {
+      const boneWorld = pose.get(slot.bone);
+      if (!boneWorld) continue;
+      const bySlot = data.skins.find((s) => s.name === 'default')?.attachments?.[slot.name] ?? {};
+      for (const [name, att] of Object.entries(bySlot)) {
+        const isActive = slot.attachment === name;
+        if (att.type === 'point') {
+          const p = applyMat(boneWorld, att.x ?? 0, att.y ?? 0);
+          const r = 8 / this.zoom;
+          const rot = (((att.rotation ?? 0) + rotationOf(boneWorld)) * Math.PI) / 180;
+          g.moveTo(p.x - r, p.y)
+            .lineTo(p.x + r, p.y)
+            .moveTo(p.x, p.y - r)
+            .lineTo(p.x, p.y + r)
+            .stroke({ width: 1.5 / this.zoom, color: 0xcc66cc, alpha: 0.9 });
+          g.moveTo(p.x, p.y)
+            .lineTo(p.x + Math.cos(rot) * r * 2, p.y + Math.sin(rot) * r * 2)
+            .stroke({ width: 1.5 / this.zoom, color: 0xcc66cc, alpha: 0.9 });
+          continue;
+        }
+        if (att.type !== 'boundingbox' && att.type !== 'clipping') continue;
+        const verts = computeVertexWorldPositions(
+          att.vertices,
+          att.vertexCount,
+          boneWorld,
+          data.bones,
+          pose,
+        );
+        if (verts.length < 4) continue;
+        const color = att.type === 'clipping' ? 0xe06c6c : 0x6cc9c9;
+        g.poly(Array.from(verts)).stroke({
+          width: 1.5 / this.zoom,
+          color,
+          alpha: isActive ? 0.95 : 0.45,
+        });
+      }
+    }
+
+    const edit = input.editTarget;
+    if (!edit) return;
+    const slot = data.slots.find((s) => s.name === edit.slot);
+    const att = slot
+      ? data.skins.find((s) => s.name === 'default')?.attachments?.[edit.slot]?.[edit.attachment]
+      : undefined;
+    const boneWorld = slot ? pose.get(slot.bone) : undefined;
+    if (!slot || !att || !boneWorld) return;
+    const count = attachmentVertexCount(att);
+    if (count === null) return;
+    const vertices = edit.overrideVertices ?? (att as { vertices: number[] }).vertices;
+    const deform =
+      att.type === 'mesh' ? input.deforms?.get(edit.slot)?.get(edit.attachment) : undefined;
+    const positions = computeVertexWorldPositions(
+      vertices,
+      count,
+      boneWorld,
+      data.bones,
+      pose,
+      deform,
+    );
+    let weights: Float32Array | null = null;
+    if (edit.weightBone) {
+      const boneIndex = data.bones.findIndex((b) => b.name === edit.weightBone);
+      if (boneIndex >= 0) weights = boneWeightPerVertex(vertices, count, boneIndex);
+    }
+    for (let v = 0; v < count; v++) {
+      const x = positions[v * 2]!;
+      const y = positions[v * 2 + 1]!;
+      let color = 0xffffff;
+      if (weights) {
+        const w = weights[v]!;
+        color =
+          (Math.round(w * 255) << 16) | (Math.round((1 - w) * 96) << 8) | Math.round((1 - w) * 255);
+      }
+      g.circle(x, y, 4.5 / this.zoom)
+        .fill({ color, alpha: 0.95 })
+        .stroke({ width: 1 / this.zoom, color: 0x1b1b1f, alpha: 0.9 });
+    }
   }
 
   /** Faint skeleton outlines for onion skinning (bones only, cheap to draw). */

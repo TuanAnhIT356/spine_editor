@@ -39,6 +39,22 @@ points down), so child bones sit at `x = parent.length`.
    in the wrong place, fix with `set_bone_transform` and screenshot again.
 7. Finish with `validate_project` — the issues array must be empty.
 
+## Meshes, weights, clipping (advanced rigging)
+
+- `create_mesh` converts a slot's region image into a deformable grid mesh
+  (`cols`/`rows` control density). Then `set_deform_keyframe` animates vertices
+  or `set_mesh_vertices` reshapes the base mesh.
+- `bind_weights` makes a mesh follow MULTIPLE bones (limbs, cloth, hair):
+  pass the bone chain — every vertex gets distance-based weights (≤4 bones,
+  normalized) and the mesh deforms automatically when those bones move.
+  Verify with a screenshot after rotating a bound bone.
+- `add_clipping` masks slots: it creates a clipping slot placed just before
+  the target slot in the draw order; everything from there until `end` renders
+  only inside the polygon. The polygon IS evaluated/previewed in the viewport.
+- `add_bounding_box` (hit-test polygons) and `add_point` (named anchors like
+  muzzles/hands) attach game metadata to slots; both render as outlines in the
+  editor and round-trip to the exported JSON.
+
 ## Checks and gotchas
 
 - Every mutation is undoable: a wrong step is one `undo` away.
