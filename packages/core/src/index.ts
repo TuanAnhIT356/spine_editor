@@ -28,3 +28,6 @@ export * from './commands/events.js';
 export * from './atlas.js';
 export * from './mesh.js';
 export * from './weights.js';
+// path.ts registers the path-constraint applier with pose.ts on import.
+export * from './path.js';
+export * from './physics.js';

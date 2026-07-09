@@ -548,6 +548,11 @@ button.danger {
   color: #eecff7;
 }
 
+.att-type.att-path {
+  background: #6b542e;
+  color: #f7e7cf;
+}
+
 .attachment-actions {
   display: flex;
   flex-wrap: wrap;

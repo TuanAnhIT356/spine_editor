@@ -7,7 +7,10 @@
 import {
   AddBone,
   AddIkConstraint,
+  AddPathConstraint,
+  AddPhysicsConstraint,
   AddSlot,
+  AddTransformConstraint,
   Composite,
   CreateAnimation,
   DeleteBoneKeyframe,
@@ -137,6 +140,9 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
           drawOrder: index,
         })),
         ik: data.ik,
+        transform: data.transform,
+        path: data.path,
+        physics: data.physics,
         animations: Object.keys(data.animations),
       };
     }
@@ -285,6 +291,120 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
           uniform: params['uniform'] === true,
         }),
       );
+      return { ok: true };
+    }
+
+    case 'add_transform_constraint': {
+      const bones = params['bones'];
+      if (!Array.isArray(bones) || !bones.every((b) => typeof b === 'string')) {
+        throw new Error('Param "bones" must be an array of bone names.');
+      }
+      executeOrThrow(
+        new AddTransformConstraint({
+          name: str(params, 'name'),
+          order: optNum(params, 'order') ?? 0,
+          skinRequired: false,
+          bones: bones as string[],
+          target: str(params, 'target'),
+          rotation: optNum(params, 'rotation') ?? 0,
+          x: optNum(params, 'x') ?? 0,
+          y: optNum(params, 'y') ?? 0,
+          scaleX: optNum(params, 'scaleX') ?? 0,
+          scaleY: optNum(params, 'scaleY') ?? 0,
+          shearY: optNum(params, 'shearY') ?? 0,
+          mixRotate: optNum(params, 'mixRotate') ?? 1,
+          mixX: optNum(params, 'mixX') ?? 1,
+          mixY: optNum(params, 'mixY') ?? optNum(params, 'mixX') ?? 1,
+          mixScaleX: optNum(params, 'mixScaleX') ?? 1,
+          mixScaleY: optNum(params, 'mixScaleY') ?? optNum(params, 'mixScaleX') ?? 1,
+          mixShearY: optNum(params, 'mixShearY') ?? 1,
+          local: params['local'] === true,
+          relative: params['relative'] === true,
+        }),
+      );
+      return { ok: true };
+    }
+
+    case 'add_path': {
+      // Adds a path attachment (composite bezier) to a slot.
+      const slotName = str(params, 'slot');
+      const name =
+        typeof params['name'] === 'string' && params['name'] !== ''
+          ? params['name']
+          : `${slotName}-path`;
+      const vertices =
+        Array.isArray(params['vertices']) &&
+        params['vertices'].every((v: unknown) => typeof v === 'number') &&
+        params['vertices'].length >= 12 &&
+        params['vertices'].length % 6 === 0
+          ? (params['vertices'] as number[])
+          : [-40, 0, 0, 0, 40, 0, 60, 0, 100, 0, 140, 0];
+      executeOrThrow(
+        new AddSkinAttachment('default', slotName, name, {
+          type: 'path',
+          closed: params['closed'] === true,
+          vertexCount: vertices.length / 2,
+          vertices,
+          lengths: [100],
+        }),
+      );
+      return { attachment: name };
+    }
+
+    case 'add_path_constraint': {
+      const bones = params['bones'];
+      if (!Array.isArray(bones) || !bones.every((b) => typeof b === 'string')) {
+        throw new Error('Param "bones" must be an array of bone names.');
+      }
+      const c: ConstructorParameters<typeof AddPathConstraint>[0] = {
+        name: str(params, 'name'),
+        order: optNum(params, 'order') ?? 0,
+        bones: bones as string[],
+        target: str(params, 'target'),
+      };
+      if (typeof params['positionMode'] === 'string') {
+        c.positionMode = params['positionMode'] as 'fixed' | 'percent';
+      }
+      if (typeof params['spacingMode'] === 'string') {
+        c.spacingMode = params['spacingMode'] as 'length' | 'fixed' | 'percent' | 'proportional';
+      }
+      if (typeof params['rotateMode'] === 'string') {
+        c.rotateMode = params['rotateMode'] as 'tangent' | 'chain' | 'chainScale';
+      }
+      for (const key of ['rotation', 'position', 'spacing', 'mixRotate', 'mixX', 'mixY'] as const) {
+        const v = optNum(params, key);
+        if (v !== undefined) c[key] = v;
+      }
+      executeOrThrow(new AddPathConstraint(c));
+      return { ok: true };
+    }
+
+    case 'add_physics_constraint': {
+      const c: ConstructorParameters<typeof AddPhysicsConstraint>[0] = {
+        name: str(params, 'name'),
+        bone: str(params, 'bone'),
+      };
+      for (const key of [
+        'order',
+        'x',
+        'y',
+        'rotate',
+        'scaleX',
+        'shearX',
+        'limit',
+        'fps',
+        'inertia',
+        'strength',
+        'damping',
+        'mass',
+        'wind',
+        'gravity',
+        'mix',
+      ] as const) {
+        const v = optNum(params, key);
+        if (v !== undefined) c[key] = v;
+      }
+      executeOrThrow(new AddPhysicsConstraint(c));
       return { ok: true };
     }
 

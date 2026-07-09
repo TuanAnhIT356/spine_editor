@@ -429,6 +429,89 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
     forward('add_point'),
   );
 
+  server.tool(
+    'add_path',
+    "Add a path attachment (composite bezier spline) to a slot. Vertices are 6 floats per point: in-handle x,y, anchor x,y, out-handle x,y in the slot bone's space. Target it with add_path_constraint to make bones follow the curve.",
+    {
+      slot: z.string(),
+      name: z.string().optional(),
+      closed: z.boolean().optional(),
+      vertices: z
+        .array(z.number())
+        .optional()
+        .describe('6 floats per point; default a 2-point 100-unit line.'),
+    },
+    forward('add_path'),
+  );
+
+  server.tool(
+    'add_path_constraint',
+    'Constrain bones to follow a path attachment. Target is a SLOT with a path attachment. positionMode fixed|percent, spacingMode length|fixed|percent|proportional, rotateMode tangent|chain|chainScale. Evaluated in the viewport (arc-length sampling).',
+    {
+      name: z.string(),
+      bones: z.array(z.string()),
+      target: z.string().describe('Slot name carrying the path attachment.'),
+      positionMode: z.enum(['fixed', 'percent']).optional(),
+      spacingMode: z.enum(['length', 'fixed', 'percent', 'proportional']).optional(),
+      rotateMode: z.enum(['tangent', 'chain', 'chainScale']).optional(),
+      position: z.number().optional(),
+      spacing: z.number().optional(),
+      rotation: z.number().optional(),
+      mixRotate: z.number().optional(),
+      mixX: z.number().optional(),
+      mixY: z.number().optional(),
+      order: z.number().optional(),
+    },
+    forward('add_path_constraint'),
+  );
+
+  server.tool(
+    'add_physics_constraint',
+    'Add a physics constraint (Spine 4.2): the bone gets spring-damper motion from inertia/wind/gravity. x/y/rotate/scaleX/shearX are per-property influence factors (0-1). Previewed deterministically in the editor timeline; exact runtime parity not guaranteed.',
+    {
+      name: z.string(),
+      bone: z.string(),
+      x: z.number().optional(),
+      y: z.number().optional(),
+      rotate: z.number().optional(),
+      scaleX: z.number().optional(),
+      shearX: z.number().optional(),
+      inertia: z.number().optional(),
+      strength: z.number().optional(),
+      damping: z.number().optional(),
+      mass: z.number().optional(),
+      wind: z.number().optional(),
+      gravity: z.number().optional(),
+      limit: z.number().optional(),
+      mix: z.number().optional(),
+    },
+    forward('add_physics_constraint'),
+  );
+
+  server.tool(
+    'add_transform_constraint',
+    "Constrain bones to copy a target bone's transform, blended by mixRotate/mixX/mixY/mixScaleX/mixScaleY (0-1). rotation/x/y/scaleX/scaleY are offsets added to the target.",
+    {
+      name: z.string(),
+      bones: z.array(z.string()),
+      target: z.string(),
+      rotation: z.number().optional(),
+      x: z.number().optional(),
+      y: z.number().optional(),
+      scaleX: z.number().optional(),
+      scaleY: z.number().optional(),
+      mixRotate: z.number().optional(),
+      mixX: z.number().optional(),
+      mixY: z.number().optional(),
+      mixScaleX: z.number().optional(),
+      mixScaleY: z.number().optional(),
+      local: z.boolean().optional(),
+      relative: z.boolean().optional(),
+      order: z.number().optional(),
+    },
+    forward('add_transform_constraint'),
+  );
+
   // ---------------------------------------------------------------- export
   server.tool(
     'export_atlas',

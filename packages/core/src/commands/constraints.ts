@@ -1,4 +1,5 @@
-import type { IkConstraintData, SkeletonData } from '../model/types.js';
+import type { IkConstraintData, SkeletonData, TransformConstraintData } from '../model/types.js';
+import type { SpinePathConstraint, SpinePhysicsConstraint } from '../spine-json/types.js';
 import type { Command } from './history.js';
 
 export class AddIkConstraint implements Command {
@@ -27,6 +28,94 @@ export class AddIkConstraint implements Command {
   undo(data: SkeletonData): void {
     const idx = data.ik.findIndex((x) => x.name === this.constraint.name);
     if (idx >= 0) data.ik.splice(idx, 1);
+  }
+}
+
+export class AddTransformConstraint implements Command {
+  readonly label: string;
+
+  constructor(private readonly constraint: TransformConstraintData) {
+    this.label = `Add transform constraint "${constraint.name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = this.constraint;
+    if (data.transform.some((x) => x.name === c.name)) {
+      throw new Error(`Transform constraint "${c.name}" already exists.`);
+    }
+    if (c.bones.length < 1) throw new Error('Transform constraints require at least one bone.');
+    for (const bone of [...c.bones, c.target]) {
+      if (!data.bones.some((b) => b.name === bone)) {
+        throw new Error(`Bone "${bone}" does not exist.`);
+      }
+    }
+    data.transform.push(structuredClone(c));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.transform.findIndex((x) => x.name === this.constraint.name);
+    if (idx >= 0) data.transform.splice(idx, 1);
+  }
+}
+
+/** Adds a path constraint; `target` must be a slot with a path attachment. */
+export class AddPathConstraint implements Command {
+  readonly label: string;
+
+  constructor(private readonly constraint: SpinePathConstraint) {
+    this.label = `Add path constraint "${constraint.name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = this.constraint;
+    if (data.path.some((x) => x.name === c.name)) {
+      throw new Error(`Path constraint "${c.name}" already exists.`);
+    }
+    if (c.bones.length < 1) throw new Error('Path constraints require at least one bone.');
+    for (const bone of c.bones) {
+      if (!data.bones.some((b) => b.name === bone)) {
+        throw new Error(`Bone "${bone}" does not exist.`);
+      }
+    }
+    if (!data.slots.some((s) => s.name === c.target)) {
+      throw new Error(`Slot "${c.target}" does not exist (path targets are slots).`);
+    }
+    const hasPath = data.skins.some((skin) =>
+      Object.values(skin.attachments?.[c.target] ?? {}).some((att) => att.type === 'path'),
+    );
+    if (!hasPath) {
+      throw new Error(`Slot "${c.target}" has no path attachment.`);
+    }
+    data.path.push(structuredClone(c));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.path.findIndex((x) => x.name === this.constraint.name);
+    if (idx >= 0) data.path.splice(idx, 1);
+  }
+}
+
+export class AddPhysicsConstraint implements Command {
+  readonly label: string;
+
+  constructor(private readonly constraint: SpinePhysicsConstraint) {
+    this.label = `Add physics constraint "${constraint.name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = this.constraint;
+    if (data.physics.some((x) => x.name === c.name)) {
+      throw new Error(`Physics constraint "${c.name}" already exists.`);
+    }
+    if (!data.bones.some((b) => b.name === c.bone)) {
+      throw new Error(`Bone "${c.bone}" does not exist.`);
+    }
+    data.physics.push(structuredClone(c));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.physics.findIndex((x) => x.name === this.constraint.name);
+    if (idx >= 0) data.physics.splice(idx, 1);
   }
 }
 

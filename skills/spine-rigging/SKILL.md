@@ -39,6 +39,20 @@ points down), so child bones sit at `x = parent.length`.
    in the wrong place, fix with `set_bone_transform` and screenshot again.
 7. Finish with `validate_project` — the issues array must be empty.
 
+## Constraints beyond IK
+
+- `add_transform_constraint` copies a target bone's rotation/position/scale
+  onto other bones with per-channel mixes — great for counter-rotation or
+  keeping accessories aligned.
+- `add_path` puts a bezier spline on a slot; `add_path_constraint` then pins a
+  bone chain to it (`positionMode`/`spacingMode`/`rotateMode`). Both are
+  evaluated in the viewport — animate the constraint's `position` timeline for
+  conveyor/orbit motion. Path points are editable in the editor UI (Edit).
+- `add_physics_constraint` gives a bone spring physics (tails, hair, cloth):
+  set `rotate: 1` for pendulum swing or `x/y: 1` for positional jiggle, tune
+  `inertia`/`strength`/`damping`/`gravity`. Preview is deterministic in the
+  editor; the exported data runs the official runtime's simulation in-game.
+
 ## Meshes, weights, clipping (advanced rigging)
 
 - `create_mesh` converts a slot's region image into a deformable grid mesh

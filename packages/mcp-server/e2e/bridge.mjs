@@ -189,6 +189,28 @@ const weightedFlag = flagAtts.flag?.vertices?.length !== flagAtts.flag?.uvs?.len
 const clipShot = await call('screenshot_viewport');
 fs.writeFileSync(`${OUT}/clipping.png`, Buffer.from(clipShot.image, 'base64'));
 
+// 9d. Path + physics + transform constraints (Phase 9 tools).
+await call('add_bone', { parent: 'root', name: 'rider', length: 20 });
+const pathAtt = await call('add_path', { slot: flagSlot.slot });
+await call('add_path_constraint', {
+  name: 'ride',
+  bones: ['rider'],
+  target: flagSlot.slot,
+  positionMode: 'percent',
+  position: 0.5,
+});
+await call('add_physics_constraint', { name: 'sway', bone: 'rider', rotate: 1, gravity: 2 });
+await call('add_bone', { parent: 'root', name: 'copy-src', x: 40 });
+await call('add_transform_constraint', {
+  name: 'copycat',
+  bones: ['mast'],
+  target: 'copy-src',
+  mixRotate: 0.5,
+  mixX: 0,
+  mixY: 0,
+});
+const treeWithConstraints = await call('get_skeleton_tree');
+
 // 10. Events through MCP land in the export.
 await call('set_event', { name: 'footstep', audio: 'step.wav' });
 await call('create_animation', { name: 'walk' });
@@ -219,6 +241,10 @@ console.log(
       weightedFlag,
       clipSlot: clipRes.slot,
       clipEnd: clipAtt?.end,
+      pathAtt,
+      pathConstraints: treeWithConstraints.path?.map((p) => p.name),
+      physicsConstraints: treeWithConstraints.physics?.map((p) => p.name),
+      transformConstraints: treeWithConstraints.transform?.map((t) => t.name),
       bboxVerts: flagAtts[`${flagSlot.slot}-bbox`]?.vertexCount,
       pointAtt: flagAtts['flag-tip'],
       eventDefs: exportedEvents.events,

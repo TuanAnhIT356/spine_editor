@@ -2,6 +2,7 @@ import {
   AddBone,
   Composite,
   IDENTITY,
+  PhysicsSimulator,
   SetAttachmentVertices,
   SetBoneTransform,
   UpsertBoneKeyframe,
@@ -14,6 +15,7 @@ import {
   computeAnimatedDeforms,
   computeAnimatedDrawOrder,
   computeAnimatedLocals,
+  computeAnimatedPath,
   computeVertexWorldPositions,
   createBone,
   getAnimationDuration,
@@ -84,6 +86,8 @@ export function Viewport() {
   const overrideRef = useRef<BoneData[] | undefined>(undefined);
   /** Uncommitted vertex array during a mesh-edit drag or paint stroke. */
   const editVertsRef = useRef<number[] | null>(null);
+  /** Deterministic physics preview; rebuilt whenever the document changes. */
+  const physicsRef = useRef<PhysicsSimulator | null>(null);
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
 
   const revision = useEditor((s) => s.revision);
@@ -100,6 +104,10 @@ export function Viewport() {
     const state = useEditor.getState();
     const { doc, mode: m, anim } = state;
     if (m === 'animate' && anim.current && doc.data.animations[anim.current]) {
+      if (doc.data.physics.length > 0) {
+        physicsRef.current ??= new PhysicsSimulator(doc.data);
+        return physicsRef.current.localsAt(anim.current, anim.time);
+      }
       return computeAnimatedLocals(doc.data, anim.current, anim.time);
     }
     return doc.data.bones;
@@ -144,6 +152,9 @@ export function Viewport() {
         : undefined,
       slotOrder: animating
         ? computeAnimatedDrawOrder(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
+      pathOverrides: animating
+        ? computeAnimatedPath(state.doc.data, state.anim.current!, state.anim.time)
         : undefined,
       ghosts: animating ? buildGhosts() : undefined,
       editTarget: state.meshEdit
@@ -190,6 +201,11 @@ export function Viewport() {
       bridgeRuntime.renderNow = null;
     };
   }, []);
+
+  // Document edits invalidate the physics state (constraints/anim changed).
+  useEffect(() => {
+    physicsRef.current = null;
+  }, [revision]);
 
   useEffect(redraw, [
     revision,

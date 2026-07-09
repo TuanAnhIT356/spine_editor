@@ -12,7 +12,7 @@
  */
 
 import type { BoneData, SkeletonData } from './model/types.js';
-import { computePose, type IkPoseValue, type Mat2D } from './pose.js';
+import { computePose, type IkPoseValue, type Mat2D, type PathPoseValue } from './pose.js';
 import type {
   SpineAnimation,
   SpineAttachmentKey,
@@ -163,6 +163,72 @@ export function computeAnimatedIk(
     out.set(name, sampleIkTimeline(keys, time));
   }
   return out;
+}
+
+/** Per-constraint path values sampled from the animation at time t. */
+export function computeAnimatedPath(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): Map<string, PathPoseValue> {
+  const out = new Map<string, PathPoseValue>();
+  const anim = data.animations[animationName];
+  if (!anim?.path) return out;
+  for (const [name, timelines] of Object.entries(anim.path)) {
+    const constraint = data.path.find((p) => p.name === name);
+    const value: PathPoseValue = {};
+    if (timelines.position?.length) {
+      value.position = sampleBoneTimeline(
+        timelines.position as SpineBoneKey[],
+        time,
+        'value',
+        0,
+        constraint?.position ?? 0,
+      );
+    }
+    if (timelines.spacing?.length) {
+      value.spacing = sampleBoneTimeline(
+        timelines.spacing as SpineBoneKey[],
+        time,
+        'value',
+        0,
+        constraint?.spacing ?? 0,
+      );
+    }
+    const mixKeys = timelines.mix;
+    if (mixKeys?.length) {
+      const asBone = mixKeys as unknown as SpineBoneKey[];
+      value.mixRotate = sampleMixChannel(asBone, time, 'mixRotate', 0, constraint?.mixRotate ?? 1);
+      value.mixX = sampleMixChannel(asBone, time, 'mixX', 1, constraint?.mixX ?? 1);
+      value.mixY = sampleMixChannel(asBone, time, 'mixY', 2, constraint?.mixY ?? value.mixX);
+    }
+    out.set(name, value);
+  }
+  return out;
+}
+
+/** Samples one named channel of a path mix timeline (bezier block per channel). */
+function sampleMixChannel(
+  keys: SpineBoneKey[],
+  time: number,
+  field: string,
+  channel: number,
+  dflt: number,
+): number {
+  const first = keys[0];
+  if (!first) return dflt;
+  const num = (k: SpineBoneKey): number => {
+    const v = (k as Record<string, unknown>)[field];
+    return typeof v === 'number' ? v : dflt;
+  };
+  if (time <= (first.time ?? 0)) return num(first);
+  let i = 0;
+  while (i < keys.length - 1 && (keys[i + 1]?.time ?? 0) <= time) i++;
+  const k1 = keys[i];
+  if (!k1) return dflt;
+  const k2 = keys[i + 1];
+  if (!k2) return num(k1);
+  return segmentValue(time, k1.time ?? 0, num(k1), k2.time ?? 0, num(k2), k1.curve, channel);
 }
 
 function hexByte(v: number): string {
@@ -470,7 +536,12 @@ export function computeAnimatedPose(
   const locals = computeAnimatedLocals(data, animationName, time);
   return {
     locals,
-    world: computePose(data, locals, computeAnimatedIk(data, animationName, time)),
+    world: computePose(
+      data,
+      locals,
+      computeAnimatedIk(data, animationName, time),
+      computeAnimatedPath(data, animationName, time),
+    ),
     attachments: computeAnimatedAttachments(data, animationName, time),
     colors: computeAnimatedColors(data, animationName, time),
     deforms: computeAnimatedDeforms(data, animationName, time),
