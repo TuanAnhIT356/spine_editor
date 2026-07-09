@@ -31,3 +31,4 @@ export * from './weights.js';
 // path.ts registers the path-constraint applier with pose.ts on import.
 export * from './path.js';
 export * from './physics.js';
+export * from './atlas-import.js';

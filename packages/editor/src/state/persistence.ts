@@ -68,6 +68,24 @@ export function readFileAsText(file: File): Promise<string> {
   });
 }
 
+export function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Reads an image file into an asset (name without extension + dimensions). */
 export async function loadImageAsset(file: File): Promise<ImageAsset> {
   const dataUrl = await new Promise<string>((resolve, reject) => {

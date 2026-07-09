@@ -46,6 +46,8 @@ export interface RenderInput {
   ghosts?: { bones: BoneData[]; color: number }[];
   /** Path-constraint timeline values at the playhead (animate mode). */
   pathOverrides?: ReadonlyMap<string, PathPoseValue>;
+  /** Skin used to resolve attachments (falls back to "default"). */
+  activeSkin?: string;
   /** Attachment being vertex-edited: draws handles (and a weight heatmap). */
   editTarget?: {
     slot: string;
@@ -138,11 +140,18 @@ function meshWorldPositions(
   return out;
 }
 
-/** Finds an attachment for a slot, preferring the "default" skin. */
-export function resolveAttachment(data: SkeletonData, slotName: string, attachmentName: string) {
-  const skins = [...data.skins].sort((a, b) =>
-    a.name === 'default' ? -1 : b.name === 'default' ? 1 : 0,
-  );
+/**
+ * Finds an attachment for a slot: the active skin wins, then "default",
+ * then any other skin (mirroring the runtime's skin + default-skin lookup).
+ */
+export function resolveAttachment(
+  data: SkeletonData,
+  slotName: string,
+  attachmentName: string,
+  activeSkin = 'default',
+) {
+  const rank = (name: string) => (name === activeSkin ? 0 : name === 'default' ? 1 : 2);
+  const skins = [...data.skins].sort((a, b) => rank(a.name) - rank(b.name));
   for (const skin of skins) {
     const att = skin.attachments?.[slotName]?.[attachmentName];
     if (att) return att;
@@ -318,7 +327,7 @@ export class SceneRenderer {
         endClipAfter(slot.name);
         continue;
       }
-      const att = resolveAttachment(data, slot.name, attachmentName);
+      const att = resolveAttachment(data, slot.name, attachmentName, input.activeSkin);
       const boneWorld = pose.get(slot.bone);
       if (!att || !boneWorld) {
         endClipAfter(slot.name);
@@ -350,7 +359,9 @@ export class SceneRenderer {
       const { tint, alpha } = tintOf(animColor);
 
       if (att.type === 'mesh') {
-        const asset = input.assets[att.path ?? attachmentName];
+        // Region lookup order mirrors the runtime: path, then the attachment's
+        // real name (skins often store "skinName/part"), then the placeholder.
+        const asset = input.assets[att.path ?? att.name ?? attachmentName];
         const texture = asset ? this.textures.get(asset.name) : undefined;
         if (!texture) {
           endClipAfter(slot.name);
@@ -383,7 +394,7 @@ export class SceneRenderer {
         continue;
       }
       const region = att as SpineRegionAttachment;
-      const asset = input.assets[region.path ?? attachmentName];
+      const asset = input.assets[region.path ?? region.name ?? attachmentName];
       if (!asset) {
         endClipAfter(slot.name);
         continue;

@@ -1,11 +1,20 @@
 import {
+  CreateSkin,
+  RemoveSkin,
   ReorderSlot,
   ReparentBone,
   UpsertDrawOrderKeyframe,
   computeAnimatedDrawOrder,
   computeDrawOrderOffsets,
 } from '@spine-editor/core';
-import { isSelected, primarySelection, useEditor, type SelectionItem } from '../state/store.js';
+import { useState } from 'react';
+import {
+  isSelected,
+  primarySelection,
+  uniqueName,
+  useEditor,
+  type SelectionItem,
+} from '../state/store.js';
 
 function clickSelect(e: React.MouseEvent, item: SelectionItem) {
   if (e.shiftKey || e.ctrlKey || e.metaKey) useEditor.getState().toggleSelection(item);
@@ -44,18 +53,80 @@ function moveSlotInDrawOrder(slotName: string, dir: -1 | 1) {
   state.execute(new ReorderSlot(slotName, idx + dir));
 }
 
+/** Skin list: pick the active (rendered) skin, create/duplicate/remove skins. */
+function SkinsSection() {
+  const revision = useEditor((s) => s.revision);
+  const doc = useEditor((s) => s.doc);
+  const activeSkin = useEditor((s) => s.activeSkin);
+  void revision;
+  const skins = doc.data.skins;
+  if (skins.length === 0) return null;
+
+  function onNewSkin(copyFrom?: string) {
+    const state = useEditor.getState();
+    const name = window.prompt(
+      copyFrom ? `Duplicate skin "${copyFrom}" as` : 'Skin name',
+      uniqueName('skin', (n) => state.doc.data.skins.some((s) => s.name === n)),
+    );
+    if (!name) return;
+    if (state.execute(new CreateSkin(name.trim(), copyFrom))) state.setActiveSkin(name.trim());
+  }
+
+  return (
+    <>
+      <div className="panel-title">Skins</div>
+      <div className="skins">
+        {skins.map((skin) => (
+          <label key={skin.name} className={`row ${activeSkin === skin.name ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="active-skin"
+              checked={activeSkin === skin.name}
+              onChange={() => useEditor.getState().setActiveSkin(skin.name)}
+            />
+            <span className="skin-name">{skin.name}</span>
+            <span className="row-actions">
+              <button title={`Duplicate "${skin.name}"`} onClick={() => onNewSkin(skin.name)}>
+                ⧉
+              </button>
+              {skin.name !== 'default' && (
+                <button
+                  title="Remove skin"
+                  onClick={() => {
+                    const state = useEditor.getState();
+                    if (state.execute(new RemoveSkin(skin.name)) && activeSkin === skin.name) {
+                      state.setActiveSkin('default');
+                    }
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          </label>
+        ))}
+        <button className="new-skin" onClick={() => onNewSkin()}>
+          + New Skin
+        </button>
+      </div>
+    </>
+  );
+}
+
 export function HierarchyPanel() {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
   const layout = useEditor((s) => s.layout);
   const assets = useEditor((s) => s.assets);
+  const [filter, setFilter] = useState('');
   void revision;
 
   const bones = doc.data.bones;
   const slots = doc.data.slots;
   const childrenOf = (parent: string) => bones.filter((b) => b.parent === parent);
   const roots = bones.filter((b) => b.parent === null);
+  const query = filter.trim().toLowerCase();
 
   function BoneRow({ name, depth }: { name: string; depth: number }) {
     const selected = isSelected(selection, 'bone', name);
@@ -129,17 +200,50 @@ export function HierarchyPanel() {
   const selectedBone = primary?.kind === 'bone' ? primary.name : null;
   const extraCount = selection.length > 1 ? selection.length - 1 : 0;
 
+  const matchedBones = query ? bones.filter((b) => b.name.toLowerCase().includes(query)) : [];
+  const matchedSlots = query ? slots.filter((s) => s.name.toLowerCase().includes(query)) : [];
+
   return (
     <div className="panel hierarchy" style={{ width: layout.hierarchyWidth }}>
       <div className="panel-title">
         Hierarchy
         {extraCount > 0 && <span className="selection-count"> · {selection.length} selected</span>}
       </div>
+      <input
+        className="tree-filter"
+        placeholder="Search bones/slots…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
       <div className="tree">
-        {roots.map((b) => (
-          <BoneRow key={b.name} name={b.name} depth={0} />
-        ))}
+        {!query && roots.map((b) => <BoneRow key={b.name} name={b.name} depth={0} />)}
+        {query && matchedBones.length === 0 && matchedSlots.length === 0 && (
+          <div className="empty">No bones or slots match “{filter}”.</div>
+        )}
+        {query &&
+          matchedBones.map((b) => (
+            <div
+              key={b.name}
+              className={`row bone ${isSelected(selection, 'bone', b.name) ? 'selected' : ''}`}
+              style={{ paddingLeft: 8 }}
+              onClick={(e) => clickSelect(e, { kind: 'bone', name: b.name })}
+            >
+              <span className="icon">◆</span> {b.name}
+            </div>
+          ))}
+        {query &&
+          matchedSlots.map((s) => (
+            <div
+              key={s.name}
+              className={`row slot ${isSelected(selection, 'slot', s.name) ? 'selected' : ''}`}
+              style={{ paddingLeft: 8 }}
+              onClick={(e) => clickSelect(e, { kind: 'slot', name: s.name })}
+            >
+              <span className="icon">▣</span> {s.name}
+            </div>
+          ))}
       </div>
+      <SkinsSection />
       <div className="panel-title">Images</div>
       <div className="assets">
         {Object.values(assets).length === 0 && (

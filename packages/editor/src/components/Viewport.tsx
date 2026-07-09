@@ -95,6 +95,7 @@ export function Viewport() {
   const assets = useEditor((s) => s.assets);
   const mode = useEditor((s) => s.mode);
   const meshEdit = useEditor((s) => s.meshEdit);
+  const activeSkin = useEditor((s) => s.activeSkin);
   const animCurrent = useEditor((s) => s.anim.current);
   const animTime = useEditor((s) => s.anim.time);
   const animGhost = useEditor((s) => s.anim.ghost);
@@ -165,6 +166,7 @@ export function Viewport() {
             weightBone: state.meshEdit.mode === 'weights' ? state.meshEdit.paintBone : null,
           }
         : undefined,
+      activeSkin: state.activeSkin,
       assets: state.assets,
       selection: state.selection,
     };
@@ -213,6 +215,7 @@ export function Viewport() {
     assets,
     mode,
     meshEdit,
+    activeSkin,
     animCurrent,
     animTime,
     animGhost,
