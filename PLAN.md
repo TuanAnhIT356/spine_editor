@@ -469,7 +469,31 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
    làm asset một click; ước tính chi phí trước khi gọi.
 4. MCP tool `generate_image` (proxy qua server) để agent ngoài cũng dùng được.
 
-#### Phase 13 — Tách thành phần (segmentation)
+#### Phase 13 — Tách thành phần (segmentation) ✅ Hoàn thành (07/2026)
+
+> Ghi chú thực hiện: `app/segment/local.py` — thuần Pillow, không cần model/GPU nên chạy
+> được trên Render free 512MB và trong CI: `remove_background` flood-fill từ 4 góc (nền
+> phẳng/gradient nhẹ — đúng loại ảnh AI hay sinh ra), `split_parts` connected-components
+> trên kênh alpha (4-connected, lọc theo `min_area`, sort theo diện tích giảm dần, tùy
+> chọn `crop` giữ nguyên canvas gốc để giữ layout khi ghép lại), `estimate_pose` template
+> tỉ lệ theo bbox silhouette (13 landmark: head/neck/shoulders/elbows/hands/hip/knees/
+> feet) — xấp xỉ có chủ đích, đủ để seed bone/point-prompt SAM, không phải detection thật.
+> `app/segment/fal.py` — BYOK cloud cho ảnh phức tạp: `remove_background` (rembg qua
+> fal.ai) và `sam_mask` (SAM 2 point/box prompt). `rembg` local là optional dependency
+> group (`uv sync --group ml`) — cấu trúc sẵn sàng nhưng không bắt buộc vì nặng cho free
+> tier. REST `/api/segment/{remove-bg,parts,pose,sam}`, tất cả nhận/trả data-URL, guard
+> đủ (data URL sai format, provider không hợp lệ, thiếu key fal, SAM thiếu prompt).
+> Editor: nút Split → dialog chọn ảnh nguồn + tùy chọn remove-bg trước + "Keep original
+> placement" (giữ canvas gốc, để attach tất cả part vào 1 bone là tái tạo đúng layout) +
+> min-area → preview từng part (đổi tên, checkbox chọn) → Import selected parts. MCP
+> thêm 3 tool: `remove_background`, `split_image_parts`, `estimate_pose` (51 tools).
+> 18 pytest server (connected-components trên ảnh 2 blob tách đúng bbox/kích thước,
+> remove-bg giữ nguyên subject, pose landmark đúng tỉ lệ, mọi guard); e2e Chromium thật
+> (`packages/editor/e2e/segment.mjs`): import ảnh 2 blob → Split → 2 part đúng kích
+> thước/tọa độ → Import selected parts → asset xuất hiện. **Chưa làm** — orchestration
+> chiến lược A (gen-từng-part với ảnh tham chiếu, thuộc Phase 14 cùng auto-rig), UI
+> review/sửa mask SAM point-prompt tương tác (endpoint đã có, chưa có UI riêng — dùng
+> qua MCP `estimate_pose` + gọi SAM thủ công khi cần).
 
 1. `rembg` in-process mặc định (không cần key) cho remove-bg.
 2. MediaPipe Pose → khớp + bounding box từng chi.

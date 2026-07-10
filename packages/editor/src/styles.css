@@ -887,3 +887,19 @@ button.danger {
   border-radius: 4px;
   background: repeating-conic-gradient(#2e2e33 0% 25%, #26262b 0% 50%) 0 0 / 16px 16px;
 }
+
+/* ---- Split Parts modal ---- */
+
+.project-row > img {
+  width: 48px;
+  height: 32px;
+  object-fit: contain;
+  background: repeating-conic-gradient(#2e2e33 0% 25%, #26262b 0% 50%) 0 0 / 12px 12px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.project-row .part-name {
+  flex: 1;
+  min-width: 80px;
+}

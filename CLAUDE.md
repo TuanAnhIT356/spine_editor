@@ -30,9 +30,15 @@ modals (`src/server/api.ts`, e2e: `packages/editor/e2e/server.mjs`, needs the se
 gpt-image-1.5 transparent, stability, runware LayerDiffuse, fal, mock for free local
 tests), `/api/generate` + per-user gallery stored in the DB, editor Generate dialog with
 game-asset prompt template + cost estimate, MCP tool `generate_image` (48 tools total).
-Phases 13–14 planned: segmentation (rembg/SAM/MediaPipe) into parts, chat history
-tables, and an AI chat that auto-rigs/animates by driving the existing bridge ops over
-WebSocket.
+**Phase 13 done**: segmentation — `server/app/segment/local.py` is pure Pillow (no ML,
+runs on free tiers/CI): flood-fill background removal, alpha connected-components part
+splitting (optional uncropped mode to preserve layout), proportional pose-landmark
+heuristic; `server/app/segment/fal.py` adds BYOK cloud remove-bg + SAM 2 point/box
+prompts for harder images; `rembg` is an optional `uv sync --group ml` dependency.
+`/api/segment/{remove-bg,parts,pose,sam}`, editor Split dialog (remove-bg → split →
+rename/select → import), MCP tools `remove_background`/`split_image_parts`/
+`estimate_pose` (51 tools total). Phase 14 planned: chat history tables and an AI chat
+that auto-rigs/animates by driving the existing bridge ops over WebSocket.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

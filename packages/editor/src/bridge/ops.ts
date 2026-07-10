@@ -241,6 +241,58 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       return { name: asset.name, width: asset.width, height: asset.height };
     }
 
+    case 'remove_background': {
+      const { removeBackground, useServer } = await import('../server/api.js');
+      if (!useServer.getState().user) {
+        throw new Error('Not signed in to the server — open the Server dialog first.');
+      }
+      const assetName = str(params, 'asset');
+      const asset = state().assets[assetName];
+      if (!asset) throw new Error(`Image "${assetName}" has not been imported.`);
+      const out = await removeBackground(
+        asset.dataUrl,
+        optStr(params, 'provider') ?? 'local',
+        optNum(params, 'tolerance') ?? 24,
+      );
+      const name = optStr(params, 'name') ?? `${assetName}-nobg`;
+      const replaced = await loadAssetFromDataUrl(name, out.data_url);
+      state().addAssets([replaced]);
+      return { name: replaced.name, width: replaced.width, height: replaced.height };
+    }
+
+    case 'split_image_parts': {
+      const { splitParts, useServer } = await import('../server/api.js');
+      if (!useServer.getState().user) {
+        throw new Error('Not signed in to the server — open the Server dialog first.');
+      }
+      const assetName = str(params, 'asset');
+      const asset = state().assets[assetName];
+      if (!asset) throw new Error(`Image "${assetName}" has not been imported.`);
+      const crop = params['keepPlacement'] === true ? false : true;
+      const result = await splitParts(asset.dataUrl, optNum(params, 'minArea') ?? 64, crop);
+      const imported: { name: string; x: number; y: number; width: number; height: number }[] = [];
+      for (const part of result.parts) {
+        let name = `${assetName}-${part.name}`;
+        let n = 2;
+        while (state().assets[name]) name = `${assetName}-${part.name}-${n++}`;
+        const loaded = await loadAssetFromDataUrl(name, part.data_url);
+        state().addAssets([loaded]);
+        imported.push({ name, x: part.x, y: part.y, width: part.width, height: part.height });
+      }
+      return { sourceWidth: result.width, sourceHeight: result.height, parts: imported };
+    }
+
+    case 'estimate_pose': {
+      const { estimatePose, useServer } = await import('../server/api.js');
+      if (!useServer.getState().user) {
+        throw new Error('Not signed in to the server — open the Server dialog first.');
+      }
+      const assetName = str(params, 'asset');
+      const asset = state().assets[assetName];
+      if (!asset) throw new Error(`Image "${assetName}" has not been imported.`);
+      return await estimatePose(asset.dataUrl);
+    }
+
     case 'generate_image': {
       // Runs on the opt-in backend with the signed-in user's BYOK key — the
       // editor session carries the auth. The result lands in the asset panel.

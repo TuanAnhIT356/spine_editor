@@ -222,6 +222,50 @@ export function deleteGalleryImage(id: number): Promise<void> {
   return request(`/api/generate/${id}`, { method: 'DELETE' });
 }
 
+export interface SplitPart {
+  name: string;
+  data_url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SplitResult {
+  width: number;
+  height: number;
+  parts: SplitPart[];
+}
+
+export interface PoseLandmarks {
+  landmarks: Record<string, { x: number; y: number }>;
+  width: number;
+  height: number;
+  bbox: { x: number; y: number; width: number; height: number } | null;
+}
+
+export function removeBackground(
+  image: string,
+  provider = 'local',
+  tolerance = 24,
+): Promise<{ data_url: string }> {
+  return request('/api/segment/remove-bg', {
+    method: 'POST',
+    body: JSON.stringify({ image, provider, tolerance }),
+  });
+}
+
+export function splitParts(image: string, minArea = 64, crop = true): Promise<SplitResult> {
+  return request('/api/segment/parts', {
+    method: 'POST',
+    body: JSON.stringify({ image, min_area: minArea, crop }),
+  });
+}
+
+export function estimatePose(image: string): Promise<PoseLandmarks> {
+  return request('/api/segment/pose', { method: 'POST', body: JSON.stringify({ image }) });
+}
+
 export function listKeys(): Promise<ApiKeyInfo[]> {
   return request('/api/keys');
 }

@@ -176,6 +176,43 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
 
   server.tool(
+    'remove_background',
+    'Remove the background of an imported image via the backend (signed-in editor session). ' +
+      'Provider "local" clears flat backdrops for free; "rembg"/"fal" use ML models. ' +
+      'Imports the result as a new asset (default "<asset>-nobg") and returns its name.',
+    {
+      asset: z.string().describe('Name of an imported image.'),
+      provider: z.enum(['local', 'rembg', 'fal']).optional(),
+      tolerance: z.number().int().min(0).max(128).optional().describe('local only'),
+      name: z.string().optional(),
+    },
+    forward('remove_background'),
+  );
+
+  server.tool(
+    'split_image_parts',
+    'Split a transparent image into separate parts (connected opaque islands) and import each ' +
+      'as an asset named "<asset>-part-N". With keepPlacement=true parts keep the full canvas, ' +
+      'so attaching them all to one bone reproduces the original layout. Returns per-part ' +
+      'names plus pixel offsets/sizes for bone placement.',
+    {
+      asset: z.string().describe('Name of an imported image (transparent background).'),
+      minArea: z.number().int().min(1).optional().describe('Ignore islands smaller than this.'),
+      keepPlacement: z.boolean().optional().describe('Uncropped full-canvas parts.'),
+    },
+    forward('split_image_parts'),
+  );
+
+  server.tool(
+    'estimate_pose',
+    'Heuristic body landmarks (head/neck/shoulders/elbows/hands/hip/knees/feet) for a ' +
+      'front-facing full-body image, in pixel coordinates (origin top-left). Use them to ' +
+      'place bones or as SAM point prompts. Approximate — verify with a screenshot.',
+    { asset: z.string().describe('Name of an imported image.') },
+    forward('estimate_pose'),
+  );
+
+  server.tool(
     'set_draw_order',
     'Move a slot to a draw-order index (0 = drawn first / furthest behind).',
     { slot: z.string(), index: z.number().int().min(0) },

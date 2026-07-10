@@ -74,6 +74,25 @@ points down), so child bones sit at `x = parent.length`.
   muzzles/hands) attach game metadata to slots; both render as outlines in the
   editor and round-trip to the exported JSON.
 
+## From one image to rig-ready parts (segmentation)
+
+Given a single character image (generated or uploaded, user signed in to the
+backend):
+
+1. `remove_background` if it still has a backdrop — `local` handles flat
+   colors free; `fal` (BYOK) handles busy photos.
+2. `split_image_parts` with `keepPlacement: true` — each opaque island
+   becomes an asset on the full canvas, so attaching every part to one bone
+   reproduces the artwork layout; the returned x/y/width/height tell you
+   where each part sits for placing bones later.
+3. `estimate_pose` gives approximate joint landmarks (pixel coords) for a
+   front-facing full body — combine with the part offsets to position bones
+   (image pixel y grows down; viewport world y grows up — convert
+   accordingly). It's a proportional template, not real detection: verify
+   with `screenshot_viewport` and adjust.
+4. For parts that are fused in one island (e.g. arm over torso), ask the user
+   to erase/redraw, or use the SAM endpoint via the editor UI (fal key).
+
 ## Skins & packed atlases
 
 - `create_skin` (optionally `copyFrom` to duplicate) + `switch_skin` change
