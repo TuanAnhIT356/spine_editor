@@ -33,10 +33,15 @@ game-asset prompt template + cost estimate, MCP tool `generate_image`. Bridge ha
 (07/2026): typed op protocol (`BRIDGE_OPS` in shared, compile-time exhaustive), pending
 requests reject on tab disconnect, per-op timeouts, takeover notice, opt-in
 `SPINE_BRIDGE_TOKEN` auth, and remove_{ik,transform,path,physics}_constraint —
-**52 MCP tools total**.
-Phases 13–14 planned: segmentation (rembg/SAM/MediaPipe) into parts, chat history
-tables, and an AI chat that auto-rigs/animates by driving the existing bridge ops over
-WebSocket.
+**52 MCP tools total**. **Phase 13 slice 1 done**: segmentation strategy B —
+`server/app/segment/` (rembg + MediaPipe pose in-process, SAM 2 via fal BYOK or a free
+mock behind a `SegmentBackend` protocol), `/api/segment` (remove-bg/pose/parts/backends),
+editor Segment dialog (mask review with point prompts, per-part re-run) importing parts
+as assets with source `origin` + optional place-on-canvas; `SPINE_SERVER_SEGMENT_FAKE=1`
+gives deterministic engines for tests/e2e/CI. Slice 2 pending: inpaint, gen-per-part
+strategy A, MCP tool `segment_image`, local SAM.
+Phase 14 planned: chat history tables and an AI chat that auto-rigs/animates by driving
+the existing bridge ops over WebSocket.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

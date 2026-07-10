@@ -469,7 +469,23 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
    làm asset một click; ước tính chi phí trước khi gọi.
 4. MCP tool `generate_image` (proxy qua server) để agent ngoài cũng dùng được.
 
-#### Phase 13 — Tách thành phần (segmentation)
+#### Phase 13 — Tách thành phần (segmentation) ✅ Slice 1 hoàn thành (07/2026)
+
+> Ghi chú thực hiện (slice 1 — chiến lược B end-to-end): `server/app/segment/` —
+> `parts.py` (PART_RECIPES 10 part từ landmarks, thuần logic), `engines.py` (rembg
+> in-process + MediaPipe Tasks PoseLandmarker, model cache `server/data/models/`,
+> env `SPINE_SERVER_SEGMENT_FAKE=1` thay bằng fake deterministic cho test/e2e/CI),
+> `backends.py` (protocol `SegmentBackend`: `FalSam2Backend` gọi `fal-ai/sam2/image`
+> BYOK + `MockBackend` free), `cutout.py` (mask → crop RGBA + tọa độ gốc). REST
+> `/api/segment`: remove-bg, pose (kèm prompts gợi ý), parts (auto hoặc custom
+> prompts, guards: thiếu fal key 400 / provider 502 / không thấy người 422 / >4096px
+> 400 / >20 part 400), backends. Editor: nút Segment → dialog review (overlay màu
+> từng part, đổi tên, click thêm fg point / Alt+click bg point, re-run từng part,
+> xóa), Import parts thành assets kèm `origin` (round-trip qua project JSON) + "Place
+> on canvas" tạo slot+attachment đúng vị trí trong 1 Composite undo. 21 pytest mới +
+> e2e server.mjs (fake engines): 10 part, rename, import, slot, origin — đều pass.
+> **Chưa làm (slice 2)**: inpaint phần che khuất, chiến lược A gen-từng-part, MCP
+> tool `segment_image`, SAM local (torch).
 
 1. `rembg` in-process mặc định (không cần key) cho remove-bg.
 2. MediaPipe Pose → khớp + bounding box từng chi.
