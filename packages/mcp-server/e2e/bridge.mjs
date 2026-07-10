@@ -238,6 +238,48 @@ await call('set_event_keyframe', { animation: 'walk', name: 'footstep', time: 0.
 const exported2 = await call('export_spine_json');
 const exportedEvents = JSON.parse(exported2.json);
 
+// ---- Phase 14: auto-rig from parts + preset walk
+console.error('[e2e] auto-rig flow');
+const PART_BOXES = [
+  ['head', 0, 330, 100, 110],
+  ['torso', 0, 112, 150, 240],
+  ['upper_arm_l', -100, 224, 80, 40],
+  ['lower_arm_l', -180, 224, 80, 40],
+  ['upper_arm_r', 100, 224, 80, 40],
+  ['lower_arm_r', 180, 224, 80, 40],
+  ['upper_leg_l', -32, -80, 50, 160],
+  ['lower_leg_l', -32, -240, 45, 160],
+  ['upper_leg_r', 32, -80, 50, 160],
+  ['lower_leg_r', 32, -240, 45, 160],
+];
+// Seed the placed-parts fixture through the page (same window.__spineEditor
+// hook anim.mjs uses) — load_project is a bridge op, not an MCP tool.
+await page.evaluate((boxes) => {
+  const s = window.__spineEditor.getState();
+  s.replaceProject(
+    {
+      skeleton: { spine: '4.2.43' },
+      bones: [{ name: 'root' }],
+      slots: boxes.map(([name]) => ({ name, bone: 'root', attachment: name })),
+      skins: [
+        {
+          name: 'default',
+          attachments: Object.fromEntries(
+            boxes.map(([name, x, y, width, height]) => [name, { [name]: { x, y, width, height } }]),
+          ),
+        },
+      ],
+    },
+    [],
+  );
+}, PART_BOXES);
+const rigRes = await call('rig_from_parts', {});
+const rigTree = await call('get_skeleton_tree');
+const rigBoneNames = rigTree.bones.map((b) => b.name);
+const presetRes = await call('apply_preset_animation', { preset: 'walk' });
+const walkExport = JSON.parse((await call('export_spine_json')).json);
+const walkPreview = await call('preview_at_time', { animation: 'walk', time: 0.25 });
+
 console.log(
   JSON.stringify(
     {
@@ -272,6 +314,14 @@ console.log(
       pointAtt: flagAtts['flag-tip'],
       eventDefs: exportedEvents.events,
       eventKeys: exportedEvents.animations?.walk?.events,
+      rigFromPartsWorks:
+        rigRes.bones.includes('spine') &&
+        rigBoneNames.includes('upper_leg_l') &&
+        (rigTree.ik ?? []).length >= 4,
+      presetWalkWorks:
+        presetRes.keys > 0 &&
+        Boolean(walkExport.animations?.walk?.bones?.upper_leg_l?.rotate) &&
+        walkPreview.duration >= 1,
     },
     null,
     2,
