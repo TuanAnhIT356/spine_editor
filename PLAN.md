@@ -469,7 +469,7 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
    làm asset một click; ước tính chi phí trước khi gọi.
 4. MCP tool `generate_image` (proxy qua server) để agent ngoài cũng dùng được.
 
-#### Phase 13 — Tách thành phần (segmentation) ✅ Slice 1 hoàn thành (07/2026)
+#### Phase 13 — Tách thành phần (segmentation) ✅ Hoàn thành (07/2026, 2 slice)
 
 > Ghi chú thực hiện (slice 1 — chiến lược B end-to-end): `server/app/segment/` —
 > `parts.py` (PART_RECIPES 10 part từ landmarks, thuần logic), `engines.py` (rembg
@@ -484,8 +484,17 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 > xóa), Import parts thành assets kèm `origin` (round-trip qua project JSON) + "Place
 > on canvas" tạo slot+attachment đúng vị trí trong 1 Composite undo. 21 pytest mới +
 > e2e server.mjs (fake engines): 10 part, rename, import, slot, origin — đều pass.
-> **Chưa làm (slice 2)**: inpaint phần che khuất, chiến lược A gen-từng-part, MCP
-> tool `segment_image`, SAM local (torch).
+> **Slice 2 (07/2026)**: provider layer thêm method tùy chọn `inpaint`/`edit`
+> (Stability inpaint BYOK + OpenAI gpt-image-1.5 edit + mock free); `/parts` nhận
+> `inpaint: true` — hole = union mask các part khác ∩ bbox (>200px²), vá per-part,
+> lỗi vào `warnings` không fail request, cờ `inpainted` + huy hiệu 🩹 trong dialog;
+> chiến lược A qua `POST /api/generate/part-set` (subject → reference vào gallery →
+> N edit "isolate only the <part>", nút "Generate part set" + grid + Add-all trong
+> Generate dialog); MCP tool thứ 53 `segment_image` (op dùng chung
+> `src/segment/import-parts.ts` với dialog); SAM 2 local qua
+> `uv sync --extra sam-local` — backend `local` tự đăng ký khi import được sam2
+> (checkpoint HF tải lần đầu, chạy mps/cuda/cpu). E2E server.mjs phủ inpaint mock +
+> part-set mock.
 
 1. `rembg` in-process mặc định (không cần key) cho remove-bg.
 2. MediaPipe Pose → khớp + bounding box từng chi.
