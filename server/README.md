@@ -45,24 +45,27 @@ connects via the Server button in its toolbar (default `http://localhost:8100`).
 | `SPINE_SERVER_DATA_DIR` | `server/data` | Where SQLite + secret live. |
 | `SPINE_SERVER_SMTP_HOST/PORT/USER/PASSWORD`, `SPINE_SERVER_MAIL_FROM` | unset | Without a host, reset mails go to `data/outbox.log` (dev mode). |
 
-## Deploy as a Hugging Face Space (free)
+## Deploy on Render (free)
 
-1. Create a Space (SDK: **Docker**, blank template). The Space serves this
-   directory as its repo root — `Dockerfile` and this README (with the YAML
-   header) are already in place.
-2. Push the contents of `server/` to the Space, either manually:
+The repo root ships a `render.yaml` Blueprint: in the Render dashboard pick
+**New → Blueprint**, select this repository (and branch), approve — it builds
+`server/Dockerfile` as a free web service with `SPINE_SERVER_SECRET`
+auto-generated. Then set the `sync: false` env vars in the service's
+**Environment** tab: `SPINE_SERVER_DATABASE_URL` (external Postgres, e.g.
+Neon — the free instance has no persistent disk), `SPINE_SERVER_CORS_ORIGINS`
+and `SPINE_SERVER_FRONTEND_URL` (your GitHub Pages URLs). The Blueprint
+already sets `SPINE_SERVER_COOKIE_SAMESITE=none` for the cross-origin cookie.
+Point the editor's Server URL at `https://<service>.onrender.com`.
 
-   ```bash
-   git subtree split --prefix server -b hf-space
-   git push https://huggingface.co/spaces/<user>/<space> hf-space:main --force
-   ```
+Free-tier note: the service spins down after ~15 idle minutes; the first
+request afterwards takes up to a minute while it wakes.
 
-   or automatically on every push to `main` via
-   `.github/workflows/deploy-space.yml` (set the `HF_TOKEN` secret and the
-   `HF_SPACE` variable, e.g. `user/spine-editor-server`, in the GitHub repo).
-3. In the Space **Settings → Variables and secrets** set at least:
-   `SPINE_SERVER_SECRET` (secret, long random string),
-   `SPINE_SERVER_DATABASE_URL` (secret, external Postgres — the Space disk is
-   ephemeral), `SPINE_SERVER_CORS_ORIGINS`, `SPINE_SERVER_FRONTEND_URL`
-   (your GitHub Pages URL) and `SPINE_SERVER_COOKIE_SAMESITE=none`.
-4. Point the editor's Server URL at `https://<user>-<space>.hf.space`.
+## Deploy as a Hugging Face Space (requires a PRO plan since 2026)
+
+Docker Spaces are no longer on the HF free tier, but this directory still
+works as a Space repo root (this README carries the Space YAML header):
+push the `server/` subtree manually or via
+`.github/workflows/deploy-space.yml` (needs the `HF_TOKEN` secret and
+`HF_SPACE` variable), then set the same env vars in
+**Settings → Variables and secrets** — `SPINE_SERVER_SECRET` explicitly,
+since Space storage is ephemeral.

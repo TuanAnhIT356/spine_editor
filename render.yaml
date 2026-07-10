@@ -1,0 +1,22 @@
+# Render Blueprint: deploys the Python backend as a free web service.
+# In the Render dashboard: New → Blueprint → pick this repo. After the first
+# deploy, fill in the sync:false env vars (database URL + frontend origins).
+services:
+  - type: web
+    name: spine-editor-server
+    runtime: docker
+    plan: free
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPINE_SERVER_SECRET
+        generateValue: true # random, persisted by Render — sessions/vault survive deploys
+      - key: SPINE_SERVER_DATABASE_URL
+        sync: false # paste your Neon/Supabase Postgres URL in the dashboard
+      - key: SPINE_SERVER_CORS_ORIGINS
+        sync: false # e.g. https://<user>.github.io
+      - key: SPINE_SERVER_FRONTEND_URL
+        sync: false # e.g. https://<user>.github.io/spine_editor
+      - key: SPINE_SERVER_COOKIE_SAMESITE
+        value: none # frontend (GitHub Pages) is on another origin
