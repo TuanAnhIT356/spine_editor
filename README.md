@@ -49,6 +49,10 @@ pnpm test        # vitest (core: model, commands, serializer, evaluator)
 pnpm lint && pnpm format:check
 ```
 
+Optional: `uv sync --extra sam-local` (in `server/`) enables the free offline
+SAM 2 segmentation backend (`local`) — torch download on install, checkpoint on
+first use.
+
 AI agents get a local code knowledge graph via
 [codegraph](https://github.com/colbymchenry/codegraph), registered in
 `.mcp.json`. One-time setup: `pnpm exec codegraph init .` — the index

@@ -177,6 +177,8 @@ export function deleteProject(id: number): Promise<void> {
 export interface ProviderInfo {
   name: string;
   supports_transparent: boolean;
+  supports_inpaint: boolean;
+  supports_edit: boolean;
   approx_cost_usd: number;
   has_key: boolean;
 }
@@ -259,6 +261,7 @@ export interface SegPartCut {
   y: number;
   width: number;
   height: number;
+  inpainted?: boolean;
 }
 export interface SegBackendInfo {
   name: string;
@@ -284,10 +287,31 @@ export function segmentParts(
   image: string,
   backend: string,
   parts?: SegPartPrompt[],
-): Promise<{ parts: SegPartCut[] }> {
+  opts?: { inpaint?: boolean; inpaintProvider?: string },
+): Promise<{ parts: SegPartCut[]; warnings: string[] }> {
   return request('/api/segment/parts', {
     method: 'POST',
-    body: JSON.stringify({ image, backend, ...(parts ? { parts } : {}) }),
+    body: JSON.stringify({
+      image,
+      backend,
+      ...(parts ? { parts } : {}),
+      ...(opts?.inpaint ? { inpaint: true, inpaint_provider: opts.inpaintProvider ?? 'mock' } : {}),
+    }),
+  });
+}
+
+export interface PartSetEntry {
+  name: string;
+  image: string;
+}
+
+export function generatePartSet(
+  provider: string,
+  opts: { subject?: string; reference?: string; parts?: string[]; size?: string },
+): Promise<{ reference: string; parts: PartSetEntry[]; warnings: string[] }> {
+  return request('/api/generate/part-set', {
+    method: 'POST',
+    body: JSON.stringify({ provider, ...opts }),
   });
 }
 

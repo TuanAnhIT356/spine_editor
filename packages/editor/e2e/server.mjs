@@ -68,6 +68,18 @@ await page.screenshot({ path: `${OUT}/01b-generated.png` });
 const generatedAssets = await page.evaluate(() =>
   Object.keys(window.__spineEditor.getState().assets),
 );
+
+// --- Phase 13 slice 2: strategy-A part set from the generated reference (mock)
+await page.click('button:has-text("Generate part set")');
+await page.waitForSelector('.partset-cell', { timeout: 20000 });
+const partSetCells = await page.locator('.partset-cell').count();
+await page.click('button:has-text("Add all to Images")');
+// A stale .form-notice from the earlier import is still rendered — wait for
+// the part-set-specific message before reading the store.
+await page.waitForSelector('.form-notice:has-text("part images")');
+const partSetAssets = await page.evaluate(() =>
+  Object.keys(window.__spineEditor.getState().assets).filter((n) => n.startsWith('upper_')),
+);
 await page.click('.generate-modal .close');
 
 // --- Phase 13: segment the generated asset into parts (fake engines + mock backend)
@@ -76,9 +88,13 @@ await page.click('button:has-text("Segment")');
 await page.waitForSelector('.generate-modal select');
 await page.selectOption('.generate-modal select >> nth=0', generatedAssets[0]);
 await page.waitForSelector('.segment-canvas');
+await page.check('.generate-modal label:has-text("Inpaint occluded areas") input');
 await page.click('button:has-text("Detect parts")');
 await page.waitForSelector('.segment-parts .key-row', { timeout: 15000 });
 const segmentParts = await page.locator('.segment-parts .key-row').count();
+const inpaintedBadges = await page
+  .locator('.segment-parts .key-row span[title="inpainted"]')
+  .count();
 await page.locator('.segment-parts .key-row').first().locator('input').nth(1).fill('my-head');
 await page.click('button:has-text("Import parts")');
 await page.waitForSelector('.form-notice');
@@ -158,7 +174,10 @@ console.log(
       email,
       maskedKey,
       generatedAssets,
+      partSetCells,
+      partSetAssetsOk: partSetAssets.length >= 4,
       segmentParts,
+      segmentInpainted: inpaintedBadges,
       segmentAssetImported: segState.assetNames.includes('my-head'),
       segmentSlotPlaced: segState.slotNames.includes('my-head'),
       segmentOriginSaved: !!segState.headOrigin,

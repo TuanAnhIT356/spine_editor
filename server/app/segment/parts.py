@@ -39,6 +39,9 @@ LIMBS: list[tuple[str, str, str]] = [
     ("lower_leg_r", "right_knee", "right_ankle"),
 ]
 
+# Canonical part order for strategy-A generation and UI defaults.
+DEFAULT_PART_NAMES: list[str] = ["head", "torso", *[name for name, _, _ in LIMBS]]
+
 XY = tuple[float, float]
 
 

@@ -11,7 +11,14 @@ def data_url(w=200, h=400) -> str:
 
 
 def test_segment_requires_auth(client):
-    assert client.post("/api/segment/pose", json={"image": data_url()}).status_code == 401
+    # Explicit invalid token: the shared session client may carry a previous
+    # test's auth header (auth_client mutates it), so don't rely on ambient state.
+    res = client.post(
+        "/api/segment/pose",
+        json={"image": data_url()},
+        headers={"authorization": "Bearer invalid-token"},
+    )
+    assert res.status_code == 401
 
 
 def test_backends_listing(auth_client):

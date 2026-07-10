@@ -91,7 +91,63 @@ class FalSam2Backend:
         return await http_get_bytes(url)
 
 
+class LocalSam2Backend:
+    """SAM 2 running locally (uv sync --extra sam-local). Free/offline; the
+    checkpoint downloads to the HF cache on first use."""
+
+    name = "local"
+    approx_cost_usd = 0.0
+
+    def __init__(self) -> None:
+        self._predictor = None
+
+    def _get_predictor(self):
+        if self._predictor is None:
+            import torch
+            from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+            device = (
+                "mps"
+                if torch.backends.mps.is_available()
+                else "cuda"
+                if torch.cuda.is_available()
+                else "cpu"
+            )
+            self._predictor = SAM2ImagePredictor.from_pretrained(
+                "facebook/sam2-hiera-small", device=device
+            )
+        return self._predictor
+
+    async def mask(self, image_png: bytes, prompt: PartPrompt) -> bytes:
+        import numpy as np
+
+        predictor = self._get_predictor()
+        rgb = np.asarray(Image.open(io.BytesIO(image_png)).convert("RGB"))
+        predictor.set_image(rgb)
+        coords = np.array([[p.x, p.y] for p in prompt.points]) if prompt.points else None
+        labels = np.array([p.label for p in prompt.points]) if prompt.points else None
+        box = (
+            np.array([prompt.box.x0, prompt.box.y0, prompt.box.x1, prompt.box.y1])
+            if prompt.box is not None
+            else None
+        )
+        masks, _scores, _logits = predictor.predict(
+            point_coords=coords, point_labels=labels, box=box, multimask_output=False
+        )
+        mask = (masks[0] > 0.5).astype("uint8") * 255
+        buf = io.BytesIO()
+        Image.fromarray(mask, mode="L").save(buf, format="PNG")
+        return buf.getvalue()
+
+
 BACKENDS: dict[str, SegmentBackend] = {
     "fal": FalSam2Backend(),
     "mock": MockBackend(),
 }
+
+try:  # registered only when the sam-local extra is installed
+    import sam2  # noqa: F401
+
+    BACKENDS["local"] = LocalSam2Backend()
+except ImportError:
+    pass
