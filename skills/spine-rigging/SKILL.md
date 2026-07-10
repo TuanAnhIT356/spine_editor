@@ -36,6 +36,9 @@ points down), so child bones sit at `x = parent.length`.
    Have a full-body image already? `segment_image` splits it into part assets
    (head/torso/limbs, optionally placed on the canvas at their original spots)
    — review the names, then rig them. Backend `mock` is free for pipeline tests.
+   After importing parts to the canvas, call `rig_from_parts` to build the
+   whole skeleton (bones + IK + draw order) in one step, then fine-tune with
+   the usual tools.
 4. `set_draw_order` — index 0 draws furthest behind. Typical order: far limbs,
    torso, near limbs, head.
 5. `add_ik_constraint` for legs/arms you want to pose by target (1-2 bone chain

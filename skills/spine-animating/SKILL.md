@@ -22,6 +22,10 @@ and existing animations.
 
 ## Workflow
 
+Start from a preset when one fits: `apply_preset_animation` (idle/walk/wave)
+retargets a ready-made loop onto rigs built by `rig_from_parts` (or any rig
+via `bone_map`) — then refine keys by hand.
+
 1. `create_animation` — switches the editor to animate mode.
 2. Key the EXTREME poses first (e.g. contact and passing poses of a walk), then
    in-betweens only where the interpolation looks wrong.

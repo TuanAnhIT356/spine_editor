@@ -38,15 +38,20 @@ import {
   UpsertEventKeyframe,
   UpsertSlotAttachmentKeyframe,
   UpsertSlotColorKeyframe,
+  PRESET_NAMES,
   autoWeightVertices,
   buildGridMeshAttachment,
+  buildRigFromParts,
   createBone,
   createEmptySkeleton,
   createSlot,
   getAnimationDuration,
+  retargetPreset,
   serializeSpineJson,
   type BoneKeyRef,
   type BoneTransformPatch,
+  type PartBox,
+  type PresetName,
   type SlotData,
   type SpineAttachmentKey,
   type SpineBoneKey,
@@ -801,6 +806,112 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
         }),
       );
       return { attachment: name };
+    }
+
+    case 'rig_from_parts': {
+      // Turns canonically-named placed parts (from segment_image / the Segment
+      // dialog's Place on canvas) into a full skeleton in one undo step.
+      const s = state();
+      const canonical = new Set([
+        'head',
+        'torso',
+        'upper_arm_l',
+        'lower_arm_l',
+        'upper_arm_r',
+        'lower_arm_r',
+        'upper_leg_l',
+        'lower_leg_l',
+        'upper_leg_r',
+        'lower_leg_r',
+      ]);
+      const defaultSkin = s.doc.data.skins.find((sk) => sk.name === 'default');
+      const parts: PartBox[] = [];
+      const slotForPart = new Map<string, { slot: string; attachment: string }>();
+      for (const slot of s.doc.data.slots) {
+        if (!slot.attachment) continue;
+        const base = slot.attachment.replace(/-\d+$/, '');
+        if (!canonical.has(base) || slotForPart.has(base)) continue;
+        const att = defaultSkin?.attachments?.[slot.name]?.[slot.attachment] as
+          { x?: number; y?: number; width?: number; height?: number } | undefined;
+        if (!att || att.width === undefined || att.height === undefined) continue;
+        parts.push({
+          name: base,
+          x: att.x ?? 0,
+          y: att.y ?? 0,
+          width: att.width,
+          height: att.height,
+        });
+        slotForPart.set(base, { slot: slot.name, attachment: slot.attachment });
+      }
+      if (parts.length === 0) {
+        throw new Error(
+          'No canonically named parts found — run segment_image (place_on_canvas) first.',
+        );
+      }
+      const plan = buildRigFromParts(parts, { ik: params['ik'] !== false });
+      const commands = [];
+      for (const bone of plan.bones) commands.push(new AddBone(bone));
+      for (const binding of plan.slotBindings) {
+        const ref = slotForPart.get(binding.slot);
+        if (!ref) continue;
+        const existing = defaultSkin?.attachments?.[ref.slot]?.[ref.attachment] as Record<
+          string,
+          unknown
+        >;
+        commands.push(new SetSlotProperties(ref.slot, { bone: binding.bone }));
+        commands.push(
+          new AddSkinAttachment(
+            'default',
+            ref.slot,
+            ref.attachment,
+            { ...existing, ...binding.attachment },
+            true,
+          ),
+        );
+      }
+      for (const constraint of plan.ik) commands.push(new AddIkConstraint(constraint));
+      plan.drawOrder.forEach((partName, index) => {
+        const ref = slotForPart.get(partName);
+        if (ref) commands.push(new ReorderSlot(ref.slot, index));
+      });
+      executeOrThrow(new Composite('Auto-rig from parts', commands));
+      return {
+        bones: plan.bones.map((b) => b.name),
+        ik: plan.ik.map((c) => c.name),
+        slots: plan.slotBindings.map((b) => b.slot),
+      };
+    }
+
+    case 'apply_preset_animation': {
+      const s = state();
+      const preset = str(params, 'preset') as PresetName;
+      if (!PRESET_NAMES.includes(preset)) {
+        throw new Error(`Unknown preset "${preset}". Valid: ${PRESET_NAMES.join(', ')}`);
+      }
+      const boneMap = (params['bone_map'] ?? undefined) as Record<string, string> | undefined;
+      const animation = retargetPreset(preset, s.doc.data, boneMap);
+      const name = optStr(params, 'animation') ?? preset;
+      const tracks = Object.keys(animation.bones ?? {});
+      if (tracks.length === 0) {
+        throw new Error(
+          'No preset tracks matched this skeleton — rig with rig_from_parts or pass bone_map.',
+        );
+      }
+      const commands = [];
+      commands.push(new CreateAnimation(name));
+      let keyCount = 0;
+      for (const [bone, boneTracks] of Object.entries(animation.bones ?? {})) {
+        for (const [timeline, keys] of Object.entries(boneTracks)) {
+          for (const key of keys ?? []) {
+            commands.push(
+              new UpsertBoneKeyframe(name, bone, timeline as SpineBoneTimelineName, key),
+            );
+            keyCount++;
+          }
+        }
+      }
+      executeOrThrow(new Composite(`Apply preset "${preset}"`, commands));
+      return { animation: name, tracks: tracks.length, keys: keyCount };
     }
 
     case 'create_skin': {
