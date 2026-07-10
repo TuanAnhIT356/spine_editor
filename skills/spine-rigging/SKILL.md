@@ -33,6 +33,9 @@ points down), so child bones sit at `x = parent.length`.
    Ask for a transparent background and describe one part per call ("upper arm
    of a knight, side view, flat shading") — or generate a full T-pose reference
    first. Provider `mock` is free/local for pipeline tests.
+   Have a full-body image already? `segment_image` splits it into part assets
+   (head/torso/limbs, optionally placed on the canvas at their original spots)
+   — review the names, then rig them. Backend `mock` is free for pipeline tests.
 4. `set_draw_order` — index 0 draws furthest behind. Typical order: far limbs,
    torso, near limbs, head.
 5. `add_ik_constraint` for legs/arms you want to pose by target (1-2 bone chain

@@ -153,6 +153,17 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
 
   server.tool(
+    'segment_image',
+    'Segment an imported image asset into body parts (head/torso/limbs) via the opt-in backend (editor must be signed in to the server). backend "mock" is free; "fal"/"local" need setup. Imports the parts as assets and, by default, places them on the canvas as root slots.',
+    {
+      asset: z.string().describe('Name of an imported image asset'),
+      backend: z.string().optional().describe('Segment backend: mock (default), fal, local'),
+      place_on_canvas: z.boolean().optional().describe('Default true'),
+    },
+    forward('segment_image'),
+  );
+
+  server.tool(
     'attach_image',
     'Create a slot on a bone showing an imported image as a region attachment (slot + attachment named after the image). Returns the slot name.',
     { asset: z.string(), bone: z.string() },

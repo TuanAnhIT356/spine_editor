@@ -268,6 +268,26 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       return { name: asset.name, width: asset.width, height: asset.height, galleryId: image.id };
     }
 
+    case 'segment_image': {
+      // Segments an imported asset via the opt-in backend (editor session auth)
+      // and imports the parts, mirroring the Segment dialog.
+      const { segmentParts, useServer } = await import('../server/api.js');
+      const { importParts } = await import('../segment/import-parts.js');
+      if (!useServer.getState().user) {
+        throw new Error('Not signed in to the server — open the Server dialog first.');
+      }
+      const assetName = str(params, 'asset');
+      const asset = state().assets[assetName];
+      if (!asset) throw new Error(`Image "${assetName}" has not been imported.`);
+      const res = await segmentParts(asset.dataUrl, optStr(params, 'backend') ?? 'mock');
+      const imported = importParts(
+        res.parts,
+        { w: asset.width, h: asset.height },
+        params['place_on_canvas'] !== false,
+      );
+      return { assets: imported.assets, slots: imported.slots, warnings: res.warnings };
+    }
+
     case 'attach_image': {
       const s = state();
       const assetName = str(params, 'asset');

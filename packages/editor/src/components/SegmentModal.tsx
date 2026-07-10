@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AddSkinAttachment, AddSlot, Composite, createSlot } from '@spine-editor/core';
+import { importParts } from '../segment/import-parts.js';
 import {
   listProviders,
   segmentBackends,
@@ -11,7 +11,7 @@ import {
   type SegPartCut,
   type SegPartPrompt,
 } from '../server/api.js';
-import { uniqueName, useEditor, type ImageAsset } from '../state/store.js';
+import { useEditor } from '../state/store.js';
 
 interface ReviewPart {
   prompt: SegPartPrompt;
@@ -210,46 +210,15 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
 
   function onImport() {
     if (!imgSize) return;
-    const state = useEditor.getState();
-    const newAssets: ImageAsset[] = [];
-    const commands = [];
-    for (const part of parts) {
-      if (!part.cut) continue;
-      const cut = part.cut;
-      let name = part.prompt.name;
-      let n = 2;
-      while (state.assets[name] || newAssets.some((a) => a.name === name)) {
-        name = `${part.prompt.name}-${n++}`;
-      }
-      newAssets.push({
-        name,
-        dataUrl: cut.image,
-        width: cut.width,
-        height: cut.height,
-        origin: { x: cut.x, y: cut.y, sourceWidth: imgSize.w, sourceHeight: imgSize.h },
-      });
-      if (placeOnCanvas) {
-        const slotName = uniqueName(name, (s) => state.doc.data.slots.some((sl) => sl.name === s));
-        commands.push(new AddSlot(createSlot(slotName, 'root', { attachment: name })));
-        commands.push(
-          new AddSkinAttachment('default', slotName, name, {
-            x: cut.x + cut.width / 2 - imgSize.w / 2,
-            y: imgSize.h / 2 - (cut.y + cut.height / 2),
-            width: cut.width,
-            height: cut.height,
-          }),
-        );
-      }
-    }
-    if (newAssets.length === 0) {
+    const cuts = parts
+      .filter((p) => p.cut)
+      .map((p) => ({ ...(p.cut as SegPartCut), name: p.prompt.name }));
+    const res = importParts(cuts, imgSize, placeOnCanvas);
+    if (res.assets.length === 0) {
       setError('No parts to import');
       return;
     }
-    state.addAssets(newAssets);
-    if (commands.length > 0) {
-      state.execute(new Composite('Import segmented parts', commands));
-    }
-    setNotice(`Imported ${newAssets.length} parts${placeOnCanvas ? ' onto the canvas' : ''}.`);
+    setNotice(`Imported ${res.assets.length} parts${placeOnCanvas ? ' onto the canvas' : ''}.`);
   }
 
   const selectedBackend = backends.find((b) => b.name === backend);
