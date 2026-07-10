@@ -24,9 +24,11 @@
 ### Task 1: devDependency + working CLI
 
 **Files:**
+
 - Modify: `package.json` (repo root, devDependencies block)
 
 **Interfaces:**
+
 - Produces: `corepack pnpm exec codegraph …` working from repo root — every later task calls this.
 
 - [ ] **Step 1: Add the dependency**
@@ -78,11 +80,13 @@ git commit -m "Add @colbymchenry/codegraph as root devDependency"
 ### Task 2: Project MCP registration + gitignore
 
 **Files:**
+
 - Create: `.mcp.json` (repo root)
 - Modify: `.gitignore`
 - Test (scratch, NOT committed): `mcp-smoke.mjs` in a temp dir OUTSIDE the repo (session scratchpad or `$TMPDIR`)
 
 **Interfaces:**
+
 - Consumes: working `codegraph` CLI from Task 1.
 - Produces: `.mcp.json` entry named `codegraph` that MCP clients (Claude Code) auto-detect at the repo root.
 
@@ -184,6 +188,7 @@ git commit -m "Register codegraph as project-scoped MCP server"
 **Files:** none committed (index is gitignored) — this task's deliverable is a verified working index on this machine.
 
 **Interfaces:**
+
 - Consumes: CLI (Task 1). Independent of Task 2.
 - Produces: `.codegraph/codegraph.db` covering `packages/` (TS/TSX) and `server/` (Python); verified query commands quoted in Task 4 docs.
 
@@ -232,10 +237,12 @@ Nothing to commit in this task.
 ### Task 4: Docs (CLAUDE.md + README)
 
 **Files:**
+
 - Modify: `CLAUDE.md` (insert new section between `## Commands` and `## Architecture`)
 - Modify: `README.md` (extend `## Development` section)
 
 **Interfaces:**
+
 - Consumes: command spellings verified in Task 3.
 
 - [ ] **Step 1: Add CLAUDE.md section**

@@ -112,12 +112,12 @@ qua pnpm.
 
 ## 5. Xử lý lỗi
 
-| Tình huống | Xử lý |
-| --- | --- |
-| Chưa init index | Docs (CLAUDE.md + README) ghi rõ lệnh init một lần |
-| Lock file kẹt (crash giữa chừng) | `pnpm exec codegraph unlock` — ghi trong CLAUDE.md |
+| Tình huống                          | Xử lý                                                                                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chưa init index                     | Docs (CLAUDE.md + README) ghi rõ lệnh init một lần                                                                                                                  |
+| Lock file kẹt (crash giữa chừng)    | `pnpm exec codegraph unlock` — ghi trong CLAUDE.md                                                                                                                  |
 | pnpm không cài được binary platform | Fallback trong README: `npm i -g @colbymchenry/codegraph` **và** đổi `.mcp.json` command từ `pnpm` thành `codegraph` gọi trực tiếp từ PATH (README ghi cả hai bước) |
-| Index lỗi thời/sai | `pnpm exec codegraph index . --force` |
+| Index lỗi thời/sai                  | `pnpm exec codegraph index . --force`                                                                                                                               |
 
 ## 6. Nghiệm thu (verification)
 
