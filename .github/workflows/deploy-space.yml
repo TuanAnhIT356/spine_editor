@@ -1,0 +1,32 @@
+name: Deploy server to Hugging Face Space
+
+# Pushes the server/ directory to a Hugging Face Docker Space whenever it
+# changes on main. Requires:
+#   - repo secret  HF_TOKEN  (HF access token with write scope)
+#   - repo variable HF_SPACE (e.g. "myuser/spine-editor-server")
+on:
+  push:
+    branches: [main]
+    paths: ['server/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push server/ subtree to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "HF_TOKEN secret or HF_SPACE variable not configured — skipping."
+            exit 0
+          fi
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git subtree split --prefix server -b hf-space
+          git push "https://oauth:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" hf-space:main --force
