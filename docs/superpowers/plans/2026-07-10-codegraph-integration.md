@@ -99,8 +99,8 @@ Exact content:
   "mcpServers": {
     "codegraph": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "codegraph", "serve", "--mcp"]
+      "command": "npx",
+      "args": ["codegraph", "serve", "--mcp"]
     }
   }
 }
@@ -122,9 +122,8 @@ Create `mcp-smoke.mjs` in a temp dir outside the repo:
 ```js
 import { spawn } from 'node:child_process';
 
-const proc = spawn('corepack', ['pnpm', 'exec', 'codegraph', 'serve', '--mcp'], {
+const proc = spawn('npx', ['codegraph', 'serve', '--mcp'], {
   cwd: process.cwd(),
-  env: { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 const send = (o) => proc.stdin.write(JSON.stringify(o) + '\n');

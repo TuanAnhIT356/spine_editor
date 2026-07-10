@@ -60,14 +60,16 @@ Thêm devDependency, pin theo minor:
   "mcpServers": {
     "codegraph": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "codegraph", "serve", "--mcp"]
+      "command": "npx",
+      "args": ["codegraph", "serve", "--mcp"]
     }
   }
 }
 ```
 
-- Cùng style với entry `spine-editor` đã hướng dẫn trong README (command `pnpm`).
+- Dùng `npx` thay vì `pnpm` (điều chỉnh lúc implement theo §8): `npx` luôn nằm cạnh
+  `node` trên PATH và resolve `node_modules/.bin/codegraph` local — máy dev này không
+  có `pnpm` trên PATH khi MCP client spawn process (chỉ có qua corepack).
 - Claude Code tự nhận `.mcp.json` project-scoped (hỏi user approve lần đầu).
 - Không thêm entry `spine-editor` vào file này trong scope hiện tại (xem §7).
 
@@ -112,12 +114,12 @@ qua pnpm.
 
 ## 5. Xử lý lỗi
 
-| Tình huống                          | Xử lý                                                                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chưa init index                     | Docs (CLAUDE.md + README) ghi rõ lệnh init một lần                                                                                                                  |
-| Lock file kẹt (crash giữa chừng)    | `pnpm exec codegraph unlock` — ghi trong CLAUDE.md                                                                                                                  |
-| pnpm không cài được binary platform | Fallback trong README: `npm i -g @colbymchenry/codegraph` **và** đổi `.mcp.json` command từ `pnpm` thành `codegraph` gọi trực tiếp từ PATH (README ghi cả hai bước) |
-| Index lỗi thời/sai                  | `pnpm exec codegraph index . --force`                                                                                                                               |
+| Tình huống                          | Xử lý                                                                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Chưa init index                     | Docs (CLAUDE.md + README) ghi rõ lệnh init một lần                                                                                                                 |
+| Lock file kẹt (crash giữa chừng)    | `pnpm exec codegraph unlock` — ghi trong CLAUDE.md                                                                                                                 |
+| pnpm không cài được binary platform | Fallback trong README: `npm i -g @colbymchenry/codegraph` **và** đổi `.mcp.json` command từ `npx` thành `codegraph` gọi trực tiếp từ PATH (README ghi cả hai bước) |
+| Index lỗi thời/sai                  | `pnpm exec codegraph index . --force`                                                                                                                              |
 
 ## 6. Nghiệm thu (verification)
 
