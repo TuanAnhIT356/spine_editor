@@ -42,6 +42,8 @@ class GalleryImage(GalleryEntry):
 class ProviderInfo(BaseModel):
     name: str
     supports_transparent: bool
+    supports_inpaint: bool = False
+    supports_edit: bool = False
     approx_cost_usd: float
     has_key: bool
 
@@ -70,6 +72,8 @@ def list_providers(user: CurrentUser, db: DbSession) -> list[ProviderInfo]:
         ProviderInfo(
             name=p.name,
             supports_transparent=p.supports_transparent,
+            supports_inpaint=getattr(p, "supports_inpaint", False),
+            supports_edit=getattr(p, "supports_edit", False),
             approx_cost_usd=p.approx_cost_usd,
             has_key=p.name in keyed or p.name == "mock",
         )

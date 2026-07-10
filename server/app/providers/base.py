@@ -4,6 +4,11 @@ Adapters receive the user's decrypted API key per call (keys never live on the
 adapter), and return raw PNG bytes. `supports_transparent` gates the
 `transparent` flag server-side so the UI can explain instead of failing deep
 inside a provider call.
+
+Optional capabilities: adapters may declare `supports_inpaint`/`supports_edit`
+plus the matching async method (`inpaint(key, image_png, mask_png, prompt)`,
+`edit(key, image_png, prompt, size, transparent)`); callers detect them with
+`getattr(provider, "supports_x", False)`.
 """
 
 from typing import Protocol
@@ -40,6 +45,17 @@ async def http_post_json(
     if res.status_code >= 400:
         # Provider error bodies can leak request details — keep only the status
         # and a trimmed snippet.
+        snippet = res.text[:200]
+        raise ProviderError(f"Provider HTTP {res.status_code}: {snippet}")
+    return res
+
+
+async def http_post_multipart(
+    url: str, headers: dict[str, str], files: dict[str, tuple], timeout: int = 180
+) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        res = await client.post(url, headers=headers, files=files)
+    if res.status_code >= 400:
         snippet = res.text[:200]
         raise ProviderError(f"Provider HTTP {res.status_code}: {snippet}")
     return res
