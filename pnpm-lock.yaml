@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@colbymchenry/codegraph':
+        specifier: ^1.4.0
+        version: 1.4.0
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.4
@@ -213,6 +216,40 @@ packages:
   '@babel/types@7.29.7':
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
+
+  '@colbymchenry/codegraph-darwin-arm64@1.4.0':
+    resolution: {integrity: sha512-/QSI3vvQRyt/H+9NllFlFbL+NwVo7G0V/Z3vay9yMfuMTjjb2p16rlvdkQkFOsO9rpYj1UpAJYsD3lPBuDmVTw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@colbymchenry/codegraph-darwin-x64@1.4.0':
+    resolution: {integrity: sha512-OiFLBfelA7sOgNqdfVKWa5DZbpy1hApNf420+eOseVFqDxl7mcdPmZQsB8sNFjHnomc8W21YDFZyFu70eT7C2g==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@colbymchenry/codegraph-linux-arm64@1.4.0':
+    resolution: {integrity: sha512-0g816KZeNP0cA0ueGoVmWeUWY2l9V4wjD/PfLda3E7++iA8MZFBqRIzTQsjv1FlTWFN52GcQaDG3pmG3aZtYqQ==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@colbymchenry/codegraph-linux-x64@1.4.0':
+    resolution: {integrity: sha512-0E268exwhFx5gZRqxOiWB3tyiT9P853h6nLbMdSooayp2Elo4zBumtnVaeNWN1ma3USww9mkLHxHpkRzelPelw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@colbymchenry/codegraph-win32-arm64@1.4.0':
+    resolution: {integrity: sha512-Y6G70FVvhGi5Zl1PMzywqZ+NEZ4+WpJQoN/KXU44IeId7PV+UjgN9sei1iK1DTsKXMVXu0bSYcyCIufbjo32+w==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@colbymchenry/codegraph-win32-x64@1.4.0':
+    resolution: {integrity: sha512-i+oGd0zCuXgsbvgfx89F3Fk+1pCoH2cZe+xQAzH0Icz7fyzhyggj9OZ08Og2FPRqf9xgyPe7jUzPBoZtuPGtPg==}
+    cpu: [x64]
+    os: [win32]
+
+  '@colbymchenry/codegraph@1.4.0':
+    resolution: {integrity: sha512-TuiF8wHsweogJe1ANGHq/yKbwttkShBDFxcpUtTCvKuFlwPWcGghC2vru4QCqNA/T8AVqiBiV+ZxBV9dkZj8GA==}
+    hasBin: true
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -2015,6 +2052,33 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@colbymchenry/codegraph-darwin-arm64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph-darwin-x64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph-linux-arm64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph-linux-x64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph-win32-arm64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph-win32-x64@1.4.0':
+    optional: true
+
+  '@colbymchenry/codegraph@1.4.0':
+    optionalDependencies:
+      '@colbymchenry/codegraph-darwin-arm64': 1.4.0
+      '@colbymchenry/codegraph-darwin-x64': 1.4.0
+      '@colbymchenry/codegraph-linux-arm64': 1.4.0
+      '@colbymchenry/codegraph-linux-x64': 1.4.0
+      '@colbymchenry/codegraph-win32-arm64': 1.4.0
+      '@colbymchenry/codegraph-win32-x64': 1.4.0
 
   '@esbuild/aix-ppc64@0.25.12':
     optional: true

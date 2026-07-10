@@ -60,6 +60,17 @@ Python backend (`server/`, requires [uv](https://docs.astral.sh/uv/)) — run fr
 CI (`.github/workflows/ci.yml`): Node job (lint, format:check, typecheck, test, build) +
 `server` job (ruff check/format, pytest) — all must pass.
 
+## Codegraph (code intelligence for AI agents)
+
+The repo registers [codegraph](https://github.com/colbymchenry/codegraph) as a
+project-scoped MCP server (`.mcp.json`). Prefer its `codegraph_explore` tool for
+structure/flow questions ("how does X reach Y", "what calls Z") before manual
+grep/read — one call returns the relevant symbols' source plus the call paths
+between them. One-time setup after `pnpm install`: `pnpm exec codegraph init .`
+(index in `.codegraph/`, gitignored, auto-syncs on file changes). Maintenance:
+`pnpm exec codegraph index . --force` rebuilds, `pnpm exec codegraph unlock`
+clears a stale lock, `pnpm exec codegraph telemetry off` disables telemetry.
+
 ## Architecture
 
 ```

@@ -332,7 +332,7 @@ export class TransformBoneKeys implements Command {
     // Group refs per timeline so collision checks see the whole picture.
     const groups = new Map<string, BoneKeyRef[]>();
     for (const ref of this.refs) {
-      const groupKey = `${ref.bone} ${ref.timeline}`;
+      const groupKey = `${ref.bone}\u0000${ref.timeline}`;
       (groups.get(groupKey) ?? groups.set(groupKey, []).get(groupKey)!).push(ref);
     }
     const before = structuredClone(anim);

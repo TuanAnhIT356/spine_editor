@@ -66,7 +66,10 @@ and existing animations.
   (solve + timeline mix/bendPositive), transform constraints, slot colors
   (`set_slot_color_keyframe`, rgba+alpha), mesh deform and draw-order
   timelines. Animate a limb by keying translate on its IK TARGET bone.
-  Path/physics constraints are stored/exported but not previewed.
+  Path constraints are evaluated (arc-length spline sampling, with
+  position/spacing/mix timelines); physics constraints are previewed via a
+  deterministic fixed-step simulator (approximate — exports run the real
+  runtime simulation).
 - Squash/flags/hair: `create_mesh` turns a slot's image into a grid mesh,
   then `set_deform_keyframe` moves vertices (x,y offsets, bone-local).
 - Events: `set_event` to define, `set_event_keyframe` to fire at a time —

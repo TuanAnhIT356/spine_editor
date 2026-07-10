@@ -13,3 +13,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+# codegraph index (rebuild per-machine: pnpm exec codegraph init .)
+.codegraph/
