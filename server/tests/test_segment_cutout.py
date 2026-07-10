@@ -1,7 +1,9 @@
 import asyncio
 import base64
 import io
+import os
 
+import pytest
 from PIL import Image
 
 from app.segment.backends import BACKENDS, MockBackend
@@ -57,8 +59,21 @@ def test_cut_part_crops_to_mask_bbox_with_origin():
 
 
 def test_backends_registry():
-    assert set(BACKENDS) == {"fal", "mock"}
+    # "local" appears only when the sam-local extra is installed.
+    assert {"fal", "mock"} <= set(BACKENDS)
     assert BACKENDS["mock"].approx_cost_usd == 0.0
+
+
+@pytest.mark.skipif(
+    os.environ.get("SEGMENT_LOCAL_SAM") != "1",
+    reason="set SEGMENT_LOCAL_SAM=1 after `uv sync --extra sam-local`",
+)
+def test_local_sam_backend_masks_a_box():
+    prompt = PartPrompt(
+        name="p", points=[Point(x=32, y=32, label=1)], box=Box(x0=8, y0=8, x1=56, y1=56)
+    )
+    mask_png = asyncio.run(BACKENDS["local"].mask(solid(64, 64), prompt))
+    assert Image.open(io.BytesIO(mask_png)).size == (64, 64)
 
 
 def test_fal_backend_maps_prompts_and_decodes_data_uri(monkeypatch):

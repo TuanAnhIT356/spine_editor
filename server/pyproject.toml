@@ -21,6 +21,13 @@ dependencies = [
   "numba>=0.59",
 ]
 
+[project.optional-dependencies]
+sam-local = [
+  "torch>=2.4",
+  "sam2>=1.1",
+  "huggingface-hub>=0.24",
+]
+
 [dependency-groups]
 dev = [
   "pytest>=8",
