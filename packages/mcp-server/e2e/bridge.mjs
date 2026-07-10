@@ -18,11 +18,21 @@ const BASE = process.argv[3] ?? 'http://localhost:4173/';
 fs.mkdirSync(OUT, { recursive: true });
 const serverDir = path.resolve(fileURLToPath(import.meta.url), '../..');
 
+// Random bridge token so ONLY this run's Chromium tab can connect — a stale
+// editor tab in someone's browser would otherwise win last-writer-takeover
+// and answer with old code.
+const BRIDGE_TOKEN = `e2e-${Math.random().toString(36).slice(2)}`;
+
 // 1. Spawn the MCP server over stdio.
 console.error('[e2e] spawning MCP server...');
 const client = new Client({ name: 'e2e', version: '0.0.1' });
 await client.connect(
-  new StdioClientTransport({ command: 'npx', args: ['tsx', 'src/index.ts'], cwd: serverDir }),
+  new StdioClientTransport({
+    command: 'npx',
+    args: ['tsx', 'src/index.ts'],
+    cwd: serverDir,
+    env: { ...process.env, SPINE_BRIDGE_TOKEN: BRIDGE_TOKEN },
+  }),
 );
 console.error('[e2e] connected, listing tools');
 const toolNames = (await client.listTools()).tools.map((t) => t.name);
@@ -49,6 +59,10 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',
 });
 const page = await browser.newPage({ viewport: { width: 1100, height: 750 } });
+await page.addInitScript(
+  (token) => window.localStorage.setItem('spine-editor.bridge-token', token),
+  BRIDGE_TOKEN,
+);
 await page.goto(BASE);
 await page.waitForTimeout(2500);
 
@@ -66,6 +80,12 @@ await call('import_image', { name: 'arm-img', dataUrl: PNG });
 const attached = await call('attach_image', { asset: 'arm-img', bone: 'arm' });
 
 await call('add_ik_constraint', { name: 'arm-ik', bones: ['arm'], target: 'hip' });
+
+// Constraint removal round-trip: remove → gone from tree → undo → back.
+await call('remove_ik_constraint', { name: 'arm-ik' });
+const ikAfterRemove = (await call('get_skeleton_tree')).ik ?? [];
+await call('undo');
+const ikAfterUndo = (await call('get_skeleton_tree')).ik ?? [];
 
 await call('create_animation', { name: 'wave' });
 await call('set_bone_keyframe', {
@@ -228,6 +248,9 @@ console.log(
       previewDuration: preview.duration,
       bones: tree.bones.map((b) => b.name),
       ik: tree.ik,
+      removeConstraintWorks:
+        !ikAfterRemove.some((c) => (c.name ?? c) === 'arm-ik') &&
+        ikAfterUndo.some((c) => (c.name ?? c) === 'arm-ik'),
       validationIssues: validation.issues,
       badBoneError,
       animationsAfterUndo: treeAfterUndo.animations,
