@@ -159,6 +159,23 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
 
   server.tool(
+    'generate_image',
+    'Generate character art with an AI provider (runs on the opt-in backend using the ' +
+      "signed-in user's stored API key) and import it as a project image. Provider " +
+      '"mock" is free and local (flat color) — use it for tests. Returns the asset name.',
+    {
+      provider: z
+        .enum(['openai', 'stability', 'runware', 'fal', 'mock'])
+        .describe('openai/runware support transparent backgrounds.'),
+      prompt: z.string().describe('Describe the character or part; be specific about pose/style.'),
+      size: z.string().optional().describe('e.g. "1024x1024" (default).'),
+      transparent: z.boolean().optional().describe('Default true; required for game parts.'),
+      name: z.string().optional().describe('Asset name; auto-generated when omitted.'),
+    },
+    forward('generate_image'),
+  );
+
+  server.tool(
     'set_draw_order',
     'Move a slot to a draw-order index (0 = drawn first / furthest behind).',
     { slot: z.string(), index: z.number().int().min(0) },

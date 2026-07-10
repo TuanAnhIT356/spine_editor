@@ -13,6 +13,7 @@ import {
 } from '../state/persistence.js';
 import { useEditor, type Tool } from '../state/store.js';
 import { useServer } from '../server/api.js';
+import { GenerateModal } from './GenerateModal.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
@@ -31,6 +32,7 @@ export function Toolbar() {
   const serverUser = useServer((s) => s.user);
   const [showServer, setShowServer] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
@@ -193,6 +195,13 @@ export function Toolbar() {
         >
           Projects
         </button>
+        <button
+          disabled={!serverUser}
+          title={serverUser ? 'Generate character art with AI (BYOK)' : 'Sign in first (Server)'}
+          onClick={() => setShowGenerate(true)}
+        >
+          Generate
+        </button>
       </div>
       <div className="group modes">
         <button
@@ -252,6 +261,7 @@ export function Toolbar() {
       />
       {showServer && <ServerModal onClose={() => setShowServer(false)} />}
       {showProjects && <ProjectsModal onClose={() => setShowProjects(false)} />}
+      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
     </div>
   );
 }

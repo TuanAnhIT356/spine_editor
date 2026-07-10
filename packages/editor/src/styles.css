@@ -835,3 +835,55 @@ button.danger {
 .server-modal .close {
   align-self: flex-end;
 }
+
+/* ---- Generate Image modal ---- */
+
+.generate-modal textarea {
+  background: #1c1c20;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  color: #e8e8ea;
+  padding: 6px 8px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.generate-modal .row-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gen-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gen-options select {
+  background: #1c1c20;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  color: #e8e8ea;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+.gen-estimate {
+  color: #8a8a92;
+  font-size: 11px;
+}
+
+.gen-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.gen-result img {
+  max-width: 220px;
+  max-height: 220px;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#2e2e33 0% 25%, #26262b 0% 50%) 0 0 / 16px 16px;
+}

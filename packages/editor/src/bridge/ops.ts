@@ -67,6 +67,11 @@ function optNum(params: Params, key: string): number | undefined {
   return typeof v === 'number' ? v : undefined;
 }
 
+function optStr(params: Params, key: string): string | undefined {
+  const v = params[key];
+  return typeof v === 'string' && v !== '' ? v : undefined;
+}
+
 function executeOrThrow(command: ConstructorParameters<typeof Object>[0]): void {
   // (typed loosely; the store surfaces command errors as exceptions here)
   const state = useEditor.getState();
@@ -234,6 +239,27 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       const asset = await loadAssetFromDataUrl(str(params, 'name'), str(params, 'dataUrl'));
       state().addAssets([asset]);
       return { name: asset.name, width: asset.width, height: asset.height };
+    }
+
+    case 'generate_image': {
+      // Runs on the opt-in backend with the signed-in user's BYOK key — the
+      // editor session carries the auth. The result lands in the asset panel.
+      const { generateImage, useServer } = await import('../server/api.js');
+      if (!useServer.getState().user) {
+        throw new Error('Not signed in to the server — open the Server dialog first.');
+      }
+      const image = await generateImage(
+        str(params, 'provider'),
+        str(params, 'prompt'),
+        optStr(params, 'size') ?? '1024x1024',
+        params['transparent'] !== false,
+      );
+      const asset = await loadAssetFromDataUrl(
+        optStr(params, 'name') ?? uniqueName('gen', (n) => Boolean(state().assets[n])),
+        image.data_url,
+      );
+      state().addAssets([asset]);
+      return { name: asset.name, width: asset.width, height: asset.height, galleryId: image.id };
     }
 
     case 'attach_image': {

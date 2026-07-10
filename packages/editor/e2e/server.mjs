@@ -55,6 +55,21 @@ const maskedKey = await page
   .innerText();
 await page.click('.server-modal .close');
 
+// --- Generate an image with the free mock provider and import it as an asset
+await page.click('button:has-text("Generate")');
+await page.waitForSelector('.generate-modal select');
+await page.selectOption('.generate-modal select', 'mock');
+await page.fill('.generate-modal textarea', 'test knight');
+await page.click('.generate-modal button:has-text("Generate")');
+await page.waitForSelector('.gen-result img');
+await page.click('.gen-result button:has-text("Add to Images")');
+await page.waitForSelector('.form-notice');
+await page.screenshot({ path: `${OUT}/01b-generated.png` });
+const generatedAssets = await page.evaluate(() =>
+  Object.keys(window.__spineEditor.getState().assets),
+);
+await page.click('.generate-modal .close');
+
 // --- Build a tiny rig, then save it as a server project
 await page.click('button:has-text("Create")');
 const vp = await page.locator('.viewport').boundingBox();
@@ -116,7 +131,16 @@ await page.screenshot({ path: `${OUT}/04-after-reset.png` });
 
 console.log(
   JSON.stringify(
-    { email, maskedKey, projectRow, serverButton, bonesAfterOpen, resetOk, pageErrors },
+    {
+      email,
+      maskedKey,
+      generatedAssets,
+      projectRow,
+      serverButton,
+      bonesAfterOpen,
+      resetOk,
+      pageErrors,
+    },
     null,
     2,
   ),

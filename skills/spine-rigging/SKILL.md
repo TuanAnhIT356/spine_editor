@@ -28,6 +28,11 @@ points down), so child bones sit at `x = parent.length`.
    origin — offset/rotate the attachment relative to the bone afterwards via
    the exported JSON conventions if needed (attachment editing tools land in a
    later phase; prefer positioning bones to match the art).
+   No art on hand? `generate_image` creates it with the user's AI provider key
+   (opt-in backend; the user must be signed in via the editor's Server dialog).
+   Ask for a transparent background and describe one part per call ("upper arm
+   of a knight, side view, flat shading") — or generate a full T-pose reference
+   first. Provider `mock` is free/local for pipeline tests.
 4. `set_draw_order` — index 0 draws furthest behind. Typical order: far limbs,
    torso, near limbs, head.
 5. `add_ik_constraint` for legs/arms you want to pose by target (1-2 bone chain
