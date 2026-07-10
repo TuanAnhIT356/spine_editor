@@ -34,6 +34,7 @@ class PartCut(BaseModel):
     y: int
     width: int
     height: int
+    inpainted: bool = False
 
 
 @dataclass
