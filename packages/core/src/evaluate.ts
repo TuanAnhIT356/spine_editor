@@ -1,17 +1,25 @@
 /**
  * Animation evaluator: samples an animation at time t and produces the
- * animated pose (bone locals, world matrices, slot attachments).
+ * animated pose (bone locals, world matrices, slot attachments, colors,
+ * deforms and draw order).
  *
- * Phase 3 scope: all bone timelines (rotate/translate/scale/shear + single
- * axis variants) with linear/stepped/bezier curves, plus the slot attachment
- * timeline. Constraints (IK/transform/path/physics), slot colors, deform,
- * draw order and events are preserved in the data but not evaluated yet.
+ * Evaluated: all bone timelines (rotate/translate/scale/shear + single-axis
+ * variants) with linear/stepped/bezier curves; slot attachment, rgba and
+ * alpha timelines; IK (mix + bendPositive), transform constraints (static
+ * mix values) and path constraint position/spacing/mix timelines; mesh
+ * deform; draw order. Physics constraints preview via PhysicsSimulator.
+ * Not evaluated (data round-trips untouched): events, animated
+ * transform-constraint mix timelines, animated physics-property timelines,
+ * bone inherit timelines, two-color (rgba2/rgb2) and sequence timelines.
  *
  * Spine timeline semantics: rotate/translate/shear values are OFFSETS added
  * to the setup pose; scale values are FACTORS multiplied with the setup pose.
  */
 
 import type { BoneData, SkeletonData } from './model/types.js';
+// Registers the path-constraint applier with pose.ts (import side effect) so
+// evaluator users get path constraints even without importing the barrel.
+import './path.js';
 import { computePose, type IkPoseValue, type Mat2D, type PathPoseValue } from './pose.js';
 import type {
   SpineAnimation,
