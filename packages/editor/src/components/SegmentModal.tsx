@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AddSkinAttachment, AddSlot, Composite, createSlot } from '@spine-editor/core';
 import {
+  listProviders,
   segmentBackends,
   segmentParts,
   segmentPose,
   segmentRemoveBg,
+  type ProviderInfo,
   type SegBackendInfo,
   type SegPartCut,
   type SegPartPrompt,
@@ -38,6 +40,10 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
   const [beforeBg, setBeforeBg] = useState(''); // one-step undo for Remove BG
   const [backends, setBackends] = useState<SegBackendInfo[]>([]);
   const [backend, setBackend] = useState('mock');
+  const [inpaint, setInpaint] = useState(false);
+  const [inpaintProvider, setInpaintProvider] = useState('mock');
+  const [inpaintProviders, setInpaintProviders] = useState<ProviderInfo[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [parts, setParts] = useState<ReviewPart[]>([]);
   const [selected, setSelected] = useState(0);
   const [placeOnCanvas, setPlaceOnCanvas] = useState(true);
@@ -54,6 +60,9 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
         setBackend(fal ? 'fal' : 'mock');
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+    listProviders()
+      .then((ps) => setInpaintProviders(ps.filter((p) => p.supports_inpaint)))
+      .catch(() => undefined);
   }, []);
 
   async function loadFrom(dataUrl: string) {
@@ -174,7 +183,9 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
 
   const onDetect = () =>
     run(async () => {
-      const [res, pose] = [await segmentParts(image, backend), await segmentPose(image)];
+      const res = await segmentParts(image, backend, undefined, { inpaint, inpaintProvider });
+      const pose = await segmentPose(image);
+      setWarnings(res.warnings ?? []);
       const prompts = new Map(pose.parts.map((p) => [p.name, p]));
       setParts(
         res.parts.map((cut) => ({
@@ -190,7 +201,8 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
     run(async () => {
       const part = parts[index];
       if (!part) return;
-      const res = await segmentParts(image, backend, [part.prompt]);
+      const res = await segmentParts(image, backend, [part.prompt], { inpaint, inpaintProvider });
+      setWarnings(res.warnings ?? []);
       const next = [...parts];
       next[index] = { ...part, cut: res.parts[0] ?? null };
       setParts(next);
@@ -286,6 +298,27 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
               <button disabled={busy} onClick={() => void onDetect()}>
                 {busy ? 'Working…' : 'Detect parts'}
               </button>
+              <label className="row-inline">
+                <input
+                  type="checkbox"
+                  checked={inpaint}
+                  onChange={(e) => setInpaint(e.target.checked)}
+                />
+                Inpaint occluded areas
+              </label>
+              {inpaint && (
+                <select
+                  value={inpaintProvider}
+                  onChange={(e) => setInpaintProvider(e.target.value)}
+                >
+                  {inpaintProviders.map((p) => (
+                    <option key={p.name} value={p.name} disabled={!p.has_key}>
+                      {p.name}
+                      {p.has_key ? '' : ' (no key)'}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             {selectedBackend && (
               <div className="gen-estimate">
@@ -323,6 +356,7 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
                           setParts(next);
                         }}
                       />
+                      {p.cut?.inpainted && <span title="inpainted">🩹</span>}
                       <button
                         disabled={busy}
                         title="Re-run this part"
@@ -359,6 +393,11 @@ export function SegmentModal({ onClose }: { onClose: () => void }) {
             )}
           </>
         )}
+        {warnings.map((w) => (
+          <div key={w} className="form-error">
+            {w}
+          </div>
+        ))}
         {error && <div className="form-error">{error}</div>}
         {notice && <div className="form-notice">{notice}</div>}
         <button className="close" onClick={onClose}>

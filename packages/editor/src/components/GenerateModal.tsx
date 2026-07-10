@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import {
   deleteGalleryImage,
   generateImage,
+  generatePartSet,
   getGalleryImage,
   listGallery,
   listProviders,
   type GalleryEntry,
   type GalleryImage,
+  type PartSetEntry,
   type ProviderInfo,
 } from '../server/api.js';
 import { useEditor, type ImageAsset } from '../state/store.js';
@@ -52,6 +54,7 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
   const [notice, setNotice] = useState('');
   const [result, setResult] = useState<GalleryImage | null>(null);
   const [gallery, setGallery] = useState<GalleryEntry[]>([]);
+  const [partSet, setPartSet] = useState<PartSetEntry[] | null>(null);
 
   const selected = providers.find((p) => p.name === provider);
 
@@ -158,7 +161,74 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
           <div className="gen-result">
             <img src={result.data_url} alt={result.prompt} />
             <button onClick={() => void onImport(result)}>Add to Images</button>
+            <button
+              disabled={busy || !selected?.supports_edit}
+              title={
+                selected?.supports_edit
+                  ? 'Generate the 10 standard parts from this image (strategy A)'
+                  : `${provider} does not support editing`
+              }
+              onClick={() =>
+                void (async () => {
+                  setBusy(true);
+                  setError('');
+                  try {
+                    const set = await generatePartSet(provider, { reference: result.data_url });
+                    setPartSet(set.parts);
+                    if (set.warnings.length) setError(set.warnings.join(' · '));
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                })()
+              }
+            >
+              {busy ? 'Working…' : 'Generate part set'}
+            </button>
           </div>
+        )}
+        {partSet && (
+          <>
+            <div className="panel-title">Part set</div>
+            <div className="segment-layout" style={{ flexWrap: 'wrap' }}>
+              {partSet.map((p) => (
+                <figure key={p.name} className="partset-cell">
+                  <img src={p.image} alt={p.name} />
+                  <figcaption>{p.name}</figcaption>
+                </figure>
+              ))}
+            </div>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void (async () => {
+                  const state = useEditor.getState();
+                  const assets: ImageAsset[] = [];
+                  for (const p of partSet) {
+                    const img = new Image();
+                    img.src = p.image;
+                    await img.decode();
+                    let name = p.name;
+                    let n = 2;
+                    while (state.assets[name] || assets.some((a) => a.name === name)) {
+                      name = `${p.name}-${n++}`;
+                    }
+                    assets.push({
+                      name,
+                      dataUrl: p.image,
+                      width: img.naturalWidth,
+                      height: img.naturalHeight,
+                    });
+                  }
+                  state.addAssets(assets);
+                  setNotice(`Imported ${assets.length} part images.`);
+                })()
+              }
+            >
+              Add all to Images
+            </button>
+          </>
         )}
         {gallery.length > 0 && (
           <>

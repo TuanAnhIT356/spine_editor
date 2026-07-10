@@ -909,3 +909,16 @@ button.danger {
 .segment-parts .key-row.selected {
   outline: 1px solid #4363d8;
 }
+
+/* --- Part set grid (Phase 13 slice 2) --- */
+.partset-cell {
+  width: 96px;
+  text-align: center;
+  font-size: 11px;
+}
+.partset-cell img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  background: repeating-conic-gradient(#333 0 25%, #222 0 50%) 0 0 / 16px 16px;
+}
