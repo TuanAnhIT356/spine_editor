@@ -308,3 +308,145 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
   từ tài liệu format công khai.
 - Ưu tiên đề xuất: **7 → 8 → 9 → 10** (giá trị animation trước, rigging nâng cao sau,
   cuối cùng là hệ sinh thái import/export). Trong từng phase, mục nào độc lập có thể làm song song.
+
+## 7. Backend server + AI tạo ảnh & auto-rig (Phase 11–14) — kế hoạch
+
+Yêu cầu: thêm backend cho editor, tích hợp API key AI gen ảnh, gen ảnh tách từng
+thành phần, AI chat tự tạo ảnh, tách ảnh thành part, tự dựng rig Spine + chuyển động.
+
+### 7.1. Đánh giá: có nên làm backend không?
+
+**Nên** — vì 4 lý do kiến trúc:
+
+1. **Bảo mật API key**: key của provider gen ảnh (OpenAI/Stability/fal.ai/Anthropic)
+   tuyệt đối không được nằm trong browser (ai mở DevTools cũng lấy được). Backend giữ key
+   mã hoá, browser chỉ gọi endpoint của mình.
+2. **Compute nặng**: segmentation (SAM/rembg chạy ONNX), inpainting, ghép pipeline nhiều
+   bước — không phù hợp chạy trong tab editor.
+3. **`core` đã UI-free**: backend Node import thẳng `@spine-editor/core` để dựng/skeleton
+   headless, dùng lại toàn bộ command API + serializer. Đây là lợi thế lớn của kiến trúc
+   hiện tại — backend không phải viết lại logic Spine nào.
+4. **AI chat = MCP ops đã có**: 47 ops trong `src/bridge/ops.ts` chính là bộ tool cho
+   LLM. Backend chỉ cần chạy vòng lặp tool-use (Claude API) và dispatch ops qua đúng
+   protocol ws hiện có — editor tab không cần sửa gì nhiều.
+
+Trước đây thiết kế cố ý serverless (deploy GitHub Pages free). Backend là **opt-in**:
+editor vẫn chạy standalone; khi có server (self-host `localhost`) thì mở thêm các tính
+năng AI. Không phá vỡ deploy tĩnh.
+
+### 7.2. Kiến trúc đề xuất
+
+```
+packages/
+└── server/        # Node 22 + Fastify, ESM, TypeScript strict
+    ├── src/keys/      # BYOK vault: key người dùng, mã hoá AES-256-GCM at rest
+    ├── src/providers/ # adapter gen ảnh: openai | stability | runware | fal
+    ├── src/segment/   # rembg-node (U2-Net/IS-Net qua onnxruntime-node), SAM client
+    ├── src/pipeline/  # ảnh → parts → rig → animation (jobs, tiến độ qua ws)
+    ├── src/chat/      # Claude API tool-use loop (model claude-opus-4-8), tools = ops
+    └── src/store/     # SQLite (drizzle) + assets trên đĩa: projects, gallery, jobs
+```
+
+- Editor ⇄ server: REST cho CRUD/gen, WebSocket cho tiến độ job + chat streaming.
+  AI chat điều khiển editor bằng đúng envelope `ws://localhost:8017` của MCP bridge
+  (server đóng vai một client nữa của bridge — không thêm code path mới trong editor).
+- **BYOK (bring your own key)**: người dùng dán key từng provider vào Settings; server
+  lưu mã hoá (secret máy chủ trong env), không log, không trả về client sau khi lưu.
+- Job model: gen/segment/rig là job bất đồng bộ có id, trạng thái, ảnh trung gian —
+  UI hiển thị từng bước và cho sửa tay trước khi sang bước sau (human-in-the-loop).
+
+### 7.3. Khảo sát provider (07/2026)
+
+| Nhu cầu                    | Lựa chọn chính                                                           | Ghi chú                                                              |
+| -------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Gen ảnh nền trong suốt     | OpenAI `gpt-image-1.5` (`background: "transparent"`)                     | `gpt-image-2` KHÔNG hỗ trợ transparent — phải route về 1.5           |
+| Gen ảnh alpha gốc          | LayerDiffuse (qua Runware API hoặc self-host diffusers)                  | alpha sinh trong latent, tóc/viền sạch hơn remove-bg                 |
+| Sửa/inpaint/xoá nền cloud  | Stability AI (stable-image edit: inpaint, remove-bg, search-and-replace) | rẻ, endpoint rời cho từng thao tác                                   |
+| Xoá nền local, free        | `rembg` (MIT, U2-Net/IS-Net, onnxruntime-node)                           | mặc định không cần key; CPU ~10s/ảnh                                 |
+| Segmentation theo điểm/box | SAM 2/3 (Apache-2.0) qua fal.ai API hoặc self-host                       | prompt bằng point/box từ pose landmark → mask từng part              |
+| Pose landmark (khớp xương) | MediaPipe Pose / MoveNet (chạy được cả browser lẫn Node)                 | cho vị trí khớp → sinh bone + điểm prompt SAM                        |
+| AI chat điều khiển editor  | Claude API `claude-opus-4-8`, tool-use + streaming                       | tools = 47 MCP ops sẵn có; adaptive thinking                         |
+| Tham chiếu auto-rig        | Meta Animated Drawings (open source)                                     | pipeline mẫu: detect figure → segment → joints → rig → preset motion |
+
+### 7.4. Pipeline "prompt → nhân vật Spine chuyển động"
+
+Hai chiến lược tách thành phần, làm cả hai và cho người dùng chọn:
+
+- **A. Gen-từng-part** (chất lượng cao nhất): chat sinh "character sheet" — gen ảnh
+  full-body T-pose trước làm tham chiếu style, rồi gọi edit/reference-image endpoint gen
+  từng part (đầu, thân, 2 tay × 2 khúc, 2 chân × 2 khúc…) nền trong suốt, cùng style.
+  Tránh style drift vì mọi part đều tham chiếu ảnh gốc.
+- **B. Gen-rồi-tách** (nhanh, dùng được với ảnh có sẵn/upload): gen (hoặc nhận) 1 ảnh
+  full-body → pose landmark tìm khớp → SAM prompt point/box theo từng chi → mask từng
+  part → cắt PNG rời → inpaint phần bị che khuất (vd. thân sau cánh tay) bằng Stability
+  inpaint để part nào cũng nguyên vẹn.
+
+Sau khi có parts (cả A lẫn B đều ra: PNG rời + vị trí gốc + landmark khớp):
+
+1. **Auto-rig** (server dùng `core` headless hoặc dispatch ops qua bridge): dựng chuỗi
+   bone theo landmark (hip→spine→head, 2 tay, 2 chân — quy ước +X dọc bone như skill
+   rigging), `import_image` + `attach_image` từng part vào đúng bone, `set_draw_order`
+   theo thứ tự che khuất, thêm IK 2-bone cho tay/chân, mesh + `bind_weights` cho part
+   bắc qua 2 bone (đã có autoWeightVertices).
+2. **Auto-animate**: thư viện preset (idle/walk/run/jump/wave) lưu dạng timeline tương
+   đối theo tên bone chuẩn → retarget sang rig vừa dựng (map theo vai trò bone, scale
+   theo độ dài chi); hoặc để AI chat tự đặt keyframe qua ops khi người dùng mô tả
+   chuyển động tự do ("vẫy tay chào").
+3. Người dùng xem preview, sửa tay bằng toàn bộ UI đã có (graph editor, weights,
+   ghosting…), xuất Spine JSON/GIF như hiện tại.
+
+### 7.5. Các phase
+
+#### Phase 11 — Backend nền tảng (`packages/server`)
+
+1. Fastify + ws, TypeScript strict, ESM, cùng monorepo (`pnpm --filter server dev`).
+2. BYOK vault: POST/DELETE key theo provider, mã hoá AES-256-GCM, masked khi liệt kê.
+3. Project storage: lưu/mở project (Spine JSON + assets) qua SQLite + đĩa; editor thêm
+   Open/Save lên server (vẫn giữ export file như cũ).
+4. Kết nối bridge: server tự làm client của `ws://localhost:8017` để dispatch ops.
+5. Editor: panel Settings (URL server + nhập key), trạng thái kết nối.
+
+#### Phase 12 — Tích hợp AI gen ảnh
+
+1. Interface `ImageProvider` (generate / edit / inpaint / removeBackground) + adapters:
+   `openai` (gpt-image-1.5 transparent), `stability`, `runware` (LayerDiffuse), `fal`.
+2. Prompt template cho game asset: T-pose/A-pose, side-view, flat shading, nền trong
+   suốt, khung part-sheet; tham số style thống nhất giữa các lần gọi.
+3. UI: dialog "Generate Image" (prompt, provider, size) → gallery ảnh gen → import làm
+   asset một click; ước tính chi phí trước khi gọi.
+4. MCP tool `generate_image` để agent bên ngoài cũng gọi được qua server.
+
+#### Phase 13 — Tách thành phần (segmentation)
+
+1. `rembg-node` local mặc định (không cần key) cho remove-bg.
+2. Pose landmark (MediaPipe Pose qua tfjs-node hoặc onnx) → khớp + bounding box chi.
+3. SAM 2 client (fal.ai BYOK; interface cho self-host sau) — prompt point/box từ
+   landmark → mask từng part; chiến lược B hoàn chỉnh kèm inpaint phần khuất.
+4. Chiến lược A: orchestration gen-từng-part với ảnh tham chiếu.
+5. UI review masks: overlay từng part, sửa nhanh (thêm/bớt point prompt), đặt tên part
+   → "Import parts" thành assets kèm vị trí gốc (giữ layout như ảnh nguồn).
+
+#### Phase 14 — AI chat auto-rig & auto-animate
+
+1. Chat panel trong editor (streaming, hiển thị tool call); server chạy vòng lặp
+   tool-use Claude API (`claude-opus-4-8`, adaptive thinking) với tools = ops bridge
+   - `generate_image` + `segment_image` + `rig_from_parts`.
+2. `rig_from_parts`: auto-rig từ landmark + parts (mục 7.4) thành một op server-side.
+3. Preset motion library + retarget; op `apply_preset_animation`.
+4. Nghiệm thu end-to-end: một câu chat "tạo nhân vật hiệp sĩ và cho nó đi bộ" →
+   gen ảnh → tách part → rig → walk cycle chạy trong viewport; e2e Chromium thật
+   (mock provider để CI không cần key).
+
+### 7.6. Rủi ro & giảm thiểu
+
+- **Style drift giữa các part gen riêng** → luôn gen ảnh tham chiếu trước, dùng
+  edit/reference endpoint; fallback chiến lược B (gen 1 ảnh rồi tách).
+- **Segmentation sai ở khớp/che khuất** → human-in-the-loop ở mọi bước (UI sửa mask,
+  sửa bone), inpaint phần khuất; không hứa "1 click hoàn hảo".
+- **Chi phí API của người dùng** → hiện estimate trước khi gọi, cache kết quả, mặc
+  định rembg local free.
+- **Bảo mật key** → chỉ lưu server, mã hoá at rest, không log, không echo về client;
+  server mặc định bind localhost.
+- **License**: SAM 2 Apache-2.0, rembg MIT, MediaPipe Apache-2.0 — tương thích Apache-2.0
+  của repo. Vẫn tuyệt đối không nhúng Spine Runtimes.
+- **CI không có key/GPU** → provider mock + fixture ảnh nhỏ cho unit/e2e.
