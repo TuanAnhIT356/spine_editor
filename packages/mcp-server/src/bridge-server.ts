@@ -3,7 +3,7 @@
  * operations to the connected editor and await its responses.
  */
 
-import type { BridgeRequest, BridgeResponse } from '@spine-editor/shared';
+import type { BridgeOp, BridgeRequest, BridgeResponse } from '@spine-editor/shared';
 import { WebSocket, WebSocketServer } from 'ws';
 
 interface Pending {
@@ -63,7 +63,7 @@ export class BridgeServer {
       );
     }
     const id = this.nextId++;
-    const message: BridgeRequest = { id, op, params };
+    const message: BridgeRequest = { id, op: op as BridgeOp, params };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);

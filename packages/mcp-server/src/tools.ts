@@ -5,6 +5,7 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { BridgeOp } from '@spine-editor/shared';
 import { z } from 'zod';
 import type { BridgeServer } from './bridge-server.js';
 
@@ -33,7 +34,7 @@ const curveSchema = z
 
 export function registerTools(server: McpServer, bridge: BridgeServer): void {
   const forward =
-    (op: string) =>
+    (op: BridgeOp) =>
     async (params: Record<string, unknown>): Promise<ToolResult> => {
       try {
         return text(await bridge.request(op, params));
@@ -503,6 +504,34 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
       mix: z.number().optional(),
     },
     forward('add_physics_constraint'),
+  );
+
+  server.tool(
+    'remove_ik_constraint',
+    'Remove an IK constraint by name (fails if an animation still keys it). Undoable.',
+    { name: z.string().describe('Constraint name') },
+    forward('remove_ik_constraint'),
+  );
+
+  server.tool(
+    'remove_transform_constraint',
+    'Remove a transform constraint by name (fails if an animation still keys it). Undoable.',
+    { name: z.string().describe('Constraint name') },
+    forward('remove_transform_constraint'),
+  );
+
+  server.tool(
+    'remove_path_constraint',
+    'Remove a path constraint by name (fails if an animation still keys it). Undoable.',
+    { name: z.string().describe('Constraint name') },
+    forward('remove_path_constraint'),
+  );
+
+  server.tool(
+    'remove_physics_constraint',
+    'Remove a physics constraint by name (fails if an animation still keys it). Undoable.',
+    { name: z.string().describe('Constraint name') },
+    forward('remove_physics_constraint'),
   );
 
   server.tool(

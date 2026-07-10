@@ -57,6 +57,9 @@ points down), so child bones sit at `x = parent.length`.
   set `rotate: 1` for pendulum swing or `x/y: 1` for positional jiggle, tune
   `inertia`/`strength`/`damping`/`gravity`. Preview is deterministic in the
   editor; the exported data runs the official runtime's simulation in-game.
+- Remove a constraint with `remove_ik_constraint` / `remove_transform_constraint` /
+  `remove_path_constraint` / `remove_physics_constraint` (blocked while an
+  animation keys it — delete those keys first). Removal is undoable.
 
 ## Meshes, weights, clipping (advanced rigging)
 
