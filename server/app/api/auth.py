@@ -50,7 +50,7 @@ def _issue_session(response: Response, db: DbSession, user: User) -> AuthOut:
         token,
         max_age=config.refresh_token_days * 86400,
         httponly=True,
-        samesite="lax",
+        samesite=config.cookie_samesite,
         secure=config.cookie_secure,
         path="/api/auth",
     )

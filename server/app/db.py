@@ -12,8 +12,20 @@ class Base(DeclarativeBase):
     pass
 
 
-connect_args = {"check_same_thread": False} if config.database_url.startswith("sqlite") else {}
-engine = create_engine(config.database_url, connect_args=connect_args)
+def _normalize_url(url: str) -> str:
+    """Accept the postgres:// / postgresql:// URLs hosts hand out and route them
+    through the psycopg3 driver."""
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url.removeprefix("postgres://")
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    return url
+
+
+database_url = _normalize_url(config.database_url)
+connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+# pre_ping: serverless Postgres (Neon/Supabase) drops idle connections.
+engine = create_engine(database_url, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 

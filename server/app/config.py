@@ -46,8 +46,14 @@ class Config:
         self.smtp_password = os.environ.get("SPINE_SERVER_SMTP_PASSWORD", "")
         self.mail_from = os.environ.get("SPINE_SERVER_MAIL_FROM", "spine-editor@localhost")
         self.frontend_url = os.environ.get("SPINE_SERVER_FRONTEND_URL", "http://localhost:5173")
-        # Refresh cookie is Secure only when the frontend is served over https.
-        self.cookie_secure = self.frontend_url.startswith("https://")
+        # "lax" works when frontend and API share a site (localhost dev). When the
+        # frontend lives on another origin (e.g. GitHub Pages → Hugging Face Space),
+        # set SPINE_SERVER_COOKIE_SAMESITE=none so browsers send the refresh cookie
+        # on cross-site fetches; "none" requires Secure, so HTTPS on the API host.
+        self.cookie_samesite = os.environ.get("SPINE_SERVER_COOKIE_SAMESITE", "lax").lower()
+        self.cookie_secure = self.cookie_samesite == "none" or self.frontend_url.startswith(
+            "https://"
+        )
 
 
 config = Config()
