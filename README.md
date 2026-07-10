@@ -49,6 +49,14 @@ pnpm test        # vitest (core: model, commands, serializer, evaluator)
 pnpm lint && pnpm format:check
 ```
 
+AI agents get a local code knowledge graph via
+[codegraph](https://github.com/colbymchenry/codegraph), registered in
+`.mcp.json`. One-time setup: `pnpm exec codegraph init .` — the index
+(`.codegraph/`, gitignored) auto-syncs as you code. If the pnpm-installed
+binary doesn't run on your platform, install it globally
+(`npm i -g @colbymchenry/codegraph`) and change `.mcp.json`'s command from
+`npx` to `codegraph` with args `["serve", "--mcp"]`.
+
 Architecture and roadmap: see `PLAN.md` and `CLAUDE.md`. End-to-end browser
 verification scripts: `packages/editor/e2e/` and `packages/mcp-server/e2e/`.
 
