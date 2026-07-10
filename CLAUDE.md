@@ -20,9 +20,11 @@ active-skin rendering, atlas import (both libgdx layouts, rotated regions), GIF 
 gifenc, hierarchy search — 47 MCP tools total). Remaining gaps, tracked in PLAN.md §6:
 binary .skel, PSD import, video/PNG-sequence export, add/remove mesh vertices, dockable
 panels; physics preview is an approximation (exports run the real runtime simulation).
-PLAN.md §7 plans Phases 11–14 (not started): an opt-in `packages/server` backend — BYOK
-AI key vault, image-gen provider adapters, segmentation (rembg/SAM) into parts, and an
-AI chat that auto-rigs/animates by driving the existing bridge ops.
+PLAN.md §7 plans Phases 11–14 (not started): an opt-in Python backend in `server/`
+(FastAPI; repo splits into frontend `packages/` + `server/`) — accounts (login/logout/
+password reset), per-user project list, chat history, settings, BYOK AI key vault,
+image-gen provider adapters, segmentation (rembg/SAM/MediaPipe) into parts, and an AI
+chat that auto-rigs/animates by driving the existing bridge ops over WebSocket.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
