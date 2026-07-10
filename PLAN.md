@@ -415,9 +415,25 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 
 ### 7.6. Các phase
 
-#### Phase 11 — Server nền tảng + tài khoản (`server/`)
+#### Phase 11 — Server nền tảng + tài khoản (`server/`) ✅ Hoàn thành (07/2026)
 
-1. Scaffold FastAPI + uvicorn + SQLAlchemy/Alembic + pytest + ruff; `uv` quản lý deps;
+> Ghi chú thực hiện: FastAPI + SQLAlchemy 2 (SQLite, `create_all` khi khởi động — Alembic
+> để khi cần migration thật; Python 3.11+ thay vì 3.12 theo môi trường). Auth đủ theo đặc
+> tả 7.3: argon2id, JWT access 15' (ký bằng khóa dẫn xuất SHA-256), refresh cookie httpOnly
+> path `/api/auth` xoay vòng single-use, logout revoke, forgot/reset (token 30', outbox
+> log khi chưa cấu hình SMTP, không lộ email tồn tại, rate-limit in-memory 10 req/phút).
+> Key vault AES-256-GCM (nonce 12 byte, masked last4). Projects CRUD lưu nguyên payload
+> `spine-editor-project` (assets data-URL nằm trong JSON — bảng assets rời để khi cần).
+> Frontend: `src/server/api.ts` (fetch wrapper tự refresh 1 lần khi 401) + `useServer`
+> store; ServerModal (URL + Test, 4 tab Sign in/Register/Forgot/Reset, quản lý key
+> masked); ProjectsModal (Save/Save-as-new + thumbnail chụp viewport 200px, Open, xóa);
+> autosave lên server debounce 3s khi đã bind project. 10 pytest + e2e Chromium thật
+> (`packages/editor/e2e/server.mjs`: đăng ký → lưu key → save project → reload giữ phiên
+> qua cookie → open lại đủ bones → forgot/reset qua outbox → đăng nhập lại). CI thêm job
+> `server` (uv + ruff check/format + pytest). Settings per-user endpoint có sẵn, UI theme/
+> provider mặc định sẽ dùng ở Phase 12.
+
+1. Scaffold FastAPI + uvicorn + SQLAlchemy + pytest + ruff; `uv` quản lý deps;
    CI thêm job Python (ruff + pytest) chạy song song job Node.
 2. Auth đầy đủ theo đặc tả 7.3: đăng ký, đăng nhập, đăng xuất, quên mật khẩu, refresh.
 3. Project CRUD + danh sách + thumbnail + autosave; upload/serve assets.

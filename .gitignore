@@ -6,3 +6,10 @@ coverage/
 *.log
 # e2e verification output (screenshots, exported JSON)
 e2e-out/
+# Python server
+server/.venv/
+server/data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

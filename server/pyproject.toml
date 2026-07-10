@@ -1,0 +1,36 @@
+[project]
+name = "spine-editor-server"
+version = "0.1.0"
+description = "Opt-in backend for the Spine editor: accounts, projects, key vault, AI pipeline (Phases 11-14)"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "sqlalchemy>=2.0",
+  "argon2-cffi>=23.1",
+  "pyjwt>=2.9",
+  "cryptography>=43",
+  "email-validator>=2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false

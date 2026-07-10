@@ -9,6 +9,8 @@ import { Toolbar } from './components/Toolbar.js';
 import { Viewport } from './components/Viewport.js';
 import { saveProjectFile } from './state/actions.js';
 import { loadAutosave, saveAutosave } from './state/persistence.js';
+import { tryRefresh } from './server/api.js';
+import { startServerAutosave } from './server/project-sync.js';
 import { useEditor } from './state/store.js';
 
 export function App() {
@@ -95,6 +97,13 @@ export function App() {
       unsub();
       window.clearTimeout(timer);
     };
+  }, []);
+
+  useEffect(() => {
+    // Restore the server session from the refresh cookie (no-op when the
+    // opt-in backend is not running) and push edits to the bound project.
+    void tryRefresh();
+    return startServerAutosave();
   }, []);
 
   return (
