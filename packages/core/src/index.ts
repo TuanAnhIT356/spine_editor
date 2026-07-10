@@ -32,3 +32,4 @@ export * from './weights.js';
 export * from './path.js';
 export * from './physics.js';
 export * from './atlas-import.js';
+export * from './autorig.js';
