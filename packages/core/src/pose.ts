@@ -374,7 +374,12 @@ export type PathConstraintApplier = (
 
 let pathApplier: PathConstraintApplier | null = null;
 
-/** Registered once by path.ts at module load. */
+/**
+ * Registered once by path.ts at module load (import side effect; evaluate.ts
+ * and index.ts both import path.js). Callers that deep-import computePose
+ * without pulling in path.js get path constraints silently skipped — import
+ * the barrel or path.js explicitly.
+ */
 export function registerPathConstraintApplier(fn: PathConstraintApplier): void {
   pathApplier = fn;
 }

@@ -29,7 +29,11 @@ modals (`src/server/api.ts`, e2e: `packages/editor/e2e/server.mjs`, needs the se
 :8100). **Phase 12 done**: BYOK image-gen — `server/app/providers/` adapters (openai
 gpt-image-1.5 transparent, stability, runware LayerDiffuse, fal, mock for free local
 tests), `/api/generate` + per-user gallery stored in the DB, editor Generate dialog with
-game-asset prompt template + cost estimate, MCP tool `generate_image` (48 tools total).
+game-asset prompt template + cost estimate, MCP tool `generate_image`. Bridge hardening
+(07/2026): typed op protocol (`BRIDGE_OPS` in shared, compile-time exhaustive), pending
+requests reject on tab disconnect, per-op timeouts, takeover notice, opt-in
+`SPINE_BRIDGE_TOKEN` auth, and remove_{ik,transform,path,physics}_constraint —
+**52 MCP tools total**.
 Phases 13–14 planned: segmentation (rembg/SAM/MediaPipe) into parts, chat history
 tables, and an AI chat that auto-rigs/animates by driving the existing bridge ops over
 WebSocket.

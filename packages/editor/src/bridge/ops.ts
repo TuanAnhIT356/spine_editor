@@ -19,6 +19,10 @@ import {
   DeleteEventKeyframe,
   RemoveAnimation,
   RemoveBone,
+  RemoveIkConstraint,
+  RemovePathConstraint,
+  RemovePhysicsConstraint,
+  RemoveTransformConstraint,
   AddSkinAttachment,
   RenameBone,
   ReorderSlot,
@@ -49,6 +53,7 @@ import {
   type SpineBoneTimelineName,
   type SpineJson,
 } from '@spine-editor/core';
+import type { BridgeOp } from '@spine-editor/shared';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { primarySelection, uniqueName, useEditor, type ImageAsset } from '../state/store.js';
@@ -108,7 +113,8 @@ async function loadAssetFromDataUrl(name: string, dataUrl: string): Promise<Imag
 
 export async function dispatchOp(op: string, params: Params): Promise<unknown> {
   const state = () => useEditor.getState();
-  switch (op) {
+  const knownOp = op as BridgeOp;
+  switch (knownOp) {
     case 'ping':
       return { ok: true };
 
@@ -435,6 +441,22 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       executeOrThrow(new AddPhysicsConstraint(c));
       return { ok: true };
     }
+
+    case 'remove_ik_constraint':
+      executeOrThrow(new RemoveIkConstraint(str(params, 'name')));
+      return { removed: str(params, 'name') };
+
+    case 'remove_transform_constraint':
+      executeOrThrow(new RemoveTransformConstraint(str(params, 'name')));
+      return { removed: str(params, 'name') };
+
+    case 'remove_path_constraint':
+      executeOrThrow(new RemovePathConstraint(str(params, 'name')));
+      return { removed: str(params, 'name') };
+
+    case 'remove_physics_constraint':
+      executeOrThrow(new RemovePhysicsConstraint(str(params, 'name')));
+      return { removed: str(params, 'name') };
 
     case 'create_animation': {
       const name = str(params, 'name');
@@ -889,7 +911,11 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
     case 'validate':
       return { issues: state().doc.validate() };
 
-    default:
-      throw new Error(`Unknown op "${op}".`);
+    default: {
+      // Compile-time exhaustiveness: a BRIDGE_OPS member without a case above
+      // fails to assign to `never`. Unknown runtime strings still land here.
+      const unhandled: never = knownOp;
+      throw new Error(`Unknown op "${String(unhandled)}".`);
+    }
   }
 }

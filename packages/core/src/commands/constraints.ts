@@ -147,3 +147,90 @@ export class RemoveIkConstraint implements Command {
     if (this.removed) data.ik.splice(this.removedIndex, 0, this.removed);
   }
 }
+
+export class RemoveTransformConstraint implements Command {
+  readonly label: string;
+  private removed: TransformConstraintData | undefined;
+  private removedIndex = -1;
+
+  constructor(private readonly name: string) {
+    this.label = `Remove transform constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const idx = data.transform.findIndex((x) => x.name === this.name);
+    if (idx < 0) throw new Error(`Transform constraint "${this.name}" does not exist.`);
+    for (const [animName, anim] of Object.entries(data.animations)) {
+      if (anim.transform && this.name in anim.transform) {
+        throw new Error(
+          `Cannot remove transform constraint "${this.name}"; referenced by animation "${animName}".`,
+        );
+      }
+    }
+    this.removed = data.transform[idx];
+    this.removedIndex = idx;
+    data.transform.splice(idx, 1);
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.removed) data.transform.splice(this.removedIndex, 0, this.removed);
+  }
+}
+
+export class RemovePathConstraint implements Command {
+  readonly label: string;
+  private removed: SpinePathConstraint | undefined;
+  private removedIndex = -1;
+
+  constructor(private readonly name: string) {
+    this.label = `Remove path constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const idx = data.path.findIndex((x) => x.name === this.name);
+    if (idx < 0) throw new Error(`Path constraint "${this.name}" does not exist.`);
+    for (const [animName, anim] of Object.entries(data.animations)) {
+      if (anim.path && this.name in anim.path) {
+        throw new Error(
+          `Cannot remove path constraint "${this.name}"; referenced by animation "${animName}".`,
+        );
+      }
+    }
+    this.removed = data.path[idx];
+    this.removedIndex = idx;
+    data.path.splice(idx, 1);
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.removed) data.path.splice(this.removedIndex, 0, this.removed);
+  }
+}
+
+export class RemovePhysicsConstraint implements Command {
+  readonly label: string;
+  private removed: SpinePhysicsConstraint | undefined;
+  private removedIndex = -1;
+
+  constructor(private readonly name: string) {
+    this.label = `Remove physics constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const idx = data.physics.findIndex((x) => x.name === this.name);
+    if (idx < 0) throw new Error(`Physics constraint "${this.name}" does not exist.`);
+    for (const [animName, anim] of Object.entries(data.animations)) {
+      if (anim.physics && this.name in anim.physics) {
+        throw new Error(
+          `Cannot remove physics constraint "${this.name}"; referenced by animation "${animName}".`,
+        );
+      }
+    }
+    this.removed = data.physics[idx];
+    this.removedIndex = idx;
+    data.physics.splice(idx, 1);
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.removed) data.physics.splice(this.removedIndex, 0, this.removed);
+  }
+}
