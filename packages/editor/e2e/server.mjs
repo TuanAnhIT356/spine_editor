@@ -70,6 +70,29 @@ const generatedAssets = await page.evaluate(() =>
 );
 await page.click('.generate-modal .close');
 
+// --- Phase 13: segment the generated asset into parts (fake engines + mock backend)
+console.error('[e2e] segment flow');
+await page.click('button:has-text("Segment")');
+await page.waitForSelector('.generate-modal select');
+await page.selectOption('.generate-modal select >> nth=0', generatedAssets[0]);
+await page.waitForSelector('.segment-canvas');
+await page.click('button:has-text("Detect parts")');
+await page.waitForSelector('.segment-parts .key-row', { timeout: 15000 });
+const segmentParts = await page.locator('.segment-parts .key-row').count();
+await page.locator('.segment-parts .key-row').first().locator('input').nth(1).fill('my-head');
+await page.click('button:has-text("Import parts")');
+await page.waitForSelector('.form-notice');
+await page.screenshot({ path: `${OUT}/01c-segmented.png` });
+const segState = await page.evaluate(() => {
+  const s = window.__spineEditor.getState();
+  return {
+    assetNames: Object.keys(s.assets),
+    slotNames: s.doc.data.slots.map((sl) => sl.name),
+    headOrigin: s.assets['my-head']?.origin ?? null,
+  };
+});
+await page.click('.generate-modal .close');
+
 // --- Build a tiny rig, then save it as a server project
 await page.click('button:has-text("Create")');
 const vp = await page.locator('.viewport').boundingBox();
@@ -135,6 +158,10 @@ console.log(
       email,
       maskedKey,
       generatedAssets,
+      segmentParts,
+      segmentAssetImported: segState.assetNames.includes('my-head'),
+      segmentSlotPlaced: segState.slotNames.includes('my-head'),
+      segmentOriginSaved: !!segState.headOrigin,
       projectRow,
       serverButton,
       bonesAfterOpen,

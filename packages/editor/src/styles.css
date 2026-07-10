@@ -887,3 +887,25 @@ button.danger {
   border-radius: 4px;
   background: repeating-conic-gradient(#2e2e33 0% 25%, #26262b 0% 50%) 0 0 / 16px 16px;
 }
+
+/* --- Segment modal (Phase 13) --- */
+.segment-layout {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.segment-canvas {
+  border: 1px solid #333;
+  cursor: crosshair;
+  max-width: 420px;
+}
+.segment-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.segment-parts .key-row.selected {
+  outline: 1px solid #4363d8;
+}

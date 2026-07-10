@@ -233,3 +233,64 @@ export function setKey(provider: string, key: string): Promise<ApiKeyInfo> {
 export function deleteKey(provider: string): Promise<void> {
   return request(`/api/keys/${provider}`, { method: 'DELETE' });
 }
+
+// ---- segmentation (Phase 13) ----
+
+export interface SegPoint {
+  x: number;
+  y: number;
+  label: 0 | 1;
+}
+export interface SegBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+export interface SegPartPrompt {
+  name: string;
+  points: SegPoint[];
+  box?: SegBox | null;
+}
+export interface SegPartCut {
+  name: string;
+  image: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface SegBackendInfo {
+  name: string;
+  has_key: boolean;
+  approx_cost_usd: number;
+}
+export interface SegPoseResponse {
+  landmarks: Record<string, [number, number, number]>;
+  width: number;
+  height: number;
+  parts: SegPartPrompt[];
+}
+
+export function segmentRemoveBg(image: string): Promise<{ image: string }> {
+  return request('/api/segment/remove-bg', { method: 'POST', body: JSON.stringify({ image }) });
+}
+
+export function segmentPose(image: string): Promise<SegPoseResponse> {
+  return request('/api/segment/pose', { method: 'POST', body: JSON.stringify({ image }) });
+}
+
+export function segmentParts(
+  image: string,
+  backend: string,
+  parts?: SegPartPrompt[],
+): Promise<{ parts: SegPartCut[] }> {
+  return request('/api/segment/parts', {
+    method: 'POST',
+    body: JSON.stringify({ image, backend, ...(parts ? { parts } : {}) }),
+  });
+}
+
+export function segmentBackends(): Promise<SegBackendInfo[]> {
+  return request('/api/segment/backends');
+}

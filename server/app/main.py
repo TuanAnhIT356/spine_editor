@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, generate, keys, projects, settings
+from .api import auth, generate, keys, projects, segment, settings
 from .config import config
 from .db import Base, engine
 
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(keys.router)
     app.include_router(settings.router)
     app.include_router(generate.router)
+    app.include_router(segment.router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

@@ -14,6 +14,7 @@ import {
 import { useEditor, type Tool } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { GenerateModal } from './GenerateModal.js';
+import { SegmentModal } from './SegmentModal.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
@@ -33,6 +34,7 @@ export function Toolbar() {
   const [showServer, setShowServer] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
+  const [showSegment, setShowSegment] = useState(false);
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
@@ -202,6 +204,15 @@ export function Toolbar() {
         >
           Generate
         </button>
+        <button
+          disabled={!serverUser}
+          title={
+            serverUser ? 'Segment a character image into parts (AI)' : 'Sign in first (Server)'
+          }
+          onClick={() => setShowSegment(true)}
+        >
+          Segment
+        </button>
       </div>
       <div className="group modes">
         <button
@@ -262,6 +273,7 @@ export function Toolbar() {
       {showServer && <ServerModal onClose={() => setShowServer(false)} />}
       {showProjects && <ProjectsModal onClose={() => setShowProjects(false)} />}
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
+      {showSegment && <SegmentModal onClose={() => setShowSegment(false)} />}
     </div>
   );
 }

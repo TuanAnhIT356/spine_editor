@@ -19,6 +19,8 @@ export interface ImageAsset {
   dataUrl: string;
   width: number;
   height: number;
+  /** Where this asset was cut from (segmentation): px, top-left origin. */
+  origin?: { x: number; y: number; sourceWidth: number; sourceHeight: number };
 }
 
 export type Tool = 'select' | 'translate' | 'rotate' | 'create';
