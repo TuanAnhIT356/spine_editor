@@ -180,6 +180,35 @@ function KeysSection() {
   );
 }
 
+function BridgeTokenSection() {
+  const [bridgeToken, setBridgeToken] = useState(
+    () => localStorage.getItem('spine-editor.bridge-token') ?? '',
+  );
+  return (
+    <div className="server-keys">
+      <div className="panel-title">MCP bridge</div>
+      <div className="server-url-row">
+        <input
+          type="password"
+          placeholder="Bridge token (only if the MCP server sets SPINE_BRIDGE_TOKEN)"
+          title="Stored locally in this browser. Reload the tab after changing it."
+          value={bridgeToken}
+          onChange={(e) => setBridgeToken(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (bridgeToken) localStorage.setItem('spine-editor.bridge-token', bridgeToken);
+            else localStorage.removeItem('spine-editor.bridge-token');
+          }}
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ServerModal({ onClose }: { onClose: () => void }) {
   const user = useServer((s) => s.user);
   const [url, setUrl] = useState(serverUrl());
@@ -205,6 +234,7 @@ export function ServerModal({ onClose }: { onClose: () => void }) {
             <span className={`health ${health}`}>{health === 'ok' ? 'connected' : 'offline'}</span>
           )}
         </div>
+        <BridgeTokenSection />
         {!user && <AuthForms />}
         {user && (
           <>
