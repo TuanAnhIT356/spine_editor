@@ -20,6 +20,15 @@ active-skin rendering, atlas import (both libgdx layouts, rotated regions), GIF 
 gifenc, hierarchy search — 47 MCP tools total). Remaining gaps, tracked in PLAN.md §6:
 binary .skel, PSD import, video/PNG-sequence export, add/remove mesh vertices, dockable
 panels; physics preview is an approximation (exports run the real runtime simulation).
+PLAN.md §7 covers the opt-in Python backend in `server/` (FastAPI; repo splits into
+frontend `packages/` + `server/`). **Phase 11 done**: accounts (register/login/logout/
+forgot+reset password, argon2id + rotating httpOnly refresh cookie), per-user project
+list with viewport thumbnails + 3s-debounced server autosave, BYOK key vault
+(AES-256-GCM, masked), per-user settings endpoint; editor gets Server/Projects toolbar
+modals (`src/server/api.ts`, e2e: `packages/editor/e2e/server.mjs`, needs the server on
+:8100). Phases 12–14 planned: image-gen provider adapters, segmentation
+(rembg/SAM/MediaPipe) into parts, chat history tables, and an AI chat that
+auto-rigs/animates by driving the existing bridge ops over WebSocket.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
@@ -38,7 +47,14 @@ pnpm monorepo (Node >= 22). Run from the repo root:
 - `pnpm --filter @spine-editor/editor dev` — start the editor dev server (Vite)
 - Single test file: `pnpm --filter @spine-editor/core test -- test/fixtures.test.ts`
 
-CI (`.github/workflows/ci.yml`) runs lint, format:check, typecheck, test, build — all must pass.
+Python backend (`server/`, requires [uv](https://docs.astral.sh/uv/)) — run from `server/`:
+
+- `uv sync` — install deps into `.venv`
+- `uv run uvicorn app.main:app --port 8100` — start the API (SQLite + secrets in `server/data/`)
+- `uv run pytest` / `uv run ruff check .` / `uv run ruff format .` — tests & lint
+
+CI (`.github/workflows/ci.yml`): Node job (lint, format:check, typecheck, test, build) +
+`server` job (ruff check/format, pytest) — all must pass.
 
 ## Architecture
 
@@ -51,6 +67,8 @@ packages/
 └── shared/      # Constants and editor↔MCP protocol types shared by all packages
 skills/          # SKILL.md files teaching AI agents rigging/animating workflows (Phase 5)
 examples/        # Hand-written Spine JSON fixtures used by core round-trip tests
+server/          # Opt-in Python backend (FastAPI): accounts, projects, BYOK key vault;
+                 # editor talks to it via REST (src/server/api.ts), default :8100
 ```
 
 Key invariants:

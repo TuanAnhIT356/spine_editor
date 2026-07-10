@@ -676,3 +676,162 @@ button.danger {
   font-family: ui-monospace, monospace;
   white-space: nowrap;
 }
+
+/* ---- Server modal (account, keys) + Projects modal ---- */
+
+.server-modal {
+  width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.server-modal input {
+  background: #1c1c20;
+  border: 1px solid #45454d;
+  border-radius: 4px;
+  color: #e8e8ea;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.server-modal button {
+  font-size: 12px;
+}
+
+.server-url-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.server-url-row input {
+  flex: 1;
+}
+
+.server-url-row .health.ok {
+  color: #4caf50;
+}
+
+.server-url-row .health.down {
+  color: #ff6b6b;
+}
+
+.server-auth .tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.server-auth .tabs button.active {
+  background: #3d6ef7;
+  color: #fff;
+}
+
+.server-auth form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-error {
+  color: #ff6b6b;
+}
+
+.form-notice {
+  color: #4caf50;
+}
+
+.server-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.server-user-row button {
+  margin-left: auto;
+}
+
+.server-keys .key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.server-keys .key-provider {
+  width: 70px;
+  color: #bdbdc2;
+}
+
+.server-keys .key-masked {
+  width: 70px;
+  font-family: ui-monospace, monospace;
+  color: #8a8a92;
+}
+
+.server-keys input {
+  flex: 1;
+}
+
+.toolbar button.server-on {
+  color: #4caf50;
+}
+
+.projects-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid #333339;
+  border-radius: 4px;
+}
+
+.project-row.selected {
+  border-color: #3d6ef7;
+}
+
+.project-row img,
+.project-row .thumb-placeholder {
+  width: 48px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #1c1c20;
+  flex: none;
+}
+
+.project-row .project-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-row .project-date {
+  color: #8a8a92;
+  font-size: 11px;
+}
+
+.bound-note {
+  color: #8a8a92;
+  font-weight: normal;
+}
+
+.server-modal .close {
+  align-self: flex-end;
+}

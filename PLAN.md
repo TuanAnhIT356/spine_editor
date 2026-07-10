@@ -308,3 +308,183 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
   từ tài liệu format công khai.
 - Ưu tiên đề xuất: **7 → 8 → 9 → 10** (giá trị animation trước, rigging nâng cao sau,
   cuối cùng là hệ sinh thái import/export). Trong từng phase, mục nào độc lập có thể làm song song.
+
+## 7. Backend Python + AI tạo ảnh & auto-rig (Phase 11–14) — kế hoạch
+
+Yêu cầu: repo chia 2 phần **frontend** (editor hiện tại) và **server** (Python); server có
+tài khoản (đăng nhập / đăng xuất / quên mật khẩu), danh sách project đã tạo, lưu lịch sử
+chat, settings; tích hợp API key AI gen ảnh, gen ảnh tách từng thành phần, AI chat tự tạo
+ảnh → tách part → tự dựng rig Spine + chuyển động.
+
+### 7.1. Vì sao Python (thay cho phương án Fastify ban đầu)?
+
+Bản nháp đầu chọn Fastify/Node chỉ vì một lý do: server có thể import thẳng
+`@spine-editor/core` (TypeScript) khi cần dựng skeleton headless. Chuyển sang Python
+được nhiều hơn mất:
+
+- **Stack AI/vision là Python-first**: `rembg`, SAM 2 (PyTorch), MediaPipe Pose,
+  Pillow/OpenCV chạy in-process trong server; bản Node phải qua onnxruntime bindings
+  hoặc spawn process Python phụ. Segmentation là phần nặng nhất của toàn pipeline.
+- **Điều khiển editor không phụ thuộc ngôn ngữ**: bridge ops là JSON qua WebSocket
+  (`ws://localhost:8017`) — Python dispatch 47 ops y hệt MCP server Node đang làm.
+  Auto-rig chạy qua editor tab đang mở nên người dùng nhìn thấy từng bước.
+- **Đánh đổi chấp nhận được**: Python không tái dùng serializer/command của `core`.
+  Khi nào thật sự cần build Spine JSON headless (không mở editor) thì thêm một CLI
+  worker Node mỏng (import `core`, nhận ops JSON qua stdin) — hoãn tới lúc có nhu cầu.
+
+### 7.2. Cấu trúc repo & kiến trúc
+
+```
+spine_editor/
+├── packages/          # FRONTEND — pnpm monorepo hiện tại (editor/core/mcp-server/shared)
+└── server/            # SERVER — Python 3.12, FastAPI + uvicorn, quản lý deps bằng uv
+    ├── app/main.py        # FastAPI app, CORS cho Vite dev, mount routers
+    ├── app/api/           # routers: auth, projects, keys, settings, generate, segment, chat
+    ├── app/auth/          # JWT access + refresh, băm argon2id, token quên mật khẩu
+    ├── app/db/            # SQLAlchemy 2 + Alembic; SQLite khi dev → Postgres khi deploy
+    ├── app/providers/     # adapter gen ảnh: openai | stability | runware | fal (httpx)
+    ├── app/segment/       # rembg, SAM 2, MediaPipe Pose — chạy in-process
+    ├── app/pipeline/      # job async: ảnh → parts → rig → animation, tiến độ qua ws
+    ├── app/chat/          # anthropic SDK (claude-opus-4-8) vòng lặp tool-use, tools = ops
+    ├── app/bridge.py      # WebSocket client nói protocol bridge với editor tab
+    └── tests/             # pytest + httpx TestClient
+```
+
+- Editor ⇄ server: **REST** cho auth/projects/settings/keys, **WebSocket** cho chat
+  streaming + tiến độ job.
+- Frontend thêm: màn hình đăng nhập/đăng ký/quên mật khẩu, dashboard "My Projects"
+  (mở project → vào editor), panel Chat, mở rộng Settings (server URL, API keys, theme).
+- Editor **vẫn chạy standalone** không cần server (deploy GitHub Pages như cũ) — server
+  là opt-in, phát hiện qua Settings.
+
+### 7.3. Tài khoản, project, chat history, settings (đặc tả Phase 11)
+
+- **Đăng ký / đăng nhập**: email + mật khẩu (băm argon2id); JWT access ngắn hạn (~15')
+  giữ trong memory phía client + refresh token trong cookie httpOnly (bảng
+  `refresh_tokens`, revoke được từng phiên).
+- **Đăng xuất**: revoke refresh token phía server + xóa cookie (đăng xuất mọi thiết bị =
+  revoke cả bảng theo user).
+- **Quên mật khẩu**: token một lần hết hạn 30' (bảng `password_resets`), gửi qua SMTP
+  cấu hình được (dev: in ra log / mailbox giả); response không tiết lộ email có tồn tại
+  hay không; rate-limit cả login lẫn forgot-password.
+- **Danh sách project**: CRUD theo user — tên, thumbnail (PNG chụp viewport lúc save),
+  `updated_at`; nội dung = Spine JSON + assets (file trên đĩa, path trong DB);
+  autosave định kỳ từ editor khi đã đăng nhập.
+- **Lịch sử chat**: bảng `conversations` + `messages` lưu đủ text lẫn tool_use/
+  tool_result — mở lại phiên cũ là tiếp tục đúng ngữ cảnh; gắn conversation với project.
+- **Settings per-user**: theme, provider gen ảnh mặc định, tham số gen; API keys BYOK ở
+  bảng riêng `api_keys`, mã hóa AES-256-GCM bằng secret trong env server, masked khi
+  liệt kê, không bao giờ trả full key về client.
+- Schema: `users, refresh_tokens, password_resets, projects, assets, api_keys, settings,
+conversations, messages, jobs`.
+
+### 7.4. Khảo sát provider (07/2026)
+
+| Nhu cầu                    | Lựa chọn chính                                                           | Ghi chú                                                       |
+| -------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Gen ảnh nền trong suốt     | OpenAI `gpt-image-1.5` (`background: "transparent"`)                     | `gpt-image-2` KHÔNG hỗ trợ transparent — phải route về 1.5    |
+| Gen ảnh alpha gốc          | LayerDiffuse (qua Runware API hoặc self-host diffusers)                  | alpha sinh trong latent, tóc/viền sạch hơn remove-bg          |
+| Sửa/inpaint/xóa nền cloud  | Stability AI (stable-image: inpaint, remove-bg, search-and-replace)      | rẻ, endpoint rời từng thao tác                                |
+| Xóa nền local, free        | `rembg` (MIT, U2-Net/IS-Net) — thư viện Python, import trực tiếp         | mặc định không cần key; CPU ~10s/ảnh                          |
+| Segmentation theo điểm/box | SAM 2/3 (Apache-2.0) — PyTorch self-host hoặc fal.ai API                 | prompt point/box từ pose landmark → mask từng part            |
+| Pose landmark (khớp xương) | MediaPipe Pose (package Python chính chủ)                                | vị trí khớp → sinh bone + điểm prompt SAM                     |
+| AI chat điều khiển editor  | Claude API `claude-opus-4-8`, anthropic Python SDK, tool-use + streaming | tools = 47 ops bridge sẵn có; adaptive thinking               |
+| Tham chiếu auto-rig        | Meta Animated Drawings (open source, Python)                             | pipeline mẫu: detect → segment → joints → rig → preset motion |
+
+### 7.5. Pipeline "prompt → nhân vật Spine chuyển động"
+
+Hai chiến lược tách thành phần, làm cả hai và cho người dùng chọn:
+
+- **A. Gen-từng-part** (chất lượng cao nhất): gen ảnh full-body T-pose trước làm tham
+  chiếu style, rồi gọi edit/reference-image endpoint gen từng part (đầu, thân, 2 tay ×
+  2 khúc, 2 chân × 2 khúc…) nền trong suốt, cùng style — tránh style drift.
+- **B. Gen-rồi-tách** (nhanh, dùng được với ảnh upload): gen (hoặc nhận) 1 ảnh
+  full-body → MediaPipe tìm khớp → SAM prompt point/box theo từng chi → mask từng part
+  → cắt PNG rời → inpaint phần bị che khuất (vd. thân sau cánh tay).
+
+Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
+
+1. **Auto-rig** (server dispatch ops qua bridge): dựng chuỗi bone theo landmark
+   (hip→spine→head, 2 tay, 2 chân — quy ước +X dọc bone như skill rigging),
+   `import_image` + `attach_image` từng part, `set_draw_order` theo thứ tự che khuất,
+   IK 2-bone cho tay/chân, mesh + `bind_weights` cho part bắc qua 2 bone.
+2. **Auto-animate**: thư viện preset (idle/walk/run/jump/wave) lưu dạng timeline tương
+   đối theo tên bone chuẩn → retarget sang rig vừa dựng (map vai trò bone, scale theo
+   độ dài chi); chuyển động tự do ("vẫy tay chào") thì AI chat tự đặt keyframe qua ops.
+3. Người dùng xem preview, sửa tay bằng UI sẵn có, xuất Spine JSON/GIF như hiện tại.
+
+### 7.6. Các phase
+
+#### Phase 11 — Server nền tảng + tài khoản (`server/`) ✅ Hoàn thành (07/2026)
+
+> Ghi chú thực hiện: FastAPI + SQLAlchemy 2 (SQLite, `create_all` khi khởi động — Alembic
+> để khi cần migration thật; Python 3.11+ thay vì 3.12 theo môi trường). Auth đủ theo đặc
+> tả 7.3: argon2id, JWT access 15' (ký bằng khóa dẫn xuất SHA-256), refresh cookie httpOnly
+> path `/api/auth` xoay vòng single-use, logout revoke, forgot/reset (token 30', outbox
+> log khi chưa cấu hình SMTP, không lộ email tồn tại, rate-limit in-memory 10 req/phút).
+> Key vault AES-256-GCM (nonce 12 byte, masked last4). Projects CRUD lưu nguyên payload
+> `spine-editor-project` (assets data-URL nằm trong JSON — bảng assets rời để khi cần).
+> Frontend: `src/server/api.ts` (fetch wrapper tự refresh 1 lần khi 401) + `useServer`
+> store; ServerModal (URL + Test, 4 tab Sign in/Register/Forgot/Reset, quản lý key
+> masked); ProjectsModal (Save/Save-as-new + thumbnail chụp viewport 200px, Open, xóa);
+> autosave lên server debounce 3s khi đã bind project. 10 pytest + e2e Chromium thật
+> (`packages/editor/e2e/server.mjs`: đăng ký → lưu key → save project → reload giữ phiên
+> qua cookie → open lại đủ bones → forgot/reset qua outbox → đăng nhập lại). CI thêm job
+> `server` (uv + ruff check/format + pytest). Settings per-user endpoint có sẵn, UI theme/
+> provider mặc định sẽ dùng ở Phase 12.
+
+1. Scaffold FastAPI + uvicorn + SQLAlchemy + pytest + ruff; `uv` quản lý deps;
+   CI thêm job Python (ruff + pytest) chạy song song job Node.
+2. Auth đầy đủ theo đặc tả 7.3: đăng ký, đăng nhập, đăng xuất, quên mật khẩu, refresh.
+3. Project CRUD + danh sách + thumbnail + autosave; upload/serve assets.
+4. Settings per-user + key vault BYOK (mã hóa AES-256-GCM).
+5. Frontend: màn hình Login/Register/Forgot, dashboard My Projects, Settings mở rộng;
+   editor Open/Save lên server (giữ export file như cũ).
+
+#### Phase 12 — Tích hợp AI gen ảnh
+
+1. Interface `ImageProvider` (generate / edit / inpaint / remove_background) + adapters
+   `openai` (gpt-image-1.5 transparent), `stability`, `runware` (LayerDiffuse), `fal`.
+2. Prompt template game asset: T-pose/A-pose, side-view, flat shading, nền trong suốt,
+   khung part-sheet; tham số style thống nhất giữa các lần gọi.
+3. UI: dialog "Generate Image" (prompt, provider, size) → gallery theo user → import
+   làm asset một click; ước tính chi phí trước khi gọi.
+4. MCP tool `generate_image` (proxy qua server) để agent ngoài cũng dùng được.
+
+#### Phase 13 — Tách thành phần (segmentation)
+
+1. `rembg` in-process mặc định (không cần key) cho remove-bg.
+2. MediaPipe Pose → khớp + bounding box từng chi.
+3. SAM 2: chạy PyTorch local (GPU nếu có, checkpoint tải lần đầu) hoặc fal.ai BYOK —
+   prompt point/box từ landmark → mask từng part; chiến lược B hoàn chỉnh kèm inpaint.
+4. Chiến lược A: orchestration gen-từng-part với ảnh tham chiếu.
+5. UI review masks: overlay từng part, sửa nhanh (thêm/bớt point prompt), đặt tên part
+   → "Import parts" thành assets kèm vị trí gốc.
+
+#### Phase 14 — AI chat auto-rig & auto-animate
+
+1. Chat panel trong editor (streaming, hiển thị tool call, lưu/khôi phục history);
+   server chạy vòng lặp tool-use anthropic SDK (`claude-opus-4-8`, adaptive thinking)
+   với tools = ops bridge + `generate_image` + `segment_image` + `rig_from_parts`.
+2. `rig_from_parts`: auto-rig từ landmark + parts (mục 7.5) thành một op server-side.
+3. Preset motion library + retarget; op `apply_preset_animation`.
+4. Nghiệm thu end-to-end: một câu chat "tạo nhân vật hiệp sĩ và cho nó đi bộ" → gen ảnh
+   → tách part → rig → walk cycle trong viewport; e2e Chromium thật (mock provider để
+   CI không cần key/GPU).
+
+### 7.7. Rủi ro & giảm thiểu
+
+- **Hai ngôn ngữ trong repo** → tách hẳn `server/` với toolchain riêng (uv, ruff,
+  pytest), CI hai job độc lập; protocol chung định nghĩa bằng JSON schema trong
+  `packages/shared` để hai bên cùng đối chiếu.
+- **Style drift giữa các part gen riêng** → luôn gen ảnh tham chiếu trước, dùng
+  edit/reference endpoint; fallback chiến lược B.
+- **Segmentation sai ở khớp/che khuất** → human-in-the-loop mọi bước (UI sửa mask, sửa
+  bone), inpaint phần khuất; không hứa "1 click hoàn hảo".
+- **Bảo mật tài khoản & key** → argon2id, rate-limit auth, refresh token revoke được,
+  key mã hóa at rest + không log/echo; server mặc định bind localhost khi self-host.
+- **Chi phí API của người dùng** → hiện estimate trước khi gọi, cache kết quả, mặc định
+  rembg local free.
+- **License**: SAM 2 Apache-2.0, rembg MIT, MediaPipe Apache-2.0 — tương thích license
+  Apache-2.0 của repo. Vẫn tuyệt đối không nhúng Spine Runtimes.
+- **CI không có key/GPU** → provider mock + fixture ảnh nhỏ cho unit/e2e.

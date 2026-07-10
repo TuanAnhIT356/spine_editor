@@ -1,4 +1,3 @@
-node_modules/
-dist/
-coverage/
+server/
 pnpm-lock.yaml
+e2e-out/

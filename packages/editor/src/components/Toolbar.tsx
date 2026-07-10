@@ -1,5 +1,5 @@
 import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { saveProjectFile } from '../state/actions.js';
@@ -12,6 +12,9 @@ import {
   type ProjectPayload,
 } from '../state/persistence.js';
 import { useEditor, type Tool } from '../state/store.js';
+import { useServer } from '../server/api.js';
+import { ProjectsModal } from './ProjectsModal.js';
+import { ServerModal } from './ServerModal.js';
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: 'select', label: 'Select', hint: '1 — click bones, drag empty space to pan' },
@@ -25,6 +28,9 @@ export function Toolbar() {
   const mode = useEditor((s) => s.mode);
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
+  const serverUser = useServer((s) => s.user);
+  const [showServer, setShowServer] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
@@ -172,6 +178,22 @@ export function Toolbar() {
         </button>
         <button onClick={() => projectInput.current?.click()}>Open Project</button>
       </div>
+      <div className="group">
+        <button
+          className={serverUser ? 'server-on' : ''}
+          title={serverUser ? `Signed in as ${serverUser.email}` : 'Server account & API keys'}
+          onClick={() => setShowServer(true)}
+        >
+          {serverUser ? '● Server' : 'Server'}
+        </button>
+        <button
+          disabled={!serverUser}
+          title={serverUser ? 'Open/save projects on the server' : 'Sign in first (Server)'}
+          onClick={() => setShowProjects(true)}
+        >
+          Projects
+        </button>
+      </div>
       <div className="group modes">
         <button
           className={mode === 'setup' ? 'active' : ''}
@@ -228,6 +250,8 @@ export function Toolbar() {
           e.target.value = '';
         }}
       />
+      {showServer && <ServerModal onClose={() => setShowServer(false)} />}
+      {showProjects && <ProjectsModal onClose={() => setShowProjects(false)} />}
     </div>
   );
 }
