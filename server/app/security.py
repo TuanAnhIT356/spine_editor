@@ -98,4 +98,4 @@ class RateLimiter:
         self._hits[key] = hits
 
 
-auth_rate_limiter = RateLimiter()
+auth_rate_limiter = RateLimiter(limit=config.auth_rate_limit)

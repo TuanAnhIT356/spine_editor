@@ -441,7 +441,25 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 5. Frontend: màn hình Login/Register/Forgot, dashboard My Projects, Settings mở rộng;
    editor Open/Save lên server (giữ export file như cũ).
 
-#### Phase 12 — Tích hợp AI gen ảnh
+#### Phase 12 — Tích hợp AI gen ảnh ✅ Hoàn thành (07/2026)
+
+> Ghi chú thực hiện: `app/providers/` — interface `ImageProvider` (generate → PNG bytes,
+> `supports_transparent`, `approx_cost_usd`) + 5 adapter: `openai` (gpt-image-1.5,
+> `background: transparent` — gpt-image-2 không hỗ trợ), `stability` (stable-image core,
+> không alpha), `runware` (LayerDiffuse alpha gốc), `fal` (FLUX schnell), `mock` (PNG
+> phẳng sinh local, free — dùng cho test/e2e/thử UI). Key giải mã từ vault ngay trước
+> call, không log/echo. REST: `POST /api/generate` (chặn transparent với provider không
+> hỗ trợ, 400 khi thiếu key, 502 khi provider lỗi), gallery `GET/GET id/DELETE`
+> (ảnh lưu data-URL trong DB để sống sót đĩa ephemeral của Render),
+> `GET /api/generate/providers` (has_key/cost/capability cho dialog). Editor: nút
+> Generate trên toolbar → dialog prompt + checkbox "Game-asset template" (bọc prompt
+> T-pose/flat-shading/nền trong suốt), chọn provider/size/transparent, hiện ước tính
+> chi phí trước khi gọi, preview nền caro, "Add to Images" đặt tên từ prompt, gallery
+> import/xóa. MCP tool thứ 48: `generate_image` (chạy qua phiên đăng nhập của editor
+> tab, import thẳng thành asset). 4 pytest mới (guards, gallery per-user); e2e
+> server.mjs thêm luồng generate mock → import asset. Rate limit auth cấu hình được
+> (`SPINE_SERVER_AUTH_RATE_LIMIT`). **Chưa làm** — edit/inpaint/reference-image
+> (Phase 13 dùng cho chiến lược A), remove-background Stability (Phase 13).
 
 1. Interface `ImageProvider` (generate / edit / inpaint / remove_background) + adapters
    `openai` (gpt-image-1.5 transparent), `stability`, `runware` (LayerDiffuse), `fal`.

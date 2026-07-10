@@ -174,6 +174,54 @@ export function deleteProject(id: number): Promise<void> {
   return request(`/api/projects/${id}`, { method: 'DELETE' });
 }
 
+export interface ProviderInfo {
+  name: string;
+  supports_transparent: boolean;
+  approx_cost_usd: number;
+  has_key: boolean;
+}
+
+export interface GalleryEntry {
+  id: number;
+  provider: string;
+  prompt: string;
+  size: string;
+  transparent: boolean;
+  created_at: string;
+}
+
+export interface GalleryImage extends GalleryEntry {
+  data_url: string;
+}
+
+export function listProviders(): Promise<ProviderInfo[]> {
+  return request('/api/generate/providers');
+}
+
+export function generateImage(
+  provider: string,
+  prompt: string,
+  size: string,
+  transparent: boolean,
+): Promise<GalleryImage> {
+  return request('/api/generate', {
+    method: 'POST',
+    body: JSON.stringify({ provider, prompt, size, transparent }),
+  });
+}
+
+export function listGallery(): Promise<GalleryEntry[]> {
+  return request('/api/generate');
+}
+
+export function getGalleryImage(id: number): Promise<GalleryImage> {
+  return request(`/api/generate/${id}`);
+}
+
+export function deleteGalleryImage(id: number): Promise<void> {
+  return request(`/api/generate/${id}`, { method: 'DELETE' });
+}
+
 export function listKeys(): Promise<ApiKeyInfo[]> {
   return request('/api/keys');
 }

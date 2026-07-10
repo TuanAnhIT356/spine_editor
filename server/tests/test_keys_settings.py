@@ -23,7 +23,10 @@ def test_key_vault_masks_and_encrypts(auth_client: TestClient) -> None:
 
     # Encrypted at rest, decryptable server-side (for Phase 12 adapters).
     with SessionLocal() as db:
-        record = db.scalar(select(ApiKey).where(ApiKey.provider == "openai"))
+        # Filter by last4 — other test users may also have stored openai keys.
+        record = db.scalar(
+            select(ApiKey).where(ApiKey.provider == "openai", ApiKey.last4 == "wxyz")
+        )
         assert secret not in record.key_encrypted
         assert decrypt_secret(record.key_encrypted) == secret
 

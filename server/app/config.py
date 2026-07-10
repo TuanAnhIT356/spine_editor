@@ -51,6 +51,8 @@ class Config:
         # set SPINE_SERVER_COOKIE_SAMESITE=none so browsers send the refresh cookie
         # on cross-site fetches; "none" requires Secure, so HTTPS on the API host.
         self.cookie_samesite = os.environ.get("SPINE_SERVER_COOKIE_SAMESITE", "lax").lower()
+        # Auth endpoints allow this many requests per IP per minute.
+        self.auth_rate_limit = int(os.environ.get("SPINE_SERVER_AUTH_RATE_LIMIT", "10"))
         self.cookie_secure = self.cookie_samesite == "none" or self.frontend_url.startswith(
             "https://"
         )

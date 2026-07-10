@@ -10,6 +10,7 @@ import tempfile
 _tmp = tempfile.mkdtemp(prefix="spine-server-test-")
 os.environ["SPINE_SERVER_DATA_DIR"] = _tmp
 os.environ["SPINE_SERVER_SECRET"] = "test-secret-not-for-production"
+os.environ["SPINE_SERVER_AUTH_RATE_LIMIT"] = "1000"  # the suite registers many users
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

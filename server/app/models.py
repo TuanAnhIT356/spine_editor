@@ -83,3 +83,19 @@ class UserSettings(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
     data: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class GenImage(Base):
+    """Generated-image gallery entry. The PNG lives in the DB as a data URL so
+    it survives hosts with ephemeral disks (Render/HF free tiers)."""
+
+    __tablename__ = "gen_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(40))
+    prompt: Mapped[str] = mapped_column(Text)
+    size: Mapped[str] = mapped_column(String(20))
+    transparent: Mapped[int] = mapped_column(Integer, default=0)
+    data_url: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
