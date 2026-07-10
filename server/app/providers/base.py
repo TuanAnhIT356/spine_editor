@@ -32,8 +32,10 @@ def parse_size(size: str) -> tuple[int, int]:
         raise ProviderError(f"Invalid size '{size}', expected e.g. 1024x1024") from err
 
 
-async def http_post_json(url: str, headers: dict[str, str], payload: object) -> httpx.Response:
-    async with httpx.AsyncClient(timeout=180) as client:
+async def http_post_json(
+    url: str, headers: dict[str, str], payload: object, timeout: int = 180
+) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         res = await client.post(url, headers=headers, json=payload)
     if res.status_code >= 400:
         # Provider error bodies can leak request details — keep only the status
