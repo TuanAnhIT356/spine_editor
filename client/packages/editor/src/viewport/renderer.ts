@@ -44,7 +44,7 @@ export interface RenderInput {
   /** Slot names back-to-front when a draw order key is active (animate mode). */
   slotOrder?: string[];
   /** Onion-skin bone poses drawn faintly under the scene (animate mode). */
-  ghosts?: { bones: BoneData[]; color: number }[];
+  ghosts?: { bones: BoneData[]; color: number; alpha?: number }[];
   /** Path-constraint timeline values at the playhead (animate mode). */
   pathOverrides?: ReadonlyMap<string, PathPoseValue>;
   /** Editor-only viewport hiding (tree visibility dots): skip drawing/picking. */
@@ -612,6 +612,7 @@ export class SceneRenderer {
     g.clear();
     if (!ghosts?.length) return;
     for (const ghost of ghosts) {
+      const alpha = ghost.alpha ?? 0.35;
       const pose = computePose({ ...data, bones: ghost.bones });
       for (const bone of ghost.bones) {
         const m = pose.get(bone.name);
@@ -620,9 +621,9 @@ export class SceneRenderer {
           const tip = applyMat(m, bone.length, 0);
           g.moveTo(m.tx, m.ty)
             .lineTo(tip.x, tip.y)
-            .stroke({ width: 2 / this.zoom, color: ghost.color, alpha: 0.35 });
+            .stroke({ width: 2 / this.zoom, color: ghost.color, alpha });
         }
-        g.circle(m.tx, m.ty, 3 / this.zoom).fill({ color: ghost.color, alpha: 0.35 });
+        g.circle(m.tx, m.ty, 3 / this.zoom).fill({ color: ghost.color, alpha });
       }
     }
   }

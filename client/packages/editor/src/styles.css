@@ -1606,3 +1606,36 @@ button.active {
   flex: 1;
   text-align: center;
 }
+
+/* ---- Ghosting window (P18) ---- */
+.ghosting-window {
+  position: fixed;
+  z-index: 25;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.ghosting-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ghosting-body .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+.ghosting-body .field input[type='number'] {
+  width: 56px;
+}
+.ghosting-body .field input[type='range'] {
+  width: 90px;
+}
