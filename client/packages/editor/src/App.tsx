@@ -113,14 +113,14 @@ export function App() {
     <div className="app">
       <Toolbar />
       <div className="main">
-        {panels.hierarchy && (
+        {panels.tree && (
           <>
             <HierarchyPanel />
             <Resizer axis="x" onResize={(d) => useEditor.getState().resizeHierarchy(d)} />
           </>
         )}
         <Viewport />
-        {panels.properties && (
+        {panels.tree && (
           <>
             <Resizer axis="x" onResize={(d) => useEditor.getState().resizeProperties(d)} />
             <PropertiesPanel />

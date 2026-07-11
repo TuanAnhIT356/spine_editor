@@ -225,7 +225,7 @@ export function Toolbar() {
         </button>
         {showViews && (
           <div className="dropdown">
-            {(['hierarchy', 'properties', 'timeline'] as const).map((p) => (
+            {(['tree', 'timeline'] as const).map((p) => (
               <label key={p} className="views-item">
                 <input
                   type="checkbox"
@@ -233,7 +233,7 @@ export function Toolbar() {
                   disabled={p === 'timeline' && mode === 'setup'}
                   onChange={() => useEditor.getState().togglePanel(p)}
                 />
-                {p === 'hierarchy' ? 'Tree' : p[0]!.toUpperCase() + p.slice(1)}
+                {p === 'tree' ? 'Tree' : 'Timeline'}
               </label>
             ))}
           </div>
