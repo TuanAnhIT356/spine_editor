@@ -101,7 +101,15 @@ menu Import PSD; MCP `import_psd`), Texture Packer settings (AtlasDialog
 padding/maxSize/powerOfTwo/trim; core packAtlas thêm powerOfTwo + orig/offset
 trim metadata), export animation WebM + PNG-sequence zip (`fflate`) qua vòng
 captureFrames dùng chung với GIF + Export Animation dialog — **64 MCP tools
-total**. Next: PLAN.md §8 phase 22b (binary .skel import/export).
+total**. **Phase 22b done** (IO slice 2): binary .skel import/export —
+`core/src/spine-binary/` (DataWriter/DataReader varint/zigzag/utf8/color,
+`writeSkel`/`readSkel` phủ toàn bộ document: skins/attachments/sequences/
+weighted vertices + mọi timeline với per-channel curves; dialect
+**"4.2-se.1"**: cấu trúc theo tài liệu công khai + mã hóa riêng cho phần 4.2
+chưa có tài liệu — physics, slot rgb/alpha/rgb2, single-axis bone timelines;
+round-trip nội bộ, KHÔNG verify bằng runtime chính thức), menu Export/Import
+SKEL, MCP `export_skel` trả base64 — **65 MCP tools total**.
+**Roadmap §8 (Spine parity) HOÀN TẤT — phases 15–22 done.**
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

@@ -60,6 +60,7 @@ export const BRIDGE_OPS = [
   'redo',
   'screenshot',
   'export_spine_json',
+  'export_skel',
   'export_atlas',
   'set_event',
   'create_mesh',

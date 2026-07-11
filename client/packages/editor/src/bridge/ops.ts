@@ -58,6 +58,7 @@ import {
   smoothWeights,
   swapWeights,
   weldMeshVertices,
+  writeSkel,
   createBone,
   createEmptySkeleton,
   createSlot,
@@ -651,6 +652,22 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
     case 'export_spine_json': {
       const s = state();
       return { json: s.doc.toJsonString(2), issues: s.doc.validate() };
+    }
+
+    case 'export_skel': {
+      const s = state();
+      const errors = s.doc.validate().filter((i) => i.severity === 'error');
+      if (errors.length > 0) {
+        throw new Error(
+          `Export blocked: ${errors.map((e) => `${e.path}: ${e.message}`).join(' | ')}`,
+        );
+      }
+      const bytes = writeSkel(s.doc.data);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      return { base64: btoa(binary), bytes: bytes.length };
     }
 
     case 'export_atlas': {

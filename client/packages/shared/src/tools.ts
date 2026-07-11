@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the 64 editor tools: name, description, zod
+ * Single source of truth for the 65 editor tools: name, description, zod
  * params shape, the bridge op that implements it, and how to present the
  * result. Consumed by the MCP server (registers them as MCP tools) and by
  * the editor's chat client (sends JSON Schemas to the chat loop and
@@ -630,6 +630,11 @@ export const TOOL_DEFS: ToolDef[] = [
   def(
     'export_spine_json',
     "Serialize the document to Spine JSON 4.2 (returns the JSON text plus validation issues). Defaults equal to Spine's are omitted, matching official exports.",
+    {},
+  ),
+  def(
+    'export_skel',
+    'Serialize the document to binary .skel (base64-encoded). Uses the 4.2-se.1 dialect: documented Spine 4.2 binary structure plus this editor’s encoding for undocumented 4.2 features; readable by this editor’s Import SKEL.',
     {},
   ),
 ];

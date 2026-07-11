@@ -318,6 +318,10 @@ const psdSlotOrder = (psdState.spine.slots ?? [])
   .map((sl) => sl.name)
   .filter((n) => psdRes.slots.includes(n));
 
+// 10e. Binary .skel export (Phase 22b).
+const skelRes = await call('export_skel');
+const skelBytes = Buffer.from(skelRes.base64, 'base64');
+
 // ---- Phase 14: auto-rig from parts + preset walk
 console.error('[e2e] auto-rig flow');
 const PART_BOXES = [
@@ -422,6 +426,10 @@ console.log(
         psdRes.assets.every((a) => (psdState.assets ?? []).some((x) => x.name === a)) &&
         psdSlotOrder[0]?.startsWith('bg') &&
         psdSlotOrder[1]?.startsWith('fg'),
+      skelExportWorks:
+        skelRes.bytes > 100 &&
+        skelBytes.length === skelRes.bytes &&
+        skelBytes.includes(Buffer.from('4.2-se.1', 'utf8')),
       rigFromPartsWorks:
         rigRes.bones.includes('spine') &&
         rigBoneNames.includes('upper_leg_l') &&

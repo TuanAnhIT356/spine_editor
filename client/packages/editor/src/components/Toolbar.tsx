@@ -1,4 +1,4 @@
-import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
+import { createEmptySkeleton, readSkel, serializeSpineJson, writeSkel } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
 import { buildAtlas, type AtlasOptions } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
@@ -6,6 +6,7 @@ import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/
 import { parsePsdToCuts } from '../state/psd-import.js';
 import { importParts } from '../segment/import-parts.js';
 import {
+  downloadBlob,
   downloadDataUrl,
   downloadText,
   loadImageAsset,
@@ -69,6 +70,7 @@ export function Toolbar() {
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
   const atlasInput = useRef<HTMLInputElement | null>(null);
   const psdInput = useRef<HTMLInputElement | null>(null);
+  const skelInput = useRef<HTMLInputElement | null>(null);
   void revision; // subscribe so undo/redo enabled state stays fresh
 
   async function onImportImages(files: FileList | null) {
@@ -133,6 +135,44 @@ export function Toolbar() {
     }
   }
 
+  function onExportSkel() {
+    const state = useEditor.getState();
+    const errors = state.doc.validate().filter((i) => i.severity === 'error');
+    if (errors.length > 0) {
+      state.setError(`Export blocked: ${errors.map((e) => `${e.path}: ${e.message}`).join(' | ')}`);
+      return;
+    }
+    const bytes = writeSkel(state.doc.data);
+    downloadBlob(
+      'skeleton.skel',
+      new Blob([bytes as unknown as BlobPart], { type: 'application/octet-stream' }),
+    );
+  }
+
+  async function onImportSkel(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const state = useEditor.getState();
+    try {
+      const result = readSkel(new Uint8Array(await file.arrayBuffer()));
+      const errors = result.issues.filter((i) => i.severity === 'error');
+      if (errors.length > 0) {
+        throw new Error(errors.map((e) => e.message).join(' | '));
+      }
+      state.replaceProject(
+        serializeSpineJson(result.data),
+        Object.values(state.assets),
+        Object.values(state.audioAssets),
+      );
+      const warnings = result.issues.filter((i) => i.severity === 'warning');
+      if (warnings.length > 0) {
+        state.setError(`Imported with warnings: ${warnings.map((e) => e.message).join(' | ')}`);
+      }
+    } catch (err) {
+      state.setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function onImportPsd(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
@@ -171,8 +211,10 @@ export function Toolbar() {
             <button onClick={() => spineJsonInput.current?.click()}>Import JSON</button>
             <button onClick={() => atlasInput.current?.click()}>Import Atlas</button>
             <button onClick={() => psdInput.current?.click()}>Import PSD</button>
+            <button onClick={() => skelInput.current?.click()}>Import SKEL</button>
             <hr />
             <button onClick={onExportJson}>Export JSON</button>
+            <button onClick={onExportSkel}>Export SKEL</button>
             <button onClick={() => setShowAtlas(true)}>Export Atlas</button>
             <button
               disabled={mode !== 'animate' || !animCurrent}
@@ -369,6 +411,16 @@ export function Toolbar() {
         hidden
         onChange={(e) => {
           void onImportPsd(e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={skelInput}
+        type="file"
+        accept=".skel"
+        hidden
+        onChange={(e) => {
+          void onImportSkel(e.target.files);
           e.target.value = '';
         }}
       />
