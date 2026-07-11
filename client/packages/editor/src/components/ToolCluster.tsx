@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { computeAnimatedLocals } from '@spine-editor/core';
 import { primarySelection, useEditor, type Tool } from '../state/store.js';
-import { applyBoneEdit, parseNumeric, type BonePatch } from '../state/bone-edit.js';
+import { applyBoneEdit, keyPoseNow, parseNumeric, type BonePatch } from '../state/bone-edit.js';
 import {
   CreateIcon,
   CursorIcon,
@@ -59,6 +59,7 @@ export function ToolCluster() {
   const selection = useEditor((s) => s.selection);
   const revision = useEditor((s) => s.revision);
   const anim = useEditor((s) => s.anim);
+  const posePreview = useEditor((s) => s.posePreview);
   void revision; // re-render on document changes so the boxes track edits
 
   const primary = primarySelection(selection);
@@ -68,7 +69,9 @@ export function ToolCluster() {
     if (!bone) return null;
     if (mode !== 'animate' || !anim.current) return bone;
     const locals = computeAnimatedLocals(useEditor.getState().doc.data, anim.current, anim.time);
-    return locals.find((b) => b.name === bone.name) ?? bone;
+    const found = locals.find((b) => b.name === bone.name) ?? bone;
+    const pp = posePreview?.[bone.name];
+    return pp ? { ...found, ...pp } : found;
   })();
 
   function commit(patch: BonePatch) {
@@ -102,7 +105,12 @@ export function ToolCluster() {
               className="tc-key"
               title="Key current value at the playhead"
               disabled={mode !== 'animate'}
-              onClick={() => commit({ rotation: shown.rotation })}
+              onClick={() =>
+                autoKey
+                  ? commit({ rotation: shown.rotation })
+                  : primary?.kind === 'bone' &&
+                    keyPoseNow(primary.name, { rotation: shown.rotation })
+              }
             >
               <KeyIcon size={10} />
             </button>
@@ -144,7 +152,10 @@ export function ToolCluster() {
           <button
             className={autoKey ? 'active tc-autokey' : 'tc-autokey'}
             title="Auto Key"
-            onClick={() => useEditor.getState().setAutoKey(!autoKey)}
+            onClick={() => {
+              if (!autoKey) useEditor.getState().clearPosePreview();
+              useEditor.getState().setAutoKey(!autoKey);
+            }}
           >
             <KeyIcon /> Auto Key
           </button>
