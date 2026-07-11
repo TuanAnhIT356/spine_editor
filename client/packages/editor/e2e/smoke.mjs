@@ -31,8 +31,8 @@ await page.screenshot({ path: `${OUT}/01-initial.png` });
 // --- Create two bones with the Create tool (drag on canvas)
 await page.click('button:has-text("Create")');
 const vp = await page.locator('.viewport').boundingBox();
-const cx = vp.x + vp.width / 2;
-const cy = vp.y + vp.height * 0.75;
+const cx = vp.x + vp.width / 2 - 250; // clear of the bottom-center tool cluster
+const cy = vp.y + vp.height * 0.45;
 await page.mouse.move(cx, cy);
 await page.mouse.down();
 await page.mouse.move(cx + 60, cy - 120, { steps: 8 });

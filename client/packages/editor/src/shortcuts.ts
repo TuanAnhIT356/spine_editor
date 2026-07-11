@@ -4,7 +4,7 @@ export interface ShortcutEntry {
 }
 
 export const SHORTCUTS: ShortcutEntry[] = [
-  { keys: '1 / 2 / 3 / 4', description: 'Select / Translate / Rotate / Create tool' },
+  { keys: '1–6', description: 'Select / Translate / Rotate / Scale / Shear / Create tool' },
   { keys: 'Space', description: 'Play or pause the current animation' },
   { keys: '← / →', description: 'Step one frame back / forward (30fps)' },
   { keys: 'Ctrl/Cmd + Z', description: 'Undo' },

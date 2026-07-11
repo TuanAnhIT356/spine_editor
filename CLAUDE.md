@@ -54,7 +54,12 @@ via the bridge op layer; FastAPI runs the anthropic streaming loop (claude-opus-
 adaptive thinking, BYOK vault key) with history in `conversations`/`messages`
 (content blocks verbatim — resume replays exact context).
 `SPINE_SERVER_CHAT_FAKE=1` scripts the model for tests/e2e (the pipeline itself runs
-real). **The PLAN.md roadmap is complete.**
+real). **Phase 15 (Spine-parity U1) done**: Spine-style shell — theme tokens, titlebar
+file menu + icon actions + dirty star + Views dropdown, in-viewport SETUP/ANIMATE
+banner, bottom tool cluster (live numeric transforms with `+`/`*`/`/` entry, new
+scale/shear tools, Local/Parent/World axes with Shift-constrain, selection/visibility/
+label filters, Auto Key toggle), bone breadcrumb, zoom slider. Next: PLAN.md §8
+Spine-parity roadmap (Phase 16 Unified Tree → Phase 22 IO pack).
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

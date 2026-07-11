@@ -39,8 +39,8 @@ await page.waitForTimeout(300);
 // --- Create one bone in setup mode
 await page.click('button:has-text("Create")');
 const vp = await page.locator('.viewport').boundingBox();
-const cx = vp.x + vp.width / 2;
-const cy = vp.y + vp.height * 0.75;
+const cx = vp.x + vp.width / 2 - 250; // clear of the bottom-center tool cluster
+const cy = vp.y + vp.height * 0.45;
 await page.mouse.move(cx, cy);
 await page.mouse.down();
 await page.mouse.move(cx + 20, cy - 150, { steps: 8 });
@@ -48,7 +48,7 @@ await page.mouse.up();
 await page.waitForTimeout(200);
 
 // --- Switch to Animate, create animation "walk" (prompt auto-accepted)
-await page.click('.modes button:has-text("Animate")');
+await page.click('.mode-banner');
 await page.click('.timeline-header button:has-text("New")');
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/01-animate-mode.png` });
