@@ -158,3 +158,34 @@ export class SetBoneTransform implements Command {
     Object.assign(bone, this.previous);
   }
 }
+
+/** Sets or clears a bone's tree color (8-hex RGBA, e.g. "ff8800ff"). */
+export class SetBoneColor implements Command {
+  readonly label: string;
+  private previous: string | undefined;
+
+  constructor(
+    private readonly name: string,
+    private readonly color: string | undefined,
+  ) {
+    this.label = `Color bone "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    if (this.color !== undefined && !/^[0-9a-fA-F]{8}$/.test(this.color)) {
+      throw new Error('Bone color must be 8-hex RGBA (e.g. "ff8800ff").');
+    }
+    const bone = data.bones.find((b) => b.name === this.name);
+    if (!bone) throw new Error(`Bone "${this.name}" does not exist.`);
+    this.previous = bone.color;
+    if (this.color === undefined) delete bone.color;
+    else bone.color = this.color;
+  }
+
+  undo(data: SkeletonData): void {
+    const bone = data.bones.find((b) => b.name === this.name);
+    if (!bone) return;
+    if (this.previous === undefined) delete bone.color;
+    else bone.color = this.previous;
+  }
+}

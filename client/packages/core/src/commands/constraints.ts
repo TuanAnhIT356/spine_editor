@@ -234,3 +234,132 @@ export class RemovePhysicsConstraint implements Command {
     if (this.removed) data.physics.splice(this.removedIndex, 0, this.removed);
   }
 }
+
+/** Patches fields of an existing IK constraint (undo restores the snapshot). */
+export class SetIkConstraintProperties implements Command {
+  readonly label: string;
+  private previous: IkConstraintData | null = null;
+
+  constructor(
+    private readonly name: string,
+    private readonly patch: Partial<Omit<IkConstraintData, 'name'>>,
+  ) {
+    this.label = `Edit IK constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = data.ik.find((x) => x.name === this.name);
+    if (!c) throw new Error(`IK constraint "${this.name}" does not exist.`);
+    const bones = this.patch.bones ?? c.bones;
+    if (bones.length < 1 || bones.length > 2) {
+      throw new Error('IK constraints require 1 or 2 bones.');
+    }
+    for (const bone of [...bones, this.patch.target ?? c.target]) {
+      if (!data.bones.some((b) => b.name === bone)) {
+        throw new Error(`Bone "${bone}" does not exist.`);
+      }
+    }
+    this.previous = structuredClone(c);
+    Object.assign(c, structuredClone(this.patch));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.ik.findIndex((x) => x.name === this.name);
+    if (idx >= 0 && this.previous) data.ik[idx] = structuredClone(this.previous);
+  }
+}
+
+/** Patches fields of an existing transform constraint. */
+export class SetTransformConstraintProperties implements Command {
+  readonly label: string;
+  private previous: TransformConstraintData | null = null;
+
+  constructor(
+    private readonly name: string,
+    private readonly patch: Partial<Omit<TransformConstraintData, 'name'>>,
+  ) {
+    this.label = `Edit transform constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = data.transform.find((x) => x.name === this.name);
+    if (!c) throw new Error(`Transform constraint "${this.name}" does not exist.`);
+    const bones = this.patch.bones ?? c.bones;
+    if (bones.length < 1) throw new Error('Transform constraints require at least one bone.');
+    for (const bone of [...bones, this.patch.target ?? c.target]) {
+      if (!data.bones.some((b) => b.name === bone)) {
+        throw new Error(`Bone "${bone}" does not exist.`);
+      }
+    }
+    this.previous = structuredClone(c);
+    Object.assign(c, structuredClone(this.patch));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.transform.findIndex((x) => x.name === this.name);
+    if (idx >= 0 && this.previous) data.transform[idx] = structuredClone(this.previous);
+  }
+}
+
+/** Patches fields of an existing path constraint (verbatim JSON shape). */
+export class SetPathConstraintProperties implements Command {
+  readonly label: string;
+  private previous: SpinePathConstraint | null = null;
+
+  constructor(
+    private readonly name: string,
+    private readonly patch: Partial<Omit<SpinePathConstraint, 'name'>>,
+  ) {
+    this.label = `Edit path constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = data.path.find((x) => x.name === this.name);
+    if (!c) throw new Error(`Path constraint "${this.name}" does not exist.`);
+    for (const bone of this.patch.bones ?? c.bones) {
+      if (!data.bones.some((b) => b.name === bone)) {
+        throw new Error(`Bone "${bone}" does not exist.`);
+      }
+    }
+    const target = this.patch.target ?? c.target;
+    if (!data.slots.some((s) => s.name === target)) {
+      throw new Error(`Slot "${target}" does not exist.`);
+    }
+    this.previous = structuredClone(c);
+    Object.assign(c, structuredClone(this.patch));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.path.findIndex((x) => x.name === this.name);
+    if (idx >= 0 && this.previous) data.path[idx] = structuredClone(this.previous);
+  }
+}
+
+/** Patches fields of an existing physics constraint (verbatim JSON shape). */
+export class SetPhysicsConstraintProperties implements Command {
+  readonly label: string;
+  private previous: SpinePhysicsConstraint | null = null;
+
+  constructor(
+    private readonly name: string,
+    private readonly patch: Partial<Omit<SpinePhysicsConstraint, 'name'>>,
+  ) {
+    this.label = `Edit physics constraint "${name}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const c = data.physics.find((x) => x.name === this.name);
+    if (!c) throw new Error(`Physics constraint "${this.name}" does not exist.`);
+    const bone = this.patch.bone ?? c.bone;
+    if (!data.bones.some((b) => b.name === bone)) {
+      throw new Error(`Bone "${bone}" does not exist.`);
+    }
+    this.previous = structuredClone(c);
+    Object.assign(c, structuredClone(this.patch));
+  }
+
+  undo(data: SkeletonData): void {
+    const idx = data.physics.findIndex((x) => x.name === this.name);
+    if (idx >= 0 && this.previous) data.physics[idx] = structuredClone(this.previous);
+  }
+}
