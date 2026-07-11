@@ -1421,3 +1421,27 @@ button.active {
   opacity: 0.35;
   pointer-events: none;
 }
+
+.tl-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px 8px 0;
+  align-items: center;
+}
+
+.tl-tab {
+  border-radius: 4px 4px 0 0;
+}
+
+.tl-tab.active {
+  background: var(--accent-soft);
+}
+
+.tl-sync {
+  margin-left: 12px;
+  font-size: 11px;
+}
+
+.tl-sync.active {
+  background: var(--accent-soft);
+}

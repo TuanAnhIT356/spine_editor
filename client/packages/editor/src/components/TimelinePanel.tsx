@@ -88,7 +88,10 @@ export function TimelinePanel() {
   const [dragKeys, setDragKeys] = useState<{ grabTime: number; delta: number } | null>(null);
   const [boxSel, setBoxSel] = useState<BoxSelState | null>(null);
   const [pps, setPps] = useState(DEFAULT_PPS);
-  const [showGraph, setShowGraph] = useState(false);
+  const [tab, setTab] = useState<'dopesheet' | 'graph'>('dopesheet');
+  const [sync, setSync] = useState(true);
+  /** Key shown in the Graph tab; frozen while Sync is off. */
+  const graphKeyRef = useRef<KeyRef | null>(null);
   const [scaleText, setScaleText] = useState('1.5');
   const [exporting, setExporting] = useState(false);
   const tracksRef = useRef<HTMLDivElement | null>(null);
@@ -252,6 +255,8 @@ export function TimelinePanel() {
     setSelectedKeys(next);
     return next;
   }
+
+  if (sync && primaryKey) graphKeyRef.current = primaryKey;
 
   function jumpToKey(dir: -1 | 1) {
     const times = [...new Set(boneTracks.flatMap((t) => t.keys.map((k) => k.time ?? 0)))].sort(
@@ -488,6 +493,27 @@ export function TimelinePanel() {
 
   return (
     <div className="timeline" style={{ height: layout.timelineHeight }}>
+      <div className="tl-tabs">
+        <button
+          className={tab === 'graph' ? 'tl-tab active' : 'tl-tab'}
+          onClick={() => setTab('graph')}
+        >
+          Graph
+        </button>
+        <button
+          className={tab === 'dopesheet' ? 'tl-tab active' : 'tl-tab'}
+          onClick={() => setTab('dopesheet')}
+        >
+          Dopesheet
+        </button>
+        <button
+          className={sync ? 'tl-sync active' : 'tl-sync'}
+          title="Sync the Graph tab to the dopesheet selection"
+          onClick={() => setSync(!sync)}
+        >
+          Sync
+        </button>
+      </div>
       <div className="timeline-header">
         <select
           value={anim.current ?? ''}
@@ -687,13 +713,8 @@ export function TimelinePanel() {
                   </option>
                 </select>
                 <button
-                  className={showGraph ? 'active' : ''}
-                  onClick={() => {
-                    // Grow the panel so the graph doesn't squeeze out the dopesheet.
-                    useEditor.getState().resizeTimeline(showGraph ? 185 : -185);
-                    setShowGraph(!showGraph);
-                  }}
-                  title="Edit the bezier curve toward the next key"
+                  onClick={() => setTab('graph')}
+                  title="Edit the bezier curve toward the next key (Graph tab)"
                 >
                   Curve
                 </button>
@@ -728,7 +749,7 @@ export function TimelinePanel() {
         </div>
       )}
 
-      {anim.current && (
+      {anim.current && tab === 'dopesheet' && (
         <div className="timeline-body" ref={tracksRef}>
           <div
             className="tracks"
@@ -881,13 +902,16 @@ export function TimelinePanel() {
         </div>
       )}
 
-      {anim.current && showGraph && primaryKey && (
+      {anim.current && tab === 'graph' && graphKeyRef.current && (
         <GraphEditor
           animation={anim.current}
-          bone={primaryKey.bone}
-          timeline={primaryKey.timeline}
-          time={primaryKey.time}
+          bone={graphKeyRef.current.bone}
+          timeline={graphKeyRef.current.timeline}
+          time={graphKeyRef.current.time}
         />
+      )}
+      {anim.current && tab === 'graph' && !graphKeyRef.current && (
+        <div className="empty">Select a key in the Dopesheet to edit its curve here.</div>
       )}
     </div>
   );
