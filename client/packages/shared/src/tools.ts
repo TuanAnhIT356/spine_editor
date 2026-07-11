@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the 63 editor tools: name, description, zod
+ * Single source of truth for the 64 editor tools: name, description, zod
  * params shape, the bridge op that implements it, and how to present the
  * result. Consumed by the MCP server (registers them as MCP tools) and by
  * the editor's chat client (sends JSON Schemas to the chat loop and
@@ -107,6 +107,16 @@ export const TOOL_DEFS: ToolDef[] = [
     {
       name: z.string().describe('Asset name without extension, e.g. "arm-upper".'),
       dataUrl: z.string().describe('data:image/png;base64,... payload.'),
+    },
+  ),
+  def(
+    'import_psd',
+    'Import a Photoshop PSD (base64 data URL): each visible raster layer becomes an image asset placed at its layer position (bottom layer first = drawn behind). Returns created asset and slot names.',
+    {
+      dataUrl: z
+        .string()
+        .describe('data:image/vnd.adobe.photoshop;base64,... (any data: prefix accepted)'),
+      place_on_canvas: z.boolean().optional().describe('Default true'),
     },
   ),
   def(

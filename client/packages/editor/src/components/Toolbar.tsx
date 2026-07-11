@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { buildAtlas, type AtlasOptions } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/actions.js';
+import { parsePsdToCuts } from '../state/psd-import.js';
+import { importParts } from '../segment/import-parts.js';
 import {
   downloadDataUrl,
   downloadText,
@@ -66,6 +68,7 @@ export function Toolbar() {
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
   const atlasInput = useRef<HTMLInputElement | null>(null);
+  const psdInput = useRef<HTMLInputElement | null>(null);
   void revision; // subscribe so undo/redo enabled state stays fresh
 
   async function onImportImages(files: FileList | null) {
@@ -130,6 +133,17 @@ export function Toolbar() {
     }
   }
 
+  async function onImportPsd(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    try {
+      const { cuts, width, height } = await parsePsdToCuts(await file.arrayBuffer());
+      importParts(cuts, { w: width, h: height }, true);
+    } catch (err) {
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function onImportSpineJson(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
@@ -156,6 +170,7 @@ export function Toolbar() {
             <button onClick={() => imagesInput.current?.click()}>Import Images</button>
             <button onClick={() => spineJsonInput.current?.click()}>Import JSON</button>
             <button onClick={() => atlasInput.current?.click()}>Import Atlas</button>
+            <button onClick={() => psdInput.current?.click()}>Import PSD</button>
             <hr />
             <button onClick={onExportJson}>Export JSON</button>
             <button onClick={() => setShowAtlas(true)}>Export Atlas</button>
@@ -344,6 +359,16 @@ export function Toolbar() {
         hidden
         onChange={(e) => {
           void onImportAtlas(e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={psdInput}
+        type="file"
+        accept=".psd"
+        hidden
+        onChange={(e) => {
+          void onImportPsd(e.target.files);
           e.target.value = '';
         }}
       />

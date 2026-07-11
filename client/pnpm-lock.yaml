@@ -60,6 +60,9 @@ importers:
       '@spine-editor/shared':
         specifier: workspace:*
         version: link:../shared
+      '@webtoon/psd':
+        specifier: ^0.4.0
+        version: 0.4.0
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -956,6 +959,9 @@ packages:
 
   '@webgpu/types@0.1.71':
     resolution: {integrity: sha512-mMy8/ODcKhab808co15eW+yN+HgXoQxRQHTiBV9Mrvl1r0ufnid7YOcI+gi4eUWSWl9ezD6TW2KXccrL8HCh2A==}
+
+  '@webtoon/psd@0.4.0':
+    resolution: {integrity: sha512-ztriE8oFOamRrV9opBURDy+JMiyhur2//vOXsC5CgdnYCB0L1Lnaag4NzP8N+NFCj7uNz9JRYtPmAbQMSDLIsQ==}
 
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
@@ -2651,6 +2657,8 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@webgpu/types@0.1.71': {}
+
+  '@webtoon/psd@0.4.0': {}
 
   '@xmldom/xmldom@0.8.13': {}
 
