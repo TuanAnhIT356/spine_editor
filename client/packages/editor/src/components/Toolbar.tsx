@@ -17,6 +17,7 @@ import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
+import { PreviewWindow } from './PreviewWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
@@ -32,6 +33,7 @@ export function Toolbar() {
   const [showChat, setShowChat] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showViews, setShowViews] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const dirty = useEditor((s) => s.revision !== s.savedRevision);
   const panels = useEditor((s) => s.panelVisibility);
   const serverProjectName = useServer((s) => s.projectName);
@@ -236,6 +238,14 @@ export function Toolbar() {
                 {p === 'tree' ? 'Tree' : 'Timeline'}
               </label>
             ))}
+            <label className="views-item">
+              <input
+                type="checkbox"
+                checked={showPreview}
+                onChange={() => setShowPreview((v) => !v)}
+              />
+              Preview
+            </label>
           </div>
         )}
       </div>
@@ -286,6 +296,7 @@ export function Toolbar() {
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
       {showSegment && <SegmentModal onClose={() => setShowSegment(false)} />}
       {showChat && <ChatWindow onClose={() => setShowChat(false)} />}
+      {showPreview && <PreviewWindow onClose={() => setShowPreview(false)} />}
     </div>
   );
 }
