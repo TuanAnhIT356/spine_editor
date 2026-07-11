@@ -4,10 +4,8 @@ import {
   Composite,
   RemoveSkinAttachment,
   ReorderSlot,
-  SetAttachmentVertices,
   SetMeshGeometry,
   SetSlotProperties,
-  autoWeightVertices,
   buildGridMeshAttachment,
   createSlot,
   isWeightedVertices,
@@ -19,27 +17,12 @@ import {
   type SpineClippingAttachment,
   type SpinePointAttachment,
 } from '@spine-editor/core';
-import { useState } from 'react';
 import { uniqueName, useEditor } from '../../../state/store.js';
 import { NumField } from './fields.js';
 
 const BLEND_MODES: SpineBlendMode[] = ['normal', 'additive', 'multiply', 'screen'];
 
 const VERTEX_TYPES = new Set(['mesh', 'boundingbox', 'clipping', 'path']);
-
-/** Unique bone indices influencing a weighted vertex array. */
-function influenceBoneIndices(vertices: number[]): number[] {
-  const out = new Set<number>();
-  let vi = 0;
-  while (vi < vertices.length) {
-    const count = vertices[vi++] ?? 0;
-    for (let b = 0; b < count; b++) {
-      out.add(vertices[vi] ?? 0);
-      vi += 4;
-    }
-  }
-  return [...out].sort((a, b) => a - b);
-}
 
 /** Mode + action row for the mesh being edited (setup-mode geometry tools). */
 function MeshToolsRow({ slotName, attName }: { slotName: string; attName: string }) {
@@ -113,99 +96,24 @@ function MeshToolsRow({ slotName, attName }: { slotName: string; attName: string
   );
 }
 
-/** Weights controls for the mesh being edited (bind bones, pick paint bone). */
+/** Weights status + shortcut to the floating Weights window. */
 function WeightsSection({ slotName, attName }: { slotName: string; attName: string }) {
   const revision = useEditor((s) => s.revision);
+  void revision;
   const doc = useEditor((s) => s.doc);
   const meshEdit = useEditor((s) => s.meshEdit);
-  void revision;
-  const [chosen, setChosen] = useState<string[]>([]);
-
   const att = doc.data.skins.find((s) => s.name === 'default')?.attachments?.[slotName]?.[attName];
   if (!att || att.type !== 'mesh' || !meshEdit) return null;
-  const count = meshVertexCount(att);
-  const weighted = isWeightedVertices(att.vertices, count);
-  const bones = doc.data.bones;
-
-  if (!weighted) {
-    return (
-      <>
-        <div className="panel-title">Weights</div>
-        <div className="empty">
-          Pick bones, then bind — vertices get distance-based weights and follow the bones.
-        </div>
-        <div className="bone-checks">
-          {bones.map((b) => (
-            <label key={b.name}>
-              <input
-                type="checkbox"
-                checked={chosen.includes(b.name)}
-                onChange={(e) =>
-                  setChosen((prev) =>
-                    e.target.checked ? [...prev, b.name] : prev.filter((n) => n !== b.name),
-                  )
-                }
-              />
-              {b.name}
-            </label>
-          ))}
-        </div>
-        <button
-          disabled={chosen.length === 0}
-          onClick={() => {
-            const state = useEditor.getState();
-            try {
-              const weightedVerts = autoWeightVertices(
-                state.doc.data,
-                slotName,
-                att.vertices,
-                chosen,
-              );
-              if (
-                state.execute(
-                  new SetAttachmentVertices('default', slotName, attName, weightedVerts),
-                )
-              ) {
-                state.setMeshEditMode('weights');
-                state.setPaintBone(chosen[0] ?? null);
-              }
-            } catch (err) {
-              state.setError(err instanceof Error ? err.message : String(err));
-            }
-          }}
-        >
-          Bind + Auto Weights
-        </button>
-      </>
-    );
-  }
-
-  const influences = influenceBoneIndices(att.vertices)
-    .map((i) => bones[i]?.name)
-    .filter((n): n is string => n !== undefined);
+  const weighted = isWeightedVertices(att.vertices, meshVertexCount(att));
   return (
     <>
       <div className="panel-title">Weights</div>
       <div className="empty">
-        Pick a bone and drag over vertices in the viewport to paint its influence (blue = 0, red =
-        1).
+        {weighted
+          ? 'Weighted mesh — use the Weights window to paint and adjust.'
+          : 'Unweighted — open the Weights window to bind bones.'}
       </div>
-      <div className="bone-checks">
-        {influences.map((name) => (
-          <label key={name}>
-            <input
-              type="radio"
-              name="paint-bone"
-              checked={meshEdit.paintBone === name}
-              onChange={() => {
-                useEditor.getState().setPaintBone(name);
-                useEditor.getState().setMeshEditMode('weights');
-              }}
-            />
-            {name}
-          </label>
-        ))}
-      </div>
+      <button onClick={() => useEditor.getState().setMeshEditMode('weights')}>Weights…</button>
     </>
   );
 }

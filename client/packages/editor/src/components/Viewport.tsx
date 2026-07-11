@@ -13,6 +13,7 @@ import {
   applyLinear,
   applyMat,
   boneWeightPerVertex,
+  boundBoneIndices,
   computeAnimatedAttachments,
   computeAnimatedColors,
   computeAnimatedDeforms,
@@ -24,6 +25,7 @@ import {
   getAnimationDuration,
   invertMat,
   isWeightedVertices,
+  meshVertexCount,
   removeMeshVertex,
   type BoneData,
   type Command,
@@ -37,6 +39,7 @@ import { primarySelection, uniqueName, useEditor, type SelectionItem } from '../
 import { SceneRenderer, attachmentVertexCount, type RenderInput } from '../viewport/renderer.js';
 import { Breadcrumb } from './Breadcrumb.js';
 import { ModeBanner } from './ModeBanner.js';
+import { WEIGHT_COLORS } from './weight-colors.js';
 import { ToolCluster } from './ToolCluster.js';
 import { ZoomControl } from './ZoomControl.js';
 
@@ -45,6 +48,26 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 
 function makeKey(time: number, fields: Omit<SpineBoneKey, 'time'>): SpineBoneKey {
   return time > 0 ? { time: round2(time), ...fields } : { ...fields };
+}
+
+/** Bound bones → palette colors for the weights overlay (order = boundBoneIndices). */
+function weightColorMap(
+  state: ReturnType<typeof useEditor.getState>,
+): Map<string, number> | undefined {
+  const edit = state.meshEdit;
+  if (!edit) return undefined;
+  const att = state.doc.data.skins.find((s) => s.name === 'default')?.attachments?.[edit.slot]?.[
+    edit.attachment
+  ];
+  if (!att || att.type !== 'mesh') return undefined;
+  const count = meshVertexCount(att);
+  if (!isWeightedVertices(att.vertices, count)) return undefined;
+  const map = new Map<string, number>();
+  boundBoneIndices(att.vertices, count).forEach((bi, i) => {
+    const name = state.doc.data.bones[bi]?.name;
+    if (name) map.set(name, WEIGHT_COLORS[i % WEIGHT_COLORS.length]!);
+  });
+  return map;
 }
 
 type DragState =
@@ -201,6 +224,7 @@ export function Viewport() {
             attachment: state.meshEdit.attachment,
             overrideVertices: editVertsRef.current ?? undefined,
             weightBone: state.meshEdit.mode === 'weights' ? state.meshEdit.paintBone : null,
+            weightColors: state.meshEdit.mode === 'weights' ? weightColorMap(state) : undefined,
           }
         : undefined,
       activeSkin: state.activeSkin,

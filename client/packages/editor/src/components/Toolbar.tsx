@@ -1,5 +1,5 @@
 import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { saveProjectFile } from '../state/actions.js';
@@ -19,6 +19,7 @@ import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
 import { GhostingWindow } from './GhostingWindow.js';
 import { PreviewWindow } from './PreviewWindow.js';
+import { WeightsWindow } from './WeightsWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
@@ -36,6 +37,12 @@ export function Toolbar() {
   const [showViews, setShowViews] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showGhosting, setShowGhosting] = useState(false);
+  const [showWeights, setShowWeights] = useState(false);
+  const meshEditMode = useEditor((s) => s.meshEdit?.mode ?? null);
+  const hasMeshEdit = meshEditMode !== null;
+  useEffect(() => {
+    if (meshEditMode === 'weights') setShowWeights(true);
+  }, [meshEditMode]);
   const dirty = useEditor((s) => s.revision !== s.savedRevision);
   const panels = useEditor((s) => s.panelVisibility);
   const serverProjectName = useServer((s) => s.projectName);
@@ -256,6 +263,15 @@ export function Toolbar() {
               />
               Ghosting
             </label>
+            <label className="views-item">
+              <input
+                type="checkbox"
+                checked={showWeights}
+                disabled={!hasMeshEdit}
+                onChange={() => setShowWeights((v) => !v)}
+              />
+              Weights
+            </label>
           </div>
         )}
       </div>
@@ -308,6 +324,7 @@ export function Toolbar() {
       {showChat && <ChatWindow onClose={() => setShowChat(false)} />}
       {showPreview && <PreviewWindow onClose={() => setShowPreview(false)} />}
       {showGhosting && <GhostingWindow onClose={() => setShowGhosting(false)} />}
+      {showWeights && <WeightsWindow onClose={() => setShowWeights(false)} />}
     </div>
   );
 }
