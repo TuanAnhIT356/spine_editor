@@ -167,11 +167,13 @@ export function TimelinePanel() {
       const s = useEditor.getState();
       const a = s.anim.current ? s.doc.getAnimation(s.anim.current) : undefined;
       const dur = a ? Math.max(getAnimationDuration(a), 0.001) : 1;
+      const start = s.anim.loopStart ?? 0;
+      const end = s.anim.loopEnd ?? dur;
       let t = s.anim.time + dt * s.anim.speed;
-      if (t > dur) {
-        if (s.anim.loop) t %= dur;
+      if (t > end) {
+        if (s.anim.loop) t = start + ((t - start) % Math.max(end - start, 0.001));
         else {
-          s.setAnimTime(dur);
+          s.setAnimTime(end);
           s.setPlaying(false);
           return;
         }
@@ -249,6 +251,16 @@ export function TimelinePanel() {
     }
     setSelectedKeys(next);
     return next;
+  }
+
+  function jumpToKey(dir: -1 | 1) {
+    const times = [...new Set(boneTracks.flatMap((t) => t.keys.map((k) => k.time ?? 0)))].sort(
+      (a, b) => a - b,
+    );
+    const t = useEditor.getState().anim.time;
+    const next =
+      dir === 1 ? times.find((x) => x > t + 1e-6) : [...times].reverse().find((x) => x < t - 1e-6);
+    if (next !== undefined) useEditor.getState().setAnimTime(next);
   }
 
   function deleteSelectedKeys() {
@@ -495,6 +507,16 @@ export function TimelinePanel() {
         <span className="sep" />
         <button
           disabled={!anim.current}
+          title="Go to start"
+          onClick={() => useEditor.getState().setAnimTime(useEditor.getState().anim.loopStart ?? 0)}
+        >
+          ⏮
+        </button>
+        <button disabled={!anim.current} title="Previous key" onClick={() => jumpToKey(-1)}>
+          ◀|
+        </button>
+        <button
+          disabled={!anim.current}
           title="Previous frame (←)"
           onClick={() => useEditor.getState().stepFrame(-1)}
         >
@@ -513,6 +535,16 @@ export function TimelinePanel() {
           onClick={() => useEditor.getState().stepFrame(1)}
         >
           ⏵
+        </button>
+        <button disabled={!anim.current} title="Next key" onClick={() => jumpToKey(1)}>
+          |▶
+        </button>
+        <button
+          disabled={!anim.current}
+          title="Go to end"
+          onClick={() => useEditor.getState().setAnimTime(duration)}
+        >
+          ⏭
         </button>
         <button
           className={anim.loop ? 'active' : ''}
@@ -541,6 +573,54 @@ export function TimelinePanel() {
         <span className="time-display">
           {anim.time.toFixed(2)}s · f{frame} / {duration.toFixed(2)}s
         </span>
+        <label className="tl-field">
+          <span>Current</span>
+          <input
+            type="number"
+            value={frame}
+            onChange={(e) => useEditor.getState().setAnimTime(Number(e.target.value) / 30)}
+          />
+        </label>
+        <label className="tl-field">
+          <span>Loop Start</span>
+          <input
+            type="number"
+            value={anim.loopStart !== null ? Math.round(anim.loopStart * 30) : ''}
+            placeholder="—"
+            onChange={(e) =>
+              useEditor
+                .getState()
+                .setLoopRange(
+                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                  anim.loopEnd,
+                )
+            }
+          />
+        </label>
+        <label className="tl-field">
+          <span>End</span>
+          <input
+            type="number"
+            value={anim.loopEnd !== null ? Math.round(anim.loopEnd * 30) : ''}
+            placeholder="—"
+            onChange={(e) =>
+              useEditor
+                .getState()
+                .setLoopRange(
+                  anim.loopStart,
+                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                )
+            }
+          />
+        </label>
+        {(anim.loopStart !== null || anim.loopEnd !== null) && (
+          <button
+            title="Clear loop range"
+            onClick={() => useEditor.getState().setLoopRange(null, null)}
+          >
+            ✕
+          </button>
+        )}
         <span className="sep" />
         <button onClick={() => zoomBy(1 / 1.2)} title="Zoom out (Ctrl/Cmd+Scroll)">
           −
@@ -669,6 +749,15 @@ export function TimelinePanel() {
               onPointerMove={(e) => scrubbing.current && onScrub(e)}
               onPointerUp={() => (scrubbing.current = false)}
             >
+              {anim.loopEnd !== null && (
+                <span
+                  className="loop-range"
+                  style={{
+                    left: PAD + (anim.loopStart ?? 0) * pps,
+                    width: Math.max((anim.loopEnd - (anim.loopStart ?? 0)) * pps, 0),
+                  }}
+                />
+              )}
               {tickTimes(span, pps).map((t) => (
                 <span key={t} className="tick" style={{ left: PAD + t * pps }}>
                   {t.toFixed(2)}

@@ -1399,3 +1399,25 @@ button.active {
   font-size: 12px;
   width: 120px;
 }
+
+/* ---- timeline phase 17 ---- */
+
+.tl-field {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.tl-field input {
+  width: 56px;
+}
+
+.loop-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-soft);
+  opacity: 0.35;
+  pointer-events: none;
+}
