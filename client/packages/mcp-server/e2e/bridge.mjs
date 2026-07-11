@@ -87,6 +87,9 @@ const ikAfterRemove = (await call('get_skeleton_tree')).ik ?? [];
 await call('undo');
 const ikAfterUndo = (await call('get_skeleton_tree')).ik ?? [];
 
+await call('set_ik_constraint', { name: 'arm-ik', mix: 0.5 });
+const ikAfterSet = (await call('get_skeleton_tree')).ik ?? [];
+
 await call('create_animation', { name: 'wave' });
 await call('set_bone_keyframe', {
   animation: 'wave',
@@ -290,6 +293,7 @@ console.log(
       previewDuration: preview.duration,
       bones: tree.bones.map((b) => b.name),
       ik: tree.ik,
+      setIkWorks: ikAfterSet.some((c) => c.name === 'arm-ik' && c.mix === 0.5),
       removeConstraintWorks:
         !ikAfterRemove.some((c) => (c.name ?? c) === 'arm-ik') &&
         ikAfterUndo.some((c) => (c.name ?? c) === 'arm-ik'),

@@ -66,6 +66,8 @@ points down), so child bones sit at `x = parent.length`.
 - Remove a constraint with `remove_ik_constraint` / `remove_transform_constraint` /
   `remove_path_constraint` / `remove_physics_constraint` (blocked while an
   animation keys it — delete those keys first). Removal is undoable.
+  Tweak one in place with set_{ik,transform,path,physics}_constraint
+  (patch semantics — only passed fields change; undoable).
 
 ## Meshes, weights, clipping (advanced rigging)
 
