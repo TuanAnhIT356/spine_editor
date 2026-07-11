@@ -31,8 +31,10 @@ import { useEffect, useRef, useState } from 'react';
 import { bridgeRuntime } from '../bridge/runtime.js';
 import { primarySelection, uniqueName, useEditor, type SelectionItem } from '../state/store.js';
 import { SceneRenderer, attachmentVertexCount, type RenderInput } from '../viewport/renderer.js';
+import { Breadcrumb } from './Breadcrumb.js';
 import { ModeBanner } from './ModeBanner.js';
 import { ToolCluster } from './ToolCluster.js';
+import { ZoomControl } from './ZoomControl.js';
 
 const RAD_DEG = 180 / Math.PI;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -859,7 +861,9 @@ export function Viewport() {
         />
       )}
       <ModeBanner />
+      <Breadcrumb />
       <ToolCluster />
+      <ZoomControl getRenderer={() => rendererRef.current} />
     </div>
   );
 }

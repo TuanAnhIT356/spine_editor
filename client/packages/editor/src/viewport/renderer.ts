@@ -225,12 +225,21 @@ export class SceneRenderer {
     this.applyCamera();
   }
 
+  onZoomChange: ((zoom: number) => void) | null = null;
+
   zoomAt(sx: number, sy: number, factor: number): void {
     const w = this.screenToWorld(sx, sy);
     this.zoom = Math.min(20, Math.max(0.05, this.zoom * factor));
     this.offsetX = sx - w.x * this.zoom;
     this.offsetY = sy + w.y * this.zoom;
     this.applyCamera();
+    this.onZoomChange?.(this.zoom);
+  }
+
+  /** Zooms around the viewport center (drives the zoom slider). */
+  setZoomCenter(zoom: number): void {
+    const clamped = Math.min(20, Math.max(0.05, zoom));
+    this.zoomAt(this.app.screen.width / 2, this.app.screen.height / 2, clamped / this.zoom);
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
