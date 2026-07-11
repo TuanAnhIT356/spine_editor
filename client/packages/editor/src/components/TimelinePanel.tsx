@@ -60,6 +60,18 @@ const sameKey = (a: KeyRef, b: KeyRef) =>
 const TICK_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60];
 
 /** Ruler tick times, spaced so ticks stay ~60px apart regardless of zoom. */
+const TIMELINE_TYPES = [
+  'rotate',
+  'translate',
+  'scale',
+  'shear',
+  'color',
+  'attachment',
+  'deform',
+  'draworder',
+  'event',
+];
+
 function tickTimes(span: number, pps: number): number[] {
   const targetPx = 60;
   const rawInterval = targetPx / pps;
@@ -90,6 +102,11 @@ export function TimelinePanel() {
   const [pps, setPps] = useState(DEFAULT_PPS);
   const [tab, setTab] = useState<'dopesheet' | 'graph'>('dopesheet');
   const [sync, setSync] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<Set<string> | null>(null);
+  const [locked, setLocked] = useState<string[] | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [shiftText, setShiftText] = useState('1');
+  const [offsetText, setOffsetText] = useState('1');
   /** Key shown in the Graph tab; frozen while Sync is off. */
   const graphKeyRef = useRef<KeyRef | null>(null);
   const [scaleText, setScaleText] = useState('1.5');
@@ -110,8 +127,14 @@ export function TimelinePanel() {
       keys: timelines[tl]!,
     })),
   );
-  const drawOrderKeys = animation?.drawOrder ?? [];
-  const eventKeys = animation?.events ?? [];
+  const visibleTracks = boneTracks.filter((t) => {
+    if (typeFilter && !typeFilter.has(t.timeline)) return false;
+    if (locked && !locked.includes(`${t.bone}.${t.timeline}`)) return false;
+    return true;
+  });
+  const drawOrderKeys =
+    typeFilter && !typeFilter.has('draworder') ? [] : (animation?.drawOrder ?? []);
+  const eventKeys = typeFilter && !typeFilter.has('event') ? [] : (animation?.events ?? []);
   const primaryKey = selectedKeys.length > 0 ? selectedKeys[selectedKeys.length - 1]! : null;
 
   /** Zooms the timeline, keeping the time under `anchorClientX` fixed on screen. */
@@ -513,6 +536,78 @@ export function TimelinePanel() {
         >
           Sync
         </button>
+        <div className="menu-wrap">
+          <button
+            className={typeFilter ? 'tl-sync active' : 'tl-sync'}
+            onClick={() => setShowFilter((v) => !v)}
+          >
+            Filter ▾
+          </button>
+          {showFilter && (
+            <div className="dropdown">
+              {TIMELINE_TYPES.map((t) => (
+                <label key={t} className="views-item">
+                  <input
+                    type="checkbox"
+                    checked={!typeFilter || typeFilter.has(t)}
+                    onChange={(e) => {
+                      const next = new Set(typeFilter ?? TIMELINE_TYPES);
+                      if (e.target.checked) next.add(t);
+                      else next.delete(t);
+                      setTypeFilter(next.size === TIMELINE_TYPES.length ? null : next);
+                    }}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          className={locked ? 'tl-sync active' : 'tl-sync'}
+          title="Freeze the current row list"
+          onClick={() =>
+            setLocked(locked ? null : boneTracks.map((t) => `${t.bone}.${t.timeline}`))
+          }
+        >
+          Lock
+        </button>
+        <span className="tl-field">
+          <span>Shift</span>
+          <input value={shiftText} onChange={(e) => setShiftText(e.target.value)} />
+          <button
+            disabled={selectedKeys.length === 0}
+            title="Move the selected keys by ±frames"
+            onClick={() => {
+              const frames = Number(shiftText);
+              if (Number.isFinite(frames) && frames !== 0) commitKeyDrag(frames / 30);
+            }}
+          >
+            Apply
+          </button>
+        </span>
+        <span className="tl-field">
+          <span>Offset</span>
+          <input value={offsetText} onChange={(e) => setOffsetText(e.target.value)} />
+          <button
+            disabled={!anim.current}
+            title="Shift every bone key of the animation by ±frames (fails on collisions)"
+            onClick={() => {
+              const frames = Number(offsetText);
+              if (!Number.isFinite(frames) || frames === 0 || !anim.current) return;
+              const refs = boneTracks.flatMap((t) =>
+                t.keys.map((k) => ({ bone: t.bone, timeline: t.timeline, time: k.time ?? 0 })),
+              );
+              if (refs.length > 0) {
+                useEditor
+                  .getState()
+                  .execute(new TransformBoneKeys(anim.current, refs, { offset: frames / 30 }));
+              }
+            }}
+          >
+            Apply
+          </button>
+        </span>
       </div>
       <div className="timeline-header">
         <select
@@ -785,7 +880,7 @@ export function TimelinePanel() {
                 </span>
               ))}
             </div>
-            {boneTracks.map((track) => (
+            {visibleTracks.map((track) => (
               <div key={`${track.bone}.${track.timeline}`} className="track">
                 <span className="track-label">
                   {track.bone} · {track.timeline}
