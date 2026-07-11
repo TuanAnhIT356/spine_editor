@@ -14,6 +14,7 @@ import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
 import { AtlasDialog } from './AtlasDialog.js';
+import { ExportAnimationDialog } from './ExportAnimationDialog.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
@@ -45,6 +46,8 @@ export function Toolbar() {
   const [showColor, setShowColor] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [showAtlas, setShowAtlas] = useState(false);
+  const [showExportAnim, setShowExportAnim] = useState(false);
+  const animCurrent = useEditor((s) => s.anim.current);
   useEffect(() => {
     const open = () => setShowColor(true);
     window.addEventListener('spine-editor:open-color', open);
@@ -156,6 +159,12 @@ export function Toolbar() {
             <hr />
             <button onClick={onExportJson}>Export JSON</button>
             <button onClick={() => setShowAtlas(true)}>Export Atlas</button>
+            <button
+              disabled={mode !== 'animate' || !animCurrent}
+              onClick={() => setShowExportAnim(true)}
+            >
+              Export Animation…
+            </button>
           </div>
         )}
       </div>
@@ -349,6 +358,7 @@ export function Toolbar() {
       {showSettings && <SettingsWindow onClose={() => setShowSettings(false)} />}
       {showColor && <ColorWindow onClose={() => setShowColor(false)} />}
       {showMetrics && <MetricsWindow onClose={() => setShowMetrics(false)} />}
+      {showExportAnim && <ExportAnimationDialog onClose={() => setShowExportAnim(false)} />}
       {showAtlas && (
         <AtlasDialog
           onExport={(o) => {
