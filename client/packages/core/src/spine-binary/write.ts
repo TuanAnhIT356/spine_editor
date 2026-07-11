@@ -316,8 +316,8 @@ function writeAttachment(sw: SkelWriter, att: SpineAttachment): void {
       w.float32(a.y ?? 0);
       w.float32(a.scaleX ?? 1);
       w.float32(a.scaleY ?? 1);
-      w.float32(a.width ?? 32);
-      w.float32(a.height ?? 32);
+      w.float32(a.width ?? 0);
+      w.float32(a.height ?? 0);
       w.color8888(a.color ?? 'ffffffff');
       writeSequence(w, a.sequence);
       break;

@@ -406,9 +406,9 @@ function readAttachment(sr: SkelReader, data: SkeletonData): SpineAttachment {
       const scaleY = r.float32();
       if (scaleY !== 1) a.scaleY = scaleY;
       const width = r.float32();
-      if (width !== 32) a.width = width;
+      if (width !== 0) a.width = width;
       const height = r.float32();
-      if (height !== 32) a.height = height;
+      if (height !== 0) a.height = height;
       const color = r.color8888();
       if (color !== 'ffffffff') a.color = color;
       const seq = readSequence(r);
