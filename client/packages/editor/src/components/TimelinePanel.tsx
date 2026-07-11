@@ -880,11 +880,74 @@ export function TimelinePanel() {
                 </span>
               ))}
             </div>
+            <div className="track summary-row">
+              <span className="track-label">{anim.current}</span>
+              {[
+                ...new Set([
+                  ...visibleTracks.flatMap((t) => t.keys.map((k) => k.time ?? 0)),
+                  ...drawOrderKeys.map((k) => k.time ?? 0),
+                  ...eventKeys.map((k) => k.time ?? 0),
+                ]),
+              ].map((t) => (
+                <span key={t} className="summary-diamond" style={{ left: PAD + t * pps - 3 }} />
+              ))}
+            </div>
+            {Object.entries(
+              visibleTracks.reduce<Record<string, Map<number, Set<string>>>>((acc, t) => {
+                const m = (acc[t.bone] ??= new Map());
+                for (const k of t.keys) {
+                  const time = k.time ?? 0;
+                  if (!m.has(time)) m.set(time, new Set());
+                  m.get(time)!.add(t.timeline);
+                }
+                return acc;
+              }, {}),
+            ).map(([bone, times]) => (
+              <div key={`sum-${bone}`} className="track bone-summary">
+                <span className="track-label">{bone}</span>
+                {[...times.entries()].map(([t, types]) => (
+                  <span
+                    key={t}
+                    className={`key ${types.size > 1 ? 'key-multi' : `key-${[...types][0]}`}`}
+                    style={{ left: PAD + t * pps - 5 }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      const refs = [...types].map((timeline) => ({
+                        bone,
+                        timeline: timeline as KeyRef['timeline'],
+                        time: t,
+                      }));
+                      setSelectedKeys(refs);
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
             {visibleTracks.map((track) => (
               <div key={`${track.bone}.${track.timeline}`} className="track">
                 <span className="track-label">
                   {track.bone} · {track.timeline}
                 </span>
+                <svg className="track-lines">
+                  {track.keys.slice(0, -1).map((key, i) => {
+                    const a = (key.time ?? 0) * pps + PAD;
+                    const b = (track.keys[i + 1]!.time ?? 0) * pps + PAD;
+                    const stepped = key.curve === 'stepped';
+                    const bezier = Array.isArray(key.curve);
+                    return (
+                      <line
+                        key={i}
+                        x1={a}
+                        y1={12}
+                        x2={b}
+                        y2={12}
+                        className={`conn conn-${track.timeline}`}
+                        strokeDasharray={stepped ? '3 3' : undefined}
+                        strokeWidth={bezier ? 2 : 1}
+                      />
+                    );
+                  })}
+                </svg>
                 {track.keys.map((key) => {
                   const t = key.time ?? 0;
                   const ref: KeyRef = { bone: track.bone, timeline: track.timeline, time: t };
@@ -894,7 +957,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={t}
-                      className={`key ${isSelected ? 'selected' : ''}`}
+                      className={`key key-${track.timeline} ${isSelected ? 'selected' : ''}`}
                       style={{ left: x - 5 }}
                       onPointerDown={(e) => {
                         e.stopPropagation();
@@ -938,7 +1001,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={t}
-                      className={`key draworder ${isSelected ? 'selected' : ''}`}
+                      className={`key draworder key-draworder ${isSelected ? 'selected' : ''}`}
                       title={`draw order (${key.offsets?.length ?? 0} offsets)`}
                       style={{ left: PAD + t * pps - 5 }}
                       onPointerDown={(e) => {
@@ -963,7 +1026,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={`${key.name}@${t}`}
-                      className={`key event ${isSelected ? 'selected' : ''}`}
+                      className={`key event key-event ${isSelected ? 'selected' : ''}`}
                       title={key.name}
                       style={{ left: PAD + t * pps - 5 }}
                       onPointerDown={(e) => {

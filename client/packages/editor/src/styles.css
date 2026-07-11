@@ -1445,3 +1445,94 @@ button.active {
 .tl-sync.active {
   background: var(--accent-soft);
 }
+
+/* ---- Spine-style key ticks ---- */
+
+.key.key-rotate {
+  background: #7bd47b;
+  border-color: #4e9c4e;
+}
+.key.key-translate {
+  background: #6fa8dc;
+  border-color: #46759f;
+}
+.key.key-scale {
+  background: #e06666;
+  border-color: #a33f3f;
+}
+.key.key-shear {
+  background: #d5a6bd;
+  border-color: #9c6f87;
+}
+.key.key-color {
+  background: #ffd966;
+  border-color: #bd9c37;
+}
+.key.key-attachment {
+  background: #e0e0e0;
+  border-color: #9c9c9c;
+}
+.key.key-deform {
+  background: #b4a7d6;
+  border-color: #7d6fa0;
+}
+.key.key-draworder,
+.key.key-event {
+  background: #f0a252;
+  border-color: #b5711f;
+}
+.key.key-multi {
+  background: #ffffff;
+  border-color: #bbbbbb;
+}
+.key.selected {
+  background: #ffd48a;
+  border-color: #ffb020;
+}
+
+.track {
+  position: relative;
+}
+
+.track-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.conn {
+  stroke: #8a8a8a;
+  opacity: 0.6;
+}
+.conn-rotate {
+  stroke: #7bd47b;
+}
+.conn-translate {
+  stroke: #6fa8dc;
+}
+.conn-scale {
+  stroke: #e06666;
+}
+.conn-shear {
+  stroke: #d5a6bd;
+}
+
+.summary-row .track-label {
+  font-weight: 600;
+}
+
+.summary-diamond {
+  position: absolute;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  background: #e05555;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.bone-summary {
+  background: rgba(255, 255, 255, 0.03);
+}
