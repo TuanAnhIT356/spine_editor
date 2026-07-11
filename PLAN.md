@@ -562,3 +562,25 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 - **License**: SAM 2 Apache-2.0, rembg MIT, MediaPipe Apache-2.0 — tương thích license
   Apache-2.0 của repo. Vẫn tuyệt đối không nhúng Spine Runtimes.
 - **CI không có key/GPU** → provider mock + fixture ảnh nhỏ cho unit/e2e.
+
+## 8. Spine-parity: giao diện + features theo Spine 2D (Phase 15–22)
+
+> Nghiên cứu 07/2026: spine-in-depth, spine-user-guide, spine-ui, spine-tools,
+> spine-preview, spine-dopesheet + 5 screenshot UI gốc. Chi tiết gap matrix và đặc tả
+> từng phase: `docs/superpowers/specs/2026-07-11-spine-parity-roadmap-and-ui-shell-design.md`.
+> Nguyên tắc: nhái bố cục/hành vi, TỰ VẼ icon SVG riêng (không copy asset Esoteric);
+> core chỉ thêm; mỗi phase một spec→plan→PR; 4 e2e xanh sau mỗi phase.
+
+| Phase  | Tên                           | Nội dung chính                                                                                                                                                                                                                                                   |
+| ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **15** | UI Shell (U1)                 | Theme token, titlebar (menu ☰ + icon Open/Save/Undo/Redo + tên project + Views ▾), mode banner trong viewport, cụm tool đáy viewport (6 tool + ô số Rotate/Translate/Scale/Shear + trục Local/Parent/World + filter matrix + Auto Key), breadcrumb, zoom slider |
+| **16** | Unified Tree (U2)             | Tree hợp nhất bên phải (bones lồng slots/attachments + sections Constraints/Skins/Events/Animations/Images), cột visibility, icon màu, search/filter, rename inline, context menu; properties dock đáy tree theo selection; thay Hierarchy+Properties            |
+| **17** | Animate dock (U3)             | Tab Graph/Dopesheet + toolbar (Sync, copy/paste key, filter, lock, Shift/Offset/Adjust, Current/Loop Start/End) + transport; key tick màu theo loại timeline, trắng khi trùng frame, đường nối theo interpolation, hàng tổng diamond                             |
+| **18** | Preview + Playback + Ghosting | Bộ trộn track trong core (speed/mix/repeat/alpha/hold-previous/additive, 4 track); view Preview, Playback, Ghosting                                                                                                                                              |
+| **19** | Weights view + Mesh tools     | Panel Weights chuẩn Spine (Influence/Prune, Direct/Update, Smooth/Auto/Weld, bảng bones màu, Bind/Swap/Remove); add/remove mesh vertex (đóng gap §6); Mesh Tools                                                                                                 |
+| **20** | Audio view                    | Asset audio, waveform trong dopesheet, event volume/balance, scrub có tiếng                                                                                                                                                                                      |
+| **21** | Views phụ + polish            | Slot Color view; tint black (model+serializer+renderer); Metrics view; Welcome screen; Settings; hotkeys Spine-style (B/N/G/C/V/X/Z)                                                                                                                             |
+| **22** | IO pack                       | PSD import (@webtoon/psd), binary .skel import/export, video/PNG-sequence export, Texture Packer settings dialog                                                                                                                                                 |
+
+Ngoài phạm vi (chờ quyết định riêng): Sliders constraint (đòi format 4.3 — ta target
+4.2), multiple skeletons/project, CLI, Skeleton Viewer.
