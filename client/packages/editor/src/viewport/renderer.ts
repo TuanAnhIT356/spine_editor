@@ -47,6 +47,9 @@ export interface RenderInput {
   ghosts?: { bones: BoneData[]; color: number }[];
   /** Path-constraint timeline values at the playhead (animate mode). */
   pathOverrides?: ReadonlyMap<string, PathPoseValue>;
+  /** Editor-only viewport hiding (tree visibility dots): skip drawing/picking. */
+  hiddenBones?: Set<string>;
+  hiddenSlots?: Set<string>;
   /** Skin used to resolve attachments (falls back to "default"). */
   activeSkin?: string;
   /** Attachment being vertex-edited: draws handles (and a weight heatmap). */
@@ -179,6 +182,8 @@ export class SceneRenderer {
   private labelLayer = new Container();
   private labels = new Map<string, Text>();
   private viewFilters: ViewFilters | null = null;
+  private hiddenBones: Set<string> | null = null;
+  private hiddenSlots: Set<string> | null = null;
 
   ready = false;
   offsetX = 0;
@@ -273,6 +278,7 @@ export class SceneRenderer {
     let best: string | null = null;
     let bestDist = 12 / this.zoom;
     for (const [name, m] of this.lastPose) {
+      if (this.hiddenBones?.has(name)) continue;
       const d = Math.hypot(m.tx - w.x, m.ty - w.y);
       if (d <= bestDist) {
         bestDist = d;
@@ -310,6 +316,8 @@ export class SceneRenderer {
 
   async render(input: RenderInput): Promise<void> {
     if (!this.ready) return;
+    this.hiddenBones = input.hiddenBones ?? null;
+    this.hiddenSlots = input.hiddenSlots ?? null;
     const data = input.bonesOverride ? { ...input.data, bones: input.bonesOverride } : input.data;
     const pose = computePose(data, undefined, undefined, input.pathOverrides);
     this.lastPose = pose;
@@ -339,6 +347,10 @@ export class SceneRenderer {
     };
 
     for (const slot of slotsInOrder) {
+      if (this.hiddenSlots?.has(slot.name)) {
+        endClipAfter(slot.name);
+        continue;
+      }
       const attachmentName = input.slotAttachments?.has(slot.name)
         ? input.slotAttachments.get(slot.name)
         : slot.attachment;
@@ -476,13 +488,14 @@ export class SceneRenderer {
     };
     if (this.viewFilters?.bones.labels) {
       for (const b of data.bones) {
+        if (this.hiddenBones?.has(b.name)) continue;
         const m = pose.get(b.name);
         if (m) put(`bone:${b.name}`, b.name, m.tx, m.ty, -18);
       }
     }
     if (this.viewFilters?.images.labels) {
       for (const s of data.slots) {
-        if (!s.attachment) continue;
+        if (!s.attachment || this.hiddenSlots?.has(s.name)) continue;
         const m = pose.get(s.bone);
         if (m) put(`slot:${s.name}`, s.attachment, m.tx, m.ty, 6);
       }
@@ -654,6 +667,7 @@ export class SceneRenderer {
     const g = this.boneLayer;
     g.clear();
     for (const bone of bones) {
+      if (this.hiddenBones?.has(bone.name)) continue;
       const m = pose.get(bone.name);
       if (!m) continue;
       const selected = selection.some((s) => s.kind === 'bone' && s.name === bone.name);

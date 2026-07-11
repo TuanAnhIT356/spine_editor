@@ -2,121 +2,23 @@ import {
   AddSkinAttachment,
   AddSlot,
   Composite,
-  RemoveBone,
   RemoveSkinAttachment,
-  RenameBone,
   ReorderSlot,
   SetAttachmentVertices,
-  SetBoneTransform,
   SetSlotProperties,
   autoWeightVertices,
   createSlot,
   isWeightedVertices,
   meshVertexCount,
-  type BoneTransformPatch,
   type Command,
   type SpineAttachment,
   type SpineBlendMode,
   type SpineClippingAttachment,
   type SpinePointAttachment,
 } from '@spine-editor/core';
-import { useEffect, useState } from 'react';
-import { primarySelection, uniqueName, useEditor } from '../state/store.js';
-
-function NumField({
-  label,
-  value,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  onCommit: (v: number) => void;
-}) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
-  const commit = () => {
-    const v = Number(text);
-    if (Number.isFinite(v) && v !== value) onCommit(v);
-    else setText(String(value));
-  };
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input
-        type="number"
-        step="1"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      />
-    </label>
-  );
-}
-
-function BoneProperties({ name }: { name: string }) {
-  const revision = useEditor((s) => s.revision);
-  const doc = useEditor((s) => s.doc);
-  void revision;
-  const bone = doc.findBone(name);
-  const [renameText, setRenameText] = useState(name);
-  useEffect(() => setRenameText(name), [name]);
-  if (!bone) return null;
-
-  const patch = (p: BoneTransformPatch) =>
-    useEditor.getState().execute(new SetBoneTransform(name, p));
-
-  const commitRename = () => {
-    const to = renameText.trim();
-    if (!to || to === name) {
-      setRenameText(name);
-      return;
-    }
-    if (useEditor.getState().execute(new RenameBone(name, to))) {
-      useEditor.getState().select({ kind: 'bone', name: to });
-    } else {
-      setRenameText(name);
-    }
-  };
-
-  return (
-    <>
-      <div className="panel-title">Bone</div>
-      <label className="field">
-        <span>Name</span>
-        <input
-          value={renameText}
-          disabled={bone.parent === null}
-          onChange={(e) => setRenameText(e.target.value)}
-          onBlur={commitRename}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        />
-      </label>
-      <NumField label="X" value={bone.x} onCommit={(x) => patch({ x })} />
-      <NumField label="Y" value={bone.y} onCommit={(y) => patch({ y })} />
-      <NumField
-        label="Rotation"
-        value={bone.rotation}
-        onCommit={(rotation) => patch({ rotation })}
-      />
-      <NumField label="Scale X" value={bone.scaleX} onCommit={(scaleX) => patch({ scaleX })} />
-      <NumField label="Scale Y" value={bone.scaleY} onCommit={(scaleY) => patch({ scaleY })} />
-      <NumField label="Length" value={bone.length} onCommit={(length) => patch({ length })} />
-      {bone.parent !== null && (
-        <button
-          className="danger"
-          onClick={() => {
-            if (useEditor.getState().execute(new RemoveBone(name))) {
-              useEditor.getState().select(null);
-            }
-          }}
-        >
-          Delete Bone
-        </button>
-      )}
-    </>
-  );
-}
+import { useState } from 'react';
+import { uniqueName, useEditor } from '../../../state/store.js';
+import { NumField } from './fields.js';
 
 const BLEND_MODES: SpineBlendMode[] = ['normal', 'additive', 'multiply', 'screen'];
 
@@ -430,7 +332,8 @@ function PointFields({
   );
 }
 
-function SlotProperties({ name }: { name: string }) {
+/** Slot properties form (moved verbatim from PropertiesPanel.SlotProperties). */
+export function SlotDock({ name }: { name: string }) {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   void revision;
@@ -485,20 +388,5 @@ function SlotProperties({ name }: { name: string }) {
         Delete Slot
       </button>
     </>
-  );
-}
-
-export function PropertiesPanel() {
-  const selection = useEditor((s) => s.selection);
-  const layout = useEditor((s) => s.layout);
-  const primary = primarySelection(selection);
-  const extraCount = selection.length > 1 ? selection.length - 1 : 0;
-  return (
-    <div className="panel properties" style={{ width: layout.propertiesWidth }}>
-      {!primary && <div className="empty">Select a bone or slot to edit its properties.</div>}
-      {extraCount > 0 && <div className="selection-count">+{extraCount} more selected</div>}
-      {primary?.kind === 'bone' && <BoneProperties name={primary.name} />}
-      {primary?.kind === 'slot' && <SlotProperties name={primary.name} />}
-    </div>
   );
 }

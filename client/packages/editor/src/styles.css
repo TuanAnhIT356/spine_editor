@@ -1287,3 +1287,88 @@ button.active {
   padding: 2px 6px;
   font-size: 11px;
 }
+
+/* ---- unified tree panel ---- */
+
+.tree-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tree-panel .tree {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tree-chips {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  align-items: center;
+}
+
+.chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  opacity: 0.5;
+}
+
+.chip.on {
+  opacity: 1;
+  background: var(--accent-soft);
+}
+
+.vis-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  padding: 0;
+  margin-right: 4px;
+  border: 1px solid var(--text-dim);
+  background: var(--text-dim);
+  flex: none;
+}
+
+.vis-dot.off {
+  background: transparent;
+}
+
+.type-icon {
+  display: inline-flex;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.row.attachment {
+  opacity: 0.85;
+}
+
+.skeleton-row {
+  font-weight: 600;
+}
+
+.tree-dock {
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding: 6px 8px;
+}
+
+.info-dock-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.info-kind {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.info-summary {
+  font-size: 12px;
+  margin-bottom: 8px;
+}

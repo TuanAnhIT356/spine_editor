@@ -38,7 +38,10 @@ export interface ViewFilters {
   images: GroupFilter;
   others: GroupFilter;
 }
-export type SelectionItem = { kind: 'bone' | 'slot'; name: string };
+export type SelectionItem = {
+  kind: 'bone' | 'slot' | 'ik' | 'transform' | 'path' | 'physics' | 'event' | 'animation';
+  name: string;
+};
 /** Zero or more selected items; the last entry is the "primary" one shown in the properties panel. */
 export type Selection = SelectionItem[];
 
@@ -149,9 +152,12 @@ interface EditorState {
   viewFilters: ViewFilters;
   /** When off, animate-mode edits are blocked instead of auto-keyed. */
   autoKey: boolean;
-  panelVisibility: { hierarchy: boolean; properties: boolean; timeline: boolean };
+  panelVisibility: { tree: boolean; timeline: boolean };
   /** revision at the last save/open — dirty indicator = revision !== savedRevision. */
   savedRevision: number;
+  /** Editor-only viewport hiding (never serialized): bone gizmos / slot sprites. */
+  hiddenBones: string[];
+  hiddenSlots: string[];
 
   setTool(tool: Tool): void;
   setMode(mode: 'setup' | 'animate'): void;
@@ -177,7 +183,9 @@ interface EditorState {
   setAxesMode(mode: AxesMode): void;
   toggleViewFilter(group: keyof ViewFilters, key: keyof GroupFilter): void;
   setAutoKey(on: boolean): void;
-  togglePanel(panel: 'hierarchy' | 'properties' | 'timeline'): void;
+  togglePanel(panel: 'tree' | 'timeline'): void;
+  toggleBoneHidden(name: string): void;
+  toggleSlotHidden(name: string): void;
   /** Marks the current revision as saved (clears the dirty indicator). */
   markSaved(): void;
   /** Steps the playhead by `frames` at 30fps, clamped to [0, duration]. */
@@ -218,8 +226,10 @@ export const useEditor = create<EditorState>()((set, get) => ({
     others: { select: true, visible: true, labels: false },
   },
   autoKey: true,
-  panelVisibility: { hierarchy: true, properties: true, timeline: true },
+  panelVisibility: { tree: true, timeline: true },
   savedRevision: 0,
+  hiddenBones: [],
+  hiddenSlots: [],
 
   setTool: (tool) => set({ tool }),
   setMode: (mode) =>
@@ -308,6 +318,18 @@ export const useEditor = create<EditorState>()((set, get) => ({
   togglePanel: (panel) =>
     set((s) => ({
       panelVisibility: { ...s.panelVisibility, [panel]: !s.panelVisibility[panel] },
+    })),
+  toggleBoneHidden: (name) =>
+    set((s) => ({
+      hiddenBones: s.hiddenBones.includes(name)
+        ? s.hiddenBones.filter((n) => n !== name)
+        : [...s.hiddenBones, name],
+    })),
+  toggleSlotHidden: (name) =>
+    set((s) => ({
+      hiddenSlots: s.hiddenSlots.includes(name)
+        ? s.hiddenSlots.filter((n) => n !== name)
+        : [...s.hiddenSlots, name],
     })),
   markSaved: () => set((s) => ({ savedRevision: s.revision })),
   stepFrame: (frames) =>

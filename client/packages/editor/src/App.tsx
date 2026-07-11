@@ -1,7 +1,6 @@
 import { RemoveBone } from '@spine-editor/core';
 import { useEffect, useState } from 'react';
-import { HierarchyPanel } from './components/HierarchyPanel.js';
-import { PropertiesPanel } from './components/PropertiesPanel.js';
+import { TreePanel } from './components/TreePanel.js';
 import { Resizer } from './components/Resizer.js';
 import { ShortcutsHelp } from './components/ShortcutsHelp.js';
 import { TimelinePanel } from './components/TimelinePanel.js';
@@ -113,17 +112,11 @@ export function App() {
     <div className="app">
       <Toolbar />
       <div className="main">
-        {panels.hierarchy && (
-          <>
-            <HierarchyPanel />
-            <Resizer axis="x" onResize={(d) => useEditor.getState().resizeHierarchy(d)} />
-          </>
-        )}
         <Viewport />
-        {panels.properties && (
+        {panels.tree && (
           <>
             <Resizer axis="x" onResize={(d) => useEditor.getState().resizeProperties(d)} />
-            <PropertiesPanel />
+            <TreePanel />
           </>
         )}
       </div>
