@@ -286,8 +286,9 @@ Ký hiệu: ✅ có · 🟡 một phần · ❌ chưa có · 📦 dữ liệu ro
 > bằng goblins: import atlas → đổi skin goblin/goblingirl render đầy đủ. Xuất **GIF** qua
 > gifenc (20fps, khung viewport, playhead khôi phục sau khi xuất). Ô search lọc bone/slot
 > trong Hierarchy. MCP thêm 3 tool: `create_skin`, `switch_skin`, `import_atlas` (47 tools).
-> **Chưa làm** — binary `.skel`, import PSD, xuất video/PNG sequence, dockable panels,
-> texture packer nâng cấp (rotation/strip), bone color/icon.
+> **Chưa làm** — dockable panels, texture packer nâng cấp (rotation/strip).
+> Đã đóng ở §8: binary `.skel` (22b, dialect 4.2-se.1), import PSD (22a),
+> xuất video/PNG sequence (22a), bone color (16b).
 
 1. **Skins UI**: panel Skins (tạo/xóa/nhân bản), chọn active skin để render + đặt attachment
    theo skin; renderer resolve theo active skin thay vì chỉ `default`.
@@ -580,7 +581,7 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 | **19** | Weights view + Mesh tools — ✅ (07/2026)                                               | Panel Weights chuẩn Spine (Influence/Prune, Direct/Update, Smooth/Auto/Weld, bảng bones màu, Bind/Swap/Remove); add/remove mesh vertex (đóng gap §6); Mesh Tools                                                                                                 |
 | **20** | Audio view — ✅ (07/2026)                                                              | Asset audio, waveform trong dopesheet, event volume/balance, scrub có tiếng                                                                                                                                                                                      |
 | **21** | Views phụ + polish — ✅ (07/2026)                                                      | Slot Color view; tint black (model+serializer+renderer); Metrics view; Welcome screen; Settings; hotkeys Spine-style (B/N/G/C/V/X/Z)                                                                                                                             |
-| **22** | IO pack — 22a ✅ (07/2026, còn .skel 22b)                                              | PSD import (@webtoon/psd), binary .skel import/export, video/PNG-sequence export, Texture Packer settings dialog                                                                                                                                                 |
+| **22** | IO pack — ✅ (07/2026, 22a+22b)                                                        | PSD import (@webtoon/psd), binary .skel import/export, video/PNG-sequence export, Texture Packer settings dialog                                                                                                                                                 |
 
 Ngoài phạm vi (chờ quyết định riêng): Sliders constraint (đòi format 4.3 — ta target
 4.2), multiple skeletons/project, CLI, Skeleton Viewer.
