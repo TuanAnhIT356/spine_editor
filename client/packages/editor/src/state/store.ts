@@ -47,6 +47,31 @@ export interface GhostConfig {
   opacity: number;
 }
 
+/** Editor preferences persisted in localStorage (never in the project file). */
+export interface EditorSettings {
+  fps: 24 | 30 | 60;
+  autosave: boolean;
+  welcome: boolean;
+}
+
+const SETTINGS_KEY = 'spine-editor.settings';
+
+function loadSettings(): EditorSettings {
+  const defaults: EditorSettings = { fps: 30, autosave: true, welcome: true };
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<EditorSettings>;
+    return {
+      fps: parsed.fps === 24 || parsed.fps === 60 ? parsed.fps : 30,
+      autosave: parsed.autosave !== false,
+      welcome: parsed.welcome !== false,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export interface ViewFilters {
   bones: GroupFilter;
   images: GroupFilter;
@@ -169,6 +194,8 @@ interface EditorState {
   anim: AnimationUiState;
   /** Onion-skin ghosting knobs (editor-only, never serialized). */
   ghostConfig: GhostConfig;
+  /** Editor preferences (fps, autosave, welcome), persisted in localStorage. */
+  settings: EditorSettings;
   /** Gizmo/drag space for transform tools (Spine-style Local/Parent/World). */
   axesMode: AxesMode;
   /** Per-group selectability / visibility / name-label toggles (tool cluster). */
@@ -211,6 +238,7 @@ interface EditorState {
   setSpeed(speed: number): void;
   setGhost(ghost: boolean): void;
   setGhostConfig(patch: Partial<GhostConfig>): void;
+  setSettings(patch: Partial<EditorSettings>): void;
   setAxesMode(mode: AxesMode): void;
   toggleViewFilter(group: keyof ViewFilters, key: keyof GroupFilter): void;
   setAutoKey(on: boolean): void;
@@ -270,6 +298,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     loopEnd: null,
   },
   ghostConfig: { before: 2, after: 2, spacingFrames: 4, opacity: 0.5 },
+  settings: loadSettings(),
   axesMode: 'local',
   viewFilters: {
     bones: { select: true, visible: true, labels: false },
@@ -374,6 +403,16 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set((s) => ({ anim: { ...s.anim, speed: Math.min(4, Math.max(0.1, speed)) } })),
   setGhost: (ghost) => set((s) => ({ anim: { ...s.anim, ghost } })),
   setGhostConfig: (patch) => set((s) => ({ ghostConfig: { ...s.ghostConfig, ...patch } })),
+  setSettings: (patch) =>
+    set((s) => {
+      const settings = { ...s.settings, ...patch };
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      } catch {
+        /* quota/no-storage: keep in-memory */
+      }
+      return { settings };
+    }),
   setAxesMode: (axesMode) => set({ axesMode }),
   toggleViewFilter: (group, key) =>
     set((s) => ({
@@ -415,7 +454,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       const anim = s.anim.current ? s.doc.getAnimation(s.anim.current) : undefined;
       if (!anim) return s;
       const duration = getAnimationDuration(anim);
-      const step = 1 / 30;
+      const step = 1 / s.settings.fps;
       const time = Math.min(
         duration,
         Math.max(0, Math.round((s.anim.time + frames * step) / step) * step),

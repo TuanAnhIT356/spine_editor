@@ -8,6 +8,7 @@ import { TimelinePanel } from './components/TimelinePanel.js';
 import { Toolbar } from './components/Toolbar.js';
 import { Viewport } from './components/Viewport.js';
 import { saveProjectFile } from './state/actions.js';
+import { bridgeRuntime } from './bridge/runtime.js';
 import { loadAutosave, saveAutosave } from './state/persistence.js';
 import { tryRefresh } from './server/api.js';
 import { startServerAutosave } from './server/project-sync.js';
@@ -23,7 +24,13 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      )
+        return;
       const s = useEditor.getState();
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z') {
@@ -45,7 +52,18 @@ export function App() {
       else if (e.key === '4') s.setTool('scale');
       else if (e.key === '5') s.setTool('shear');
       else if (e.key === '6') s.setTool('create');
-      else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
+      else if (e.key.toLowerCase() === 'v' && !mod) s.setTool('select');
+      else if (e.key.toLowerCase() === 'c' && !mod) s.setTool('create');
+      else if (e.key.toLowerCase() === 'b' && !mod) s.toggleViewFilter('bones', 'visible');
+      else if (e.key.toLowerCase() === 'n' && !mod) s.toggleViewFilter('bones', 'labels');
+      else if (e.key.toLowerCase() === 'g' && !mod && s.mode === 'animate') {
+        s.setGhost(!s.anim.ghost);
+      } else if (e.key.toLowerCase() === 'x' && !mod) {
+        const order = ['local', 'parent', 'world'] as const;
+        s.setAxesMode(order[(order.indexOf(s.axesMode) + 1) % order.length]!);
+      } else if (e.key.toLowerCase() === 'z' && !mod) {
+        bridgeRuntime.renderer?.setZoomCenter(1);
+      } else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
         e.preventDefault();
         s.setPlaying(!s.anim.playing);
       } else if (
@@ -97,6 +115,7 @@ export function App() {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const s = useEditor.getState();
+        if (!s.settings.autosave) return;
         void saveAutosave({
           format: 'spine-editor-project',
           version: 1,

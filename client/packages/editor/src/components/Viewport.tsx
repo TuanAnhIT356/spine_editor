@@ -178,7 +178,7 @@ export function Viewport() {
     const animation = doc.getAnimation(anim.current);
     if (!animation) return undefined;
     const duration = getAnimationDuration(animation);
-    const spacing = Math.max(ghostConfig.spacingFrames, 1) / 30;
+    const spacing = Math.max(ghostConfig.spacingFrames, 1) / state.settings.fps;
     const alpha = 0.7 * ghostConfig.opacity;
     const steps: number[] = [];
     for (let i = -Math.round(ghostConfig.before); i < 0; i++) steps.push(i);

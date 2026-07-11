@@ -1740,3 +1740,30 @@ button.active {
   top: 0;
   pointer-events: none;
 }
+
+/* ---- Settings window (P21) ---- */
+.settings-window {
+  position: fixed;
+  z-index: 25;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.settings-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-body .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}

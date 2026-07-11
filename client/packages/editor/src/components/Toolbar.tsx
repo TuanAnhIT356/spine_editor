@@ -19,6 +19,7 @@ import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
 import { GhostingWindow } from './GhostingWindow.js';
 import { PreviewWindow } from './PreviewWindow.js';
+import { SettingsWindow } from './SettingsWindow.js';
 import { WeightsWindow } from './WeightsWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
@@ -38,6 +39,7 @@ export function Toolbar() {
   const [showPreview, setShowPreview] = useState(false);
   const [showGhosting, setShowGhosting] = useState(false);
   const [showWeights, setShowWeights] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const meshEditMode = useEditor((s) => s.meshEdit?.mode ?? null);
   const hasMeshEdit = meshEditMode !== null;
   useEffect(() => {
@@ -276,6 +278,14 @@ export function Toolbar() {
               />
               Weights
             </label>
+            <label className="views-item">
+              <input
+                type="checkbox"
+                checked={showSettings}
+                onChange={() => setShowSettings((v) => !v)}
+              />
+              Settings
+            </label>
           </div>
         )}
       </div>
@@ -329,6 +339,7 @@ export function Toolbar() {
       {showPreview && <PreviewWindow onClose={() => setShowPreview(false)} />}
       {showGhosting && <GhostingWindow onClose={() => setShowGhosting(false)} />}
       {showWeights && <WeightsWindow onClose={() => setShowWeights(false)} />}
+      {showSettings && <SettingsWindow onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

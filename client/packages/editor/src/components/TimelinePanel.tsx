@@ -126,6 +126,7 @@ export function TimelinePanel() {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const anim = useEditor((s) => s.anim);
+  const fps = useEditor((s) => s.settings.fps);
   const layout = useEditor((s) => s.layout);
   const audioAssets = useEditor((s) => s.audioAssets);
   void revision;
@@ -566,7 +567,7 @@ export function TimelinePanel() {
     state.execute(new UpsertBoneKeyframe(anim.current, ref.bone, ref.timeline, next));
   }
 
-  const frame = Math.round(anim.time * 30);
+  const frame = Math.round(anim.time * fps);
 
   return (
     <div className="timeline" style={{ height: layout.timelineHeight }}>
@@ -634,7 +635,7 @@ export function TimelinePanel() {
             title="Move the selected keys by ±frames"
             onClick={() => {
               const frames = Number(shiftText);
-              if (Number.isFinite(frames) && frames !== 0) commitKeyDrag(frames / 30);
+              if (Number.isFinite(frames) && frames !== 0) commitKeyDrag(frames / fps);
             }}
           >
             Apply
@@ -655,7 +656,7 @@ export function TimelinePanel() {
               if (refs.length > 0) {
                 useEditor
                   .getState()
-                  .execute(new TransformBoneKeys(anim.current, refs, { offset: frames / 30 }));
+                  .execute(new TransformBoneKeys(anim.current, refs, { offset: frames / fps }));
               }
             }}
           >
@@ -765,20 +766,20 @@ export function TimelinePanel() {
           <input
             type="number"
             value={frame}
-            onChange={(e) => useEditor.getState().setAnimTime(Number(e.target.value) / 30)}
+            onChange={(e) => useEditor.getState().setAnimTime(Number(e.target.value) / fps)}
           />
         </label>
         <label className="tl-field">
           <span>Loop Start</span>
           <input
             type="number"
-            value={anim.loopStart !== null ? Math.round(anim.loopStart * 30) : ''}
+            value={anim.loopStart !== null ? Math.round(anim.loopStart * fps) : ''}
             placeholder="—"
             onChange={(e) =>
               useEditor
                 .getState()
                 .setLoopRange(
-                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                  e.target.value === '' ? null : Number(e.target.value) / fps,
                   anim.loopEnd,
                 )
             }
@@ -788,14 +789,14 @@ export function TimelinePanel() {
           <span>End</span>
           <input
             type="number"
-            value={anim.loopEnd !== null ? Math.round(anim.loopEnd * 30) : ''}
+            value={anim.loopEnd !== null ? Math.round(anim.loopEnd * fps) : ''}
             placeholder="—"
             onChange={(e) =>
               useEditor
                 .getState()
                 .setLoopRange(
                   anim.loopStart,
-                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                  e.target.value === '' ? null : Number(e.target.value) / fps,
                 )
             }
           />
