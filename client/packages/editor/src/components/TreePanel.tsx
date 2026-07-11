@@ -1,0 +1,283 @@
+import { CreateSkin, RemoveSkin } from '@spine-editor/core';
+import { useState } from 'react';
+import { useServer } from '../server/api.js';
+import { primarySelection, uniqueName, useEditor } from '../state/store.js';
+import {
+  AnimationIcon,
+  CurveIcon,
+  EventIcon,
+  IkIcon,
+  PhysicsIcon,
+  SkeletonIcon,
+  TransformIcon,
+} from './icons.js';
+import { Resizer } from './Resizer.js';
+import { clickSelect } from './tree/tree-actions.js';
+import { TreeRows } from './tree/TreeRows.js';
+import { BoneDock } from './tree/dock/BoneDock.js';
+import { InfoDock } from './tree/dock/InfoDock.js';
+import { SlotDock } from './tree/dock/SlotDock.js';
+
+/** Skin list: pick the active (rendered) skin, create/duplicate/remove skins. */
+function SkinsSection() {
+  const revision = useEditor((s) => s.revision);
+  const doc = useEditor((s) => s.doc);
+  const activeSkin = useEditor((s) => s.activeSkin);
+  void revision;
+  const skins = doc.data.skins;
+  if (skins.length === 0) return null;
+
+  function onNewSkin(copyFrom?: string) {
+    const state = useEditor.getState();
+    const name = window.prompt(
+      copyFrom ? `Duplicate skin "${copyFrom}" as` : 'Skin name',
+      uniqueName('skin', (n) => state.doc.data.skins.some((s) => s.name === n)),
+    );
+    if (!name) return;
+    if (state.execute(new CreateSkin(name.trim(), copyFrom))) state.setActiveSkin(name.trim());
+  }
+
+  return (
+    <>
+      <div className="panel-title">Skins</div>
+      <div className="skins">
+        {skins.map((skin) => (
+          <label key={skin.name} className={`row ${activeSkin === skin.name ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="active-skin"
+              checked={activeSkin === skin.name}
+              onChange={() => useEditor.getState().setActiveSkin(skin.name)}
+            />
+            <span className="skin-name">{skin.name}</span>
+            <span className="row-actions">
+              <button title={`Duplicate "${skin.name}"`} onClick={() => onNewSkin(skin.name)}>
+                ⧉
+              </button>
+              {skin.name !== 'default' && (
+                <button
+                  title="Remove skin"
+                  onClick={() => {
+                    const state = useEditor.getState();
+                    if (state.execute(new RemoveSkin(skin.name)) && activeSkin === skin.name) {
+                      state.setActiveSkin('default');
+                    }
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          </label>
+        ))}
+        <button className="new-skin" onClick={() => onNewSkin()}>
+          + New Skin
+        </button>
+      </div>
+    </>
+  );
+}
+
+const CONSTRAINT_GROUPS = [
+  { kind: 'ik' as const, icon: IkIcon },
+  { kind: 'transform' as const, icon: TransformIcon },
+  { kind: 'path' as const, icon: CurveIcon },
+  { kind: 'physics' as const, icon: PhysicsIcon },
+];
+
+function ConstraintsSection() {
+  const revision = useEditor((s) => s.revision);
+  const doc = useEditor((s) => s.doc);
+  const selection = useEditor((s) => s.selection);
+  void revision;
+  const names = {
+    ik: doc.data.ik.map((c) => c.name),
+    transform: doc.data.transform.map((c) => c.name),
+    path: doc.data.path.map((c) => c.name),
+    physics: doc.data.physics.map((c) => c.name),
+  };
+  const total = Object.values(names).reduce((n, list) => n + list.length, 0);
+  if (total === 0) return null;
+  return (
+    <>
+      <div className="panel-title">Constraints</div>
+      {CONSTRAINT_GROUPS.map(({ kind, icon: Icon }) =>
+        names[kind].map((name) => (
+          <div
+            key={`${kind}:${name}`}
+            className={`row constraint ${
+              selection.some((s) => s.kind === kind && s.name === name) ? 'selected' : ''
+            }`}
+            style={{ paddingLeft: 16 }}
+            onClick={(e) => clickSelect(e, { kind, name })}
+          >
+            <span className="type-icon">
+              <Icon size={12} />
+            </span>
+            {name}
+          </div>
+        )),
+      )}
+    </>
+  );
+}
+
+function EventsSection() {
+  const revision = useEditor((s) => s.revision);
+  const doc = useEditor((s) => s.doc);
+  const selection = useEditor((s) => s.selection);
+  void revision;
+  const names = Object.keys(doc.data.events);
+  if (names.length === 0) return null;
+  return (
+    <>
+      <div className="panel-title">Events</div>
+      {names.map((name) => (
+        <div
+          key={name}
+          className={`row event ${
+            selection.some((s) => s.kind === 'event' && s.name === name) ? 'selected' : ''
+          }`}
+          style={{ paddingLeft: 16 }}
+          onClick={(e) => clickSelect(e, { kind: 'event', name })}
+        >
+          <span className="type-icon">
+            <EventIcon size={12} />
+          </span>
+          {name}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function AnimationsSection() {
+  const revision = useEditor((s) => s.revision);
+  const doc = useEditor((s) => s.doc);
+  const selection = useEditor((s) => s.selection);
+  void revision;
+  const names = Object.keys(doc.data.animations);
+  if (names.length === 0) return null;
+  return (
+    <>
+      <div className="panel-title">Animations</div>
+      {names.map((name) => (
+        <div
+          key={name}
+          className={`row animation ${
+            selection.some((s) => s.kind === 'animation' && s.name === name) ? 'selected' : ''
+          }`}
+          style={{ paddingLeft: 16 }}
+          title="Double-click to open in animate mode"
+          onClick={(e) => clickSelect(e, { kind: 'animation', name })}
+          onDoubleClick={() => {
+            useEditor.getState().setAnimation(name);
+            useEditor.getState().setMode('animate');
+          }}
+        >
+          <span className="type-icon">
+            <AnimationIcon size={12} />
+          </span>
+          {name}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ImagesSection() {
+  const revision = useEditor((s) => s.revision);
+  const assets = useEditor((s) => s.assets);
+  const selection = useEditor((s) => s.selection);
+  void revision;
+  const primary = primarySelection(selection);
+  const selectedBone = primary?.kind === 'bone' ? primary.name : null;
+  return (
+    <>
+      <div className="panel-title">Images</div>
+      <div className="assets">
+        {Object.values(assets).length === 0 && (
+          <div className="empty">Import images, then attach them to a selected bone.</div>
+        )}
+        {Object.values(assets).map((asset) => (
+          <div key={asset.name} className="asset-row">
+            <img src={asset.dataUrl} alt={asset.name} />
+            <span className="asset-name" title={`${asset.width}×${asset.height}`}>
+              {asset.name}
+            </span>
+            <button
+              disabled={!selectedBone}
+              title={selectedBone ? `Attach to bone "${selectedBone}"` : 'Select a bone first'}
+              onClick={() =>
+                selectedBone && useEditor.getState().attachAsset(asset.name, selectedBone)
+              }
+            >
+              Attach
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** Spine-style unified panel: tree + sections above, properties dock below. */
+export function TreePanel() {
+  const layout = useEditor((s) => s.layout);
+  const selection = useEditor((s) => s.selection);
+  const [filter, setFilter] = useState('');
+  const [show, setShow] = useState({ slots: true, attachments: true, constraints: true });
+  const [dockHeight, setDockHeight] = useState(260);
+  const primary = primarySelection(selection);
+  const projectName = useServer((s) => s.projectName) || 'untitled';
+  const extraCount = selection.length > 1 ? selection.length - 1 : 0;
+
+  return (
+    <div className="panel tree-panel" style={{ width: layout.propertiesWidth }}>
+      <input
+        className="tree-filter"
+        placeholder="Search bones/slots…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <div className="tree-chips">
+        {(['slots', 'attachments', 'constraints'] as const).map((k) => (
+          <button
+            key={k}
+            className={show[k] ? 'chip on' : 'chip'}
+            onClick={() => setShow((s) => ({ ...s, [k]: !s[k] }))}
+          >
+            {k[0]!.toUpperCase() + k.slice(1)}
+          </button>
+        ))}
+        {extraCount > 0 && <span className="selection-count">{selection.length} selected</span>}
+      </div>
+      <div className="tree">
+        <div className="row skeleton-row">
+          <span className="type-icon">
+            <SkeletonIcon size={13} />
+          </span>
+          {projectName}
+        </div>
+        <TreeRows query={filter.trim().toLowerCase()} show={show} />
+        {show.constraints && <ConstraintsSection />}
+        <SkinsSection />
+        <EventsSection />
+        <AnimationsSection />
+        <ImagesSection />
+      </div>
+      <Resizer
+        axis="y"
+        onResize={(d) => setDockHeight((h) => Math.max(120, Math.min(600, h - d)))}
+      />
+      <div className="tree-dock" style={{ height: dockHeight }}>
+        {!primary && <div className="empty">Select a bone or slot to edit its properties.</div>}
+        {primary?.kind === 'bone' && <BoneDock name={primary.name} />}
+        {primary?.kind === 'slot' && <SlotDock name={primary.name} />}
+        {primary && primary.kind !== 'bone' && primary.kind !== 'slot' && (
+          <InfoDock item={primary} />
+        )}
+      </div>
+    </div>
+  );
+}

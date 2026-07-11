@@ -126,3 +126,87 @@ export const TagIcon = ({ size }: { size?: number }) =>
 export const CursorIcon = ({ size }: { size?: number }) =>
   svg(size, <path d="M5 2l7 6-3 .5L11 12l-1.7 1L7.5 9.6 5 11z" />);
 export const KeyIcon = ({ size }: { size?: number }) => svg(size, <path d="M8 3l4 5-4 5-4-5z" />);
+export const BoneIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M4 12 12 4M3 13a1.6 1.6 0 1 0 2-2m6-6a1.6 1.6 0 1 0 2-2" />);
+export const SlotIcon = ({ size }: { size?: number }) =>
+  svg(size, <rect x="3" y="3" width="10" height="10" rx="1.5" />);
+export const ImageIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1" />
+      <path d="m3 11 3-3 3 3 2-2 2 2" />
+      <circle cx="6" cy="6" r="1" />
+    </>,
+  );
+export const MeshIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <path d="M3 3h10v10H3z" />
+      <path d="M3 8h10M8 3v10M3 3l10 10" />
+    </>,
+  );
+export const BBoxIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M3 3h3M10 3h3M3 3v3M3 10v3M3 13h3M10 13h3M13 3v3M13 10v3" />);
+export const PointIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <circle cx="8" cy="8" r="2" />
+      <path d="M8 2v2.5M8 11.5V14M2 8h2.5M11.5 8H14" />
+    </>,
+  );
+export const ClipIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <circle cx="4.5" cy="11.5" r="1.6" />
+      <circle cx="4.5" cy="4.5" r="1.6" />
+      <path d="m6 10 8-6.5M6 6l8 6.5" />
+    </>,
+  );
+export const CurveIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M2 12c4 0 3-8 7-8 2.5 0 3 2 5 2" />);
+export const IkIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <path d="M3 13 8 8l4-1" />
+      <circle cx="12.5" cy="6.5" r="1.6" />
+      <circle cx="3" cy="13" r="1" />
+    </>,
+  );
+export const TransformIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <rect x="2.5" y="2.5" width="7" height="7" />
+      <rect x="6.5" y="6.5" width="7" height="7" />
+    </>,
+  );
+export const PhysicsIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <path d="M3 3c0 3 2 3 2 6s-2 3-2 4m5-13c0 3 2 3 2 6s-2 3-2 4m5-13c0 3 2 3 2 6s-2 3-2 4" />,
+  );
+export const EventIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M4 2h8l-2 4 2 0-6 8 1.5-6H4z" />);
+export const AnimationIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="m6.5 5.5 4 2.5-4 2.5z" />
+    </>,
+  );
+export const SkeletonIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <circle cx="8" cy="3" r="1.6" />
+      <path d="M8 5v4M8 9l-3 4M8 9l3 4M4 6.5 8 8l4-1.5" />
+    </>,
+  );
+export const SkinIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M5 3 3 5v3h2v5h6V8h2V5l-2-2-2 1.5h-2z" />);
