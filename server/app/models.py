@@ -1,8 +1,5 @@
-"""Database models: users/auth, projects, BYOK key vault, settings.
-
-Conversations/messages (chat history) land in Phase 14 together with the chat API;
-the schema in PLAN.md §7.3 reserves their names.
-"""
+"""Database models: users/auth, projects, BYOK key vault, settings, gen-image
+gallery, and chat history (conversations/messages, PLAN.md §7.3)."""
 
 from datetime import UTC, datetime
 
@@ -98,4 +95,30 @@ class GenImage(Base):
     size: Mapped[str] = mapped_column(String(20))
     transparent: Mapped[int] = mapped_column(Integer, default=0)
     data_url: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Conversation(Base):
+    """AI chat session. Optionally bound to a project; messages store anthropic
+    content blocks verbatim so reopening a conversation replays exact context."""
+
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), default="New chat")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    role: Mapped[str] = mapped_column(String(16))  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text)  # JSON list of anthropic content blocks
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
