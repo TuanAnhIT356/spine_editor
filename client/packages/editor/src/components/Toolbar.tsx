@@ -1,6 +1,6 @@
 import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
-import { buildAtlas } from '../state/atlas.js';
+import { buildAtlas, type AtlasOptions } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/actions.js';
 import {
@@ -13,6 +13,7 @@ import {
 import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
+import { AtlasDialog } from './AtlasDialog.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
@@ -43,6 +44,7 @@ export function Toolbar() {
   const [showSettings, setShowSettings] = useState(false);
   const [showColor, setShowColor] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [showAtlas, setShowAtlas] = useState(false);
   useEffect(() => {
     const open = () => setShowColor(true);
     window.addEventListener('spine-editor:open-color', open);
@@ -114,10 +116,10 @@ export function Toolbar() {
     useEditor.getState().replaceProject(serializeSpineJson(createEmptySkeleton()), [], []);
   }
 
-  async function onExportAtlas() {
+  async function onExportAtlas(options?: AtlasOptions) {
     const state = useEditor.getState();
     try {
-      const built = await buildAtlas(Object.values(state.assets), 'skeleton.png');
+      const built = await buildAtlas(Object.values(state.assets), 'skeleton.png', options);
       downloadText('skeleton.atlas', built.atlasText, 'text/plain');
       downloadDataUrl('skeleton.png', built.pngDataUrl);
     } catch (err) {
@@ -153,7 +155,7 @@ export function Toolbar() {
             <button onClick={() => atlasInput.current?.click()}>Import Atlas</button>
             <hr />
             <button onClick={onExportJson}>Export JSON</button>
-            <button onClick={() => void onExportAtlas()}>Export Atlas</button>
+            <button onClick={() => setShowAtlas(true)}>Export Atlas</button>
           </div>
         )}
       </div>
@@ -347,6 +349,15 @@ export function Toolbar() {
       {showSettings && <SettingsWindow onClose={() => setShowSettings(false)} />}
       {showColor && <ColorWindow onClose={() => setShowColor(false)} />}
       {showMetrics && <MetricsWindow onClose={() => setShowMetrics(false)} />}
+      {showAtlas && (
+        <AtlasDialog
+          onExport={(o) => {
+            setShowAtlas(false);
+            void onExportAtlas(o);
+          }}
+          onClose={() => setShowAtlas(false)}
+        />
+      )}
     </div>
   );
 }
