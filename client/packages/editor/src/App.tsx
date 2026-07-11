@@ -1,5 +1,6 @@
 import { RemoveBone } from '@spine-editor/core';
 import { useEffect, useState } from 'react';
+import { audioEngine } from './audio/engine.js';
 import { TreePanel } from './components/TreePanel.js';
 import { Resizer } from './components/Resizer.js';
 import { ShortcutsHelp } from './components/ShortcutsHelp.js';
@@ -16,6 +17,7 @@ export function App() {
   const error = useEditor((s) => s.error);
   const mode = useEditor((s) => s.mode);
   const panels = useEditor((s) => s.panelVisibility);
+  const audioAssets = useEditor((s) => s.audioAssets);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
@@ -80,10 +82,18 @@ export function App() {
   useEffect(() => {
     let timer: number | undefined;
     void loadAutosave().then((payload) => {
-      if (payload) useEditor.getState().replaceProject(payload.spine, payload.assets);
+      if (payload)
+        useEditor
+          .getState()
+          .replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
     });
     const unsub = useEditor.subscribe((state, prev) => {
-      if (state.revision === prev.revision && state.assets === prev.assets) return;
+      if (
+        state.revision === prev.revision &&
+        state.assets === prev.assets &&
+        state.audioAssets === prev.audioAssets
+      )
+        return;
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const s = useEditor.getState();
@@ -92,6 +102,7 @@ export function App() {
           version: 1,
           spine: s.doc.toJson(),
           assets: Object.values(s.assets),
+          audioAssets: Object.values(s.audioAssets),
         }).catch(() => undefined);
       }, 800);
     });
@@ -100,6 +111,11 @@ export function App() {
       window.clearTimeout(timer);
     };
   }, []);
+
+  useEffect(() => {
+    audioEngine.retain(Object.keys(audioAssets));
+    for (const a of Object.values(audioAssets)) audioEngine.ensure(a.name, a.dataUrl);
+  }, [audioAssets]);
 
   useEffect(() => {
     // Restore the server session from the refresh cookie (no-op when the

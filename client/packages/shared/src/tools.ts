@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the 61 editor tools: name, description, zod
+ * Single source of truth for the 62 editor tools: name, description, zod
  * params shape, the bridge op that implements it, and how to present the
  * result. Consumed by the MCP server (registers them as MCP tools) and by
  * the editor's chat client (sends JSON Schemas to the chat loop and
@@ -107,6 +107,14 @@ export const TOOL_DEFS: ToolDef[] = [
     {
       name: z.string().describe('Asset name without extension, e.g. "arm-upper".'),
       dataUrl: z.string().describe('data:image/png;base64,... payload.'),
+    },
+  ),
+  def(
+    'import_audio',
+    'Import an audio clip (data URL) as a project audio asset. Reference it from an event via set_event { audio: <asset> } — the editor then plays it during playback/scrub and shows its waveform in the dopesheet.',
+    {
+      name: z.string().describe('Asset name without extension, e.g. "footstep".'),
+      dataUrl: z.string().describe('data:audio/wav;base64,... payload.'),
     },
   ),
   def(

@@ -75,6 +75,7 @@ import {
   type SpineJson,
 } from '@spine-editor/core';
 import type { BridgeOp } from '@spine-editor/shared';
+import { audioEngine } from '../audio/engine.js';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { primarySelection, uniqueName, useEditor, type ImageAsset } from '../state/store.js';
@@ -151,6 +152,7 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
           width: a.width,
           height: a.height,
         })),
+        audioAssets: Object.keys(s.audioAssets),
         spine: s.doc.toJson(),
         issues: s.doc.validate(),
       };
@@ -266,6 +268,18 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       const asset = await loadAssetFromDataUrl(str(params, 'name'), str(params, 'dataUrl'));
       state().addAssets([asset]);
       return { name: asset.name, width: asset.width, height: asset.height };
+    }
+
+    case 'import_audio': {
+      const s = state();
+      const dataUrl = str(params, 'dataUrl');
+      if (!dataUrl.startsWith('data:audio/')) {
+        throw new Error('Param "dataUrl" must be a data:audio/... URL.');
+      }
+      const name = uniqueName(str(params, 'name'), (n) => n in s.audioAssets);
+      s.addAudioAssets([{ name, dataUrl }]);
+      audioEngine.ensure(name, dataUrl);
+      return { asset: name };
     }
 
     case 'generate_image': {

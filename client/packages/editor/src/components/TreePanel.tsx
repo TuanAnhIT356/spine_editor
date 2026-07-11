@@ -9,9 +9,11 @@ import {
   RemoveTransformConstraint,
   type Command,
 } from '@spine-editor/core';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { audioEngine } from '../audio/engine.js';
 import { useServer } from '../server/api.js';
-import { primarySelection, uniqueName, useEditor } from '../state/store.js';
+import { readFileAsDataUrl } from '../state/persistence.js';
+import { primarySelection, uniqueName, useEditor, type AudioAsset } from '../state/store.js';
 import {
   AnimationIcon,
   CurveIcon,
@@ -288,6 +290,83 @@ function ImagesSection() {
   );
 }
 
+function AudioSection() {
+  const audioAssets = useEditor((s) => s.audioAssets);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  async function onImport(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const state = useEditor.getState();
+    try {
+      const next: AudioAsset[] = [];
+      for (const file of Array.from(files)) {
+        const dataUrl = await readFileAsDataUrl(file);
+        const base = file.name.replace(/\.[^.]+$/, '') || 'audio';
+        const name = uniqueName(
+          base,
+          (n) => n in state.audioAssets || next.some((a) => a.name === n),
+        );
+        next.push({ name, dataUrl });
+      }
+      state.addAudioAssets(next);
+      for (const a of next) audioEngine.ensure(a.name, a.dataUrl);
+    } catch (err) {
+      state.setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <>
+      <div className="panel-title">Audio</div>
+      <div className="assets audio-assets">
+        {Object.values(audioAssets).length === 0 && (
+          <div className="empty">Import audio, then pick it on an event (Audio field).</div>
+        )}
+        {Object.values(audioAssets).map((asset) => (
+          <div key={asset.name} className="asset-row">
+            <span className="audio-icon">🔉</span>
+            <span className="asset-name" title={asset.name}>
+              {asset.name}
+            </span>
+            <button
+              title="Preview"
+              onClick={() => {
+                audioEngine.ensure(asset.name, asset.dataUrl);
+                audioEngine.play(asset.name);
+              }}
+            >
+              ▶
+            </button>
+            <button
+              title="Remove audio asset"
+              onClick={() => {
+                useEditor.getState().removeAudioAsset(asset.name);
+                audioEngine.remove(asset.name);
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <button className="asset-import" onClick={() => inputRef.current?.click()}>
+        Import Audio
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          void onImport(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </>
+  );
+}
+
 /** Spine-style unified panel: tree + sections above, properties dock below. */
 export function TreePanel() {
   const layout = useEditor((s) => s.layout);
@@ -337,6 +416,7 @@ export function TreePanel() {
         <EventsSection openMenu={openMenu} />
         <AnimationsSection openMenu={openMenu} />
         <ImagesSection />
+        <AudioSection />
       </div>
       <Resizer
         axis="y"

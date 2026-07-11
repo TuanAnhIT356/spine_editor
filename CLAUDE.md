@@ -81,7 +81,14 @@ hull ring), weight ops smooth/prune/swap/remove-bone (`weights.ts`), floating We
 window (bone palette + %, Bind/Remove/Swap, Auto/Smooth/Prune, brush Amount +
 Add/Replace with Shift-subtract, multi-color vertex overlay + bone tint), mesh tool
 row Modify/Create/Delete/Weights/Weld/Reset (geometry edits setup-mode only), MCP
-`edit_mesh` + `adjust_weights` — **61 MCP tools total**. Next: PLAN.md §8 phases 20–22.
+`edit_mesh` + `adjust_weights` — **61 MCP tools total**. **Phase 20 done**: audio —
+`AudioAsset` trong store + project payload (field optional `audioAssets`), Web Audio
+engine (`src/audio/engine.ts`: decode cache, peaks, play qua gain+panner, mute),
+section AUDIO trong tree (import/preview/xóa), EventDock audio thành select,
+waveform theo zoom trên track events (`EventWave`), phát tiếng event khi play
+(loop-wrap aware, volume/balance = key ?? def, rate = speed) và khi scrub 2 chiều,
+nút 🔊/🔇 transport; MCP `import_audio` — **62 MCP tools total**. Next: PLAN.md §8
+phases 21–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

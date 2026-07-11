@@ -9,6 +9,7 @@ export function saveProjectFile(): void {
     version: 1,
     spine: state.doc.toJson(),
     assets: Object.values(state.assets),
+    audioAssets: Object.values(state.audioAssets),
   };
   downloadText('project.spine-editor.json', JSON.stringify(payload));
   state.markSaved();

@@ -1,11 +1,13 @@
 import type { SpineJson } from '@spine-editor/core';
-import type { ImageAsset } from './store.js';
+import type { AudioAsset, ImageAsset } from './store.js';
 
 export interface ProjectPayload {
   format: 'spine-editor-project';
   version: 1;
   spine: SpineJson;
   assets: ImageAsset[];
+  /** Optional since P20 — older project files simply have no audio. */
+  audioAssets?: AudioAsset[];
 }
 
 const DB_NAME = 'spine-editor';

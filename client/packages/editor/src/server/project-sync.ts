@@ -11,6 +11,7 @@ export function collectPayload(): ProjectPayload {
     version: 1,
     spine: s.doc.toJson(),
     assets: Object.values(s.assets),
+    audioAssets: Object.values(s.audioAssets),
   };
 }
 
@@ -61,7 +62,12 @@ let autosaveTimer: number | undefined;
  */
 export function startServerAutosave(): () => void {
   const unsub = useEditor.subscribe((state, prev) => {
-    if (state.revision === prev.revision && state.assets === prev.assets) return;
+    if (
+      state.revision === prev.revision &&
+      state.assets === prev.assets &&
+      state.audioAssets === prev.audioAssets
+    )
+      return;
     const { user, projectId } = useServer.getState();
     if (!user || projectId === null) return;
     window.clearTimeout(autosaveTimer);

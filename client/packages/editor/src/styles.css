@@ -1723,3 +1723,20 @@ button.active {
 .weights-body .field input[type='range'] {
   width: 110px;
 }
+
+/* ---- Audio assets (P20) ---- */
+.audio-assets .audio-icon {
+  width: 18px;
+  text-align: center;
+  flex: none;
+}
+.asset-import {
+  margin: 4px 0;
+}
+
+/* ---- Event audio waveform (P20) ---- */
+.track .wave {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}

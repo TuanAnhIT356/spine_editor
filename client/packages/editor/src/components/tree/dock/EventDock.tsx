@@ -6,6 +6,7 @@ import { NumField } from './fields.js';
 export function EventDock({ name }: { name: string }) {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
+  const audioAssets = useEditor((s) => s.audioAssets);
   void revision;
   const def = doc.data.events[name];
   if (!def) return null;
@@ -25,10 +26,20 @@ export function EventDock({ name }: { name: string }) {
       </label>
       <label className="field">
         <span>Audio</span>
-        <input
-          defaultValue={def.audio ?? ''}
-          onBlur={(e) => patch({ audio: e.target.value || undefined })}
-        />
+        <select
+          value={def.audio ?? ''}
+          onChange={(e) => patch({ audio: e.target.value || undefined })}
+        >
+          <option value="">— none —</option>
+          {Object.keys(audioAssets).map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+          {def.audio && !(def.audio in audioAssets) && (
+            <option value={def.audio}>{def.audio} (missing)</option>
+          )}
+        </select>
       </label>
       <NumField label="Volume" value={def.volume ?? 1} onCommit={(volume) => patch({ volume })} />
       <NumField
