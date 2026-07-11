@@ -7,6 +7,7 @@ import { ShortcutsHelp } from './components/ShortcutsHelp.js';
 import { TimelinePanel } from './components/TimelinePanel.js';
 import { Toolbar } from './components/Toolbar.js';
 import { Viewport } from './components/Viewport.js';
+import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { saveProjectFile } from './state/actions.js';
 import { bridgeRuntime } from './bridge/runtime.js';
 import { loadAutosave, saveAutosave } from './state/persistence.js';
@@ -20,6 +21,7 @@ export function App() {
   const panels = useEditor((s) => s.panelVisibility);
   const audioAssets = useEditor((s) => s.audioAssets);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,10 +102,13 @@ export function App() {
   useEffect(() => {
     let timer: number | undefined;
     void loadAutosave().then((payload) => {
-      if (payload)
+      if (payload) {
         useEditor
           .getState()
           .replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
+      } else if (useEditor.getState().settings.welcome) {
+        setShowWelcome(true);
+      }
     });
     const unsub = useEditor.subscribe((state, prev) => {
       if (
@@ -162,6 +167,7 @@ export function App() {
         </>
       )}
       {showShortcuts && <ShortcutsHelp onClose={() => setShowShortcuts(false)} />}
+      {showWelcome && <WelcomeScreen onClose={() => setShowWelcome(false)} />}
       <button
         className="shortcuts-toggle"
         title="Keyboard shortcuts (?)"

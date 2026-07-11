@@ -63,6 +63,12 @@ await page.addInitScript(
   (token) => window.localStorage.setItem('spine-editor.bridge-token', token),
   BRIDGE_TOKEN,
 );
+await page.addInitScript(() =>
+  window.localStorage.setItem(
+    'spine-editor.settings',
+    JSON.stringify({ fps: 30, autosave: true, welcome: false }),
+  ),
+);
 await page.goto(BASE);
 await page.waitForTimeout(2500);
 

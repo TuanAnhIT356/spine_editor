@@ -1,15 +1,14 @@
-import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
+import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
-import { saveProjectFile } from '../state/actions.js';
+import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/actions.js';
 import {
   downloadDataUrl,
   downloadText,
   loadImageAsset,
   readFileAsDataUrl,
   readFileAsText,
-  type ProjectPayload,
 } from '../state/persistence.js';
 import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
@@ -103,13 +102,10 @@ export function Toolbar() {
   async function onOpenProject(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const state = useEditor.getState();
     try {
-      const payload = JSON.parse(await readFileAsText(file)) as ProjectPayload;
-      if (payload.format !== 'spine-editor-project') throw new Error('Not a project file.');
-      state.replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
+      await openProjectFile(file);
     } catch (err) {
-      state.setError(err instanceof Error ? err.message : String(err));
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -132,22 +128,10 @@ export function Toolbar() {
   async function onImportSpineJson(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const state = useEditor.getState();
     try {
-      const json = JSON.parse(await readFileAsText(file)) as SpineJson;
-      if (!json.skeleton) throw new Error('Not a Spine JSON file (missing "skeleton").');
-      // Keep imported images so same-named attachments keep rendering.
-      const issues = state.replaceProject(
-        json,
-        Object.values(state.assets),
-        Object.values(state.audioAssets),
-      );
-      const errors = issues.filter((i) => i.severity === 'error');
-      if (errors.length > 0) {
-        state.setError(`Imported with errors: ${errors.map((e) => e.message).join(' | ')}`);
-      }
+      await importSpineJsonFile(file);
     } catch (err) {
-      state.setError(err instanceof Error ? err.message : String(err));
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
     }
   }
 
