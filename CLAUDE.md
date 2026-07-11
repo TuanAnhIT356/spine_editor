@@ -95,7 +95,13 @@ Welcome screen (hiện khi không có autosave, tắt được trong Settings); 
 window (fps 24/30/60 cho step/fields/ghost, autosave toggle); hotkeys B/N/G/C/V/X/Z
 với guard input đầy đủ (textarea/contentEditable); MCP `set_slot_color` cùng
 `set_slot_color_keyframe` nhận dark (key rgba2) — **63 MCP tools total**.
-Next: PLAN.md §8 phase 22.
+**Phase 22a done** (IO slice 1): PSD import (`@webtoon/psd` — layer ảnh hiện,
+đảo về bottom-first, thành asset đặt đúng vị trí + draw order qua importParts;
+menu Import PSD; MCP `import_psd`), Texture Packer settings (AtlasDialog
+padding/maxSize/powerOfTwo/trim; core packAtlas thêm powerOfTwo + orig/offset
+trim metadata), export animation WebM + PNG-sequence zip (`fflate`) qua vòng
+captureFrames dùng chung với GIF + Export Animation dialog — **64 MCP tools
+total**. Next: PLAN.md §8 phase 22b (binary .skel import/export).
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
