@@ -13,8 +13,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format": "prettier --write --config .prettierrc.json . \"../docs/**/*.md\" \"../*.md\"",
+    "format:check": "prettier --check --config .prettierrc.json . \"../docs/**/*.md\" \"../*.md\""
   },
   "devDependencies": {
     "@colbymchenry/codegraph": "^1.4.0",
