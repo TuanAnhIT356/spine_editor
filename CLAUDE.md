@@ -87,8 +87,15 @@ engine (`src/audio/engine.ts`: decode cache, peaks, play qua gain+panner, mute),
 section AUDIO trong tree (import/preview/xóa), EventDock audio thành select,
 waveform theo zoom trên track events (`EventWave`), phát tiếng event khi play
 (loop-wrap aware, volume/balance = key ?? def, rate = speed) và khi scrub 2 chiều,
-nút 🔊/🔇 transport; MCP `import_audio` — **62 MCP tools total**. Next: PLAN.md §8
-phases 21–22.
+nút 🔊/🔇 transport; MCP `import_audio` — **62 MCP tools total**. **Phase 21 done**:
+Slot Color view (floating Color window, setup color + tint black; dark validate
+6-hex, bật/tắt qua null), tint black end-to-end — evaluate rgba2/rgb2
+(`computeAnimatedDarkColors`) + renderer ColorMatrixFilter per slot; Metrics window;
+Welcome screen (hiện khi không có autosave, tắt được trong Settings); Settings
+window (fps 24/30/60 cho step/fields/ghost, autosave toggle); hotkeys B/N/G/C/V/X/Z
+với guard input đầy đủ (textarea/contentEditable); MCP `set_slot_color` cùng
+`set_slot_color_keyframe` nhận dark (key rgba2) — **63 MCP tools total**.
+Next: PLAN.md §8 phase 22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
