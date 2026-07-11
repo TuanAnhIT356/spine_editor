@@ -335,6 +335,13 @@ export function Viewport() {
   function onPointerDown(e: React.PointerEvent) {
     const r = rendererRef.current;
     if (!r?.ready) return;
+    // Shell overlays (banner, tool cluster, breadcrumb, zoom) handle their own
+    // clicks — capturing their pointers here would swallow the button events.
+    if (
+      (e.target as HTMLElement).closest?.('.mode-banner, .tool-cluster, .breadcrumb, .zoom-control')
+    ) {
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = localPoint(e);
     if (e.button === 1 || e.button === 2) {
