@@ -90,9 +90,12 @@ export interface LayoutState {
 export interface MeshEditState {
   slot: string;
   attachment: string;
-  mode: 'vertices' | 'weights';
+  mode: 'vertices' | 'create' | 'delete' | 'weights';
   /** Bone whose weights are shown/painted in weights mode. */
   paintBone: string | null;
+  /** Weight-brush strength 0..1 and behavior. */
+  paintAmount: number;
+  paintMode: 'add' | 'replace';
 }
 
 const LAYOUT_STORAGE_KEY = 'spine-editor:layout';
@@ -187,6 +190,8 @@ interface EditorState {
   endMeshEdit(): void;
   setMeshEditMode(mode: MeshEditState['mode']): void;
   setPaintBone(bone: string | null): void;
+  setPaintAmount(amount: number): void;
+  setPaintMode(mode: 'add' | 'replace'): void;
   setActiveSkin(name: string): void;
   resizeHierarchy(deltaPx: number): void;
   resizeProperties(deltaPx: number): void;
@@ -295,13 +300,24 @@ export const useEditor = create<EditorState>()((set, get) => ({
     })),
   startMeshEdit: (slot, attachment) =>
     set({
-      meshEdit: { slot, attachment, mode: 'vertices', paintBone: null },
+      meshEdit: {
+        slot,
+        attachment,
+        mode: 'vertices',
+        paintBone: null,
+        paintAmount: 0.2,
+        paintMode: 'add',
+      },
       selection: [{ kind: 'slot', name: slot }],
     }),
   endMeshEdit: () => set({ meshEdit: null }),
   setMeshEditMode: (mode) => set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, mode } } : s)),
   setPaintBone: (bone) =>
     set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, paintBone: bone } } : s)),
+  setPaintAmount: (paintAmount) =>
+    set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, paintAmount } } : s)),
+  setPaintMode: (paintMode) =>
+    set((s) => (s.meshEdit ? { meshEdit: { ...s.meshEdit, paintMode } } : s)),
   setActiveSkin: (name) => set({ activeSkin: name }),
   resizeHierarchy: (deltaPx) =>
     set((s) => {

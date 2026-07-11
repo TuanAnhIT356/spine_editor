@@ -5,11 +5,14 @@ import {
   PhysicsSimulator,
   SetAttachmentVertices,
   SetBoneTransform,
+  SetMeshGeometry,
   UpsertBoneKeyframe,
   UpsertDeformKeyframe,
+  addMeshVertex,
   adjustVertexWeight,
   applyLinear,
   applyMat,
+  boneWeightPerVertex,
   computeAnimatedAttachments,
   computeAnimatedColors,
   computeAnimatedDeforms,
@@ -21,6 +24,7 @@ import {
   getAnimationDuration,
   invertMat,
   isWeightedVertices,
+  removeMeshVertex,
   type BoneData,
   type Command,
   type Mat2D,
@@ -322,7 +326,11 @@ export function Viewport() {
   }
 
   /** One weight-brush dab at screen point p (radius 30px, falloff to edge). */
-  function paintDab(ctx: NonNullable<ReturnType<typeof editContext>>, p: { x: number; y: number }) {
+  function paintDab(
+    ctx: NonNullable<ReturnType<typeof editContext>>,
+    p: { x: number; y: number },
+    subtract = false,
+  ) {
     const state = useEditor.getState();
     const boneName = ctx.edit.paintBone;
     if (!boneName) return;
@@ -331,13 +339,21 @@ export function Viewport() {
     if (boneIndex < 0 || !paintBoneWorld) return;
     const invPaint = invertMat(paintBoneWorld);
     const radius = 30;
+    const amount = state.meshEdit?.paintAmount ?? 0.2;
+    const mode = state.meshEdit?.paintMode ?? 'add';
     let working = editVertsRef.current ?? [...ctx.vertices];
+    // Replace mode targets an absolute weight, so it needs the start-of-dab weights.
+    const curWeights =
+      mode === 'replace' ? boneWeightPerVertex(working, ctx.count, boneIndex) : null;
     const positions = editWorldPositions(ctx);
     for (let v = 0; v < ctx.count; v++) {
       const s = ctx.renderer.worldToScreen(positions[v * 2]!, positions[v * 2 + 1]!);
       const d = Math.hypot(s.x - p.x, s.y - p.y);
       if (d > radius) continue;
-      const delta = 0.2 * (1 - d / radius);
+      const falloff = 1 - d / radius;
+      const delta = curWeights
+        ? amount * falloff - curWeights[v]!
+        : (subtract ? -1 : 1) * amount * falloff;
       const local = applyMat(invPaint, positions[v * 2]!, positions[v * 2 + 1]!);
       try {
         working = adjustVertexWeight(working, ctx.count, v, boneIndex, delta, {
@@ -375,6 +391,51 @@ export function Viewport() {
     // Mesh-edit session: vertex dragging / weight painting replaces the tools.
     const ctx = editContext();
     if (ctx) {
+      if (ctx.edit.mode === 'create' || ctx.edit.mode === 'delete') {
+        if (state.mode !== 'setup') {
+          state.setError('Add/remove mesh vertices in setup mode only.');
+          return;
+        }
+        if (ctx.att.type !== 'mesh') {
+          state.setError('Add/remove vertices works on meshes only.');
+          return;
+        }
+        const mesh = ctx.att;
+        try {
+          let next;
+          if (ctx.edit.mode === 'create') {
+            const wpt = r.screenToWorld(p.x, p.y);
+            const inv = invertMat(ctx.boneWorld);
+            const lp = applyMat(inv, wpt.x, wpt.y);
+            next = addMeshVertex(state.doc.data, ctx.edit.slot, mesh, lp.x, lp.y);
+          } else {
+            const positions = editWorldPositions(ctx);
+            let best = -1;
+            let bestDist = 12;
+            for (let v = 0; v < ctx.count; v++) {
+              const sp = r.worldToScreen(positions[v * 2]!, positions[v * 2 + 1]!);
+              const d = Math.hypot(sp.x - p.x, sp.y - p.y);
+              if (d < bestDist) {
+                bestDist = d;
+                best = v;
+              }
+            }
+            if (best < 0) return;
+            next = removeMeshVertex(state.doc.data, ctx.edit.slot, mesh, best);
+          }
+          state.execute(
+            new SetMeshGeometry('default', ctx.edit.slot, ctx.edit.attachment, {
+              vertices: next.vertices,
+              uvs: next.uvs,
+              triangles: next.triangles,
+              hull: next.hull ?? next.uvs.length / 2,
+            }),
+          );
+        } catch (err) {
+          state.setError(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
       if (ctx.edit.mode === 'weights') {
         if (!ctx.weighted) {
           state.setError('Bind bones first (Weights section in the Properties panel).');
@@ -385,7 +446,7 @@ export function Viewport() {
           return;
         }
         dragRef.current = { kind: 'paint' };
-        paintDab(ctx, p);
+        paintDab(ctx, p, e.shiftKey);
         return;
       }
       // Vertices mode: grab the nearest handle within 12px.
@@ -575,7 +636,7 @@ export function Viewport() {
     }
     if (drag.kind === 'paint') {
       const ctx = editContext();
-      if (ctx) paintDab(ctx, p);
+      if (ctx) paintDab(ctx, p, e.shiftKey);
       return;
     }
     const world = r.screenToWorld(p.x, p.y);

@@ -1639,3 +1639,15 @@ button.active {
 .ghosting-body .field input[type='range'] {
   width: 90px;
 }
+
+/* ---- Mesh tools row (P19) ---- */
+.mesh-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+.mesh-tools button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}

@@ -5,11 +5,14 @@ import {
   RemoveSkinAttachment,
   ReorderSlot,
   SetAttachmentVertices,
+  SetMeshGeometry,
   SetSlotProperties,
   autoWeightVertices,
+  buildGridMeshAttachment,
   createSlot,
   isWeightedVertices,
   meshVertexCount,
+  weldMeshVertices,
   type Command,
   type SpineAttachment,
   type SpineBlendMode,
@@ -36,6 +39,78 @@ function influenceBoneIndices(vertices: number[]): number[] {
     }
   }
   return [...out].sort((a, b) => a - b);
+}
+
+/** Mode + action row for the mesh being edited (setup-mode geometry tools). */
+function MeshToolsRow({ slotName, attName }: { slotName: string; attName: string }) {
+  const meshEdit = useEditor((s) => s.meshEdit);
+  const mode = useEditor((s) => s.mode);
+  const doc = useEditor((s) => s.doc);
+  if (!meshEdit) return null;
+  const att = doc.data.skins.find((s) => s.name === 'default')?.attachments?.[slotName]?.[attName];
+  if (!att || att.type !== 'mesh') return null;
+  const setup = mode === 'setup';
+  const state = () => useEditor.getState();
+  const geometryOf = (m: {
+    vertices: number[];
+    uvs: number[];
+    triangles: number[];
+    hull?: number;
+  }) => ({
+    vertices: m.vertices,
+    uvs: m.uvs,
+    triangles: m.triangles,
+    hull: m.hull ?? m.uvs.length / 2,
+  });
+  const modes = [
+    ['vertices', 'Modify'],
+    ['create', 'Create'],
+    ['delete', 'Delete'],
+    ['weights', 'Weights'],
+  ] as const;
+  return (
+    <div className="mesh-tools">
+      {modes.map(([m, label]) => (
+        <button
+          key={m}
+          className={meshEdit.mode === m ? 'active' : ''}
+          disabled={!setup && (m === 'create' || m === 'delete')}
+          onClick={() => state().setMeshEditMode(m)}
+        >
+          {label}
+        </button>
+      ))}
+      <button
+        disabled={!setup}
+        title="Merge vertices closer than 1 unit"
+        onClick={() => {
+          try {
+            const { mesh: welded, merged } = weldMeshVertices(state().doc.data, slotName, att, 1);
+            if (merged > 0) {
+              state().execute(
+                new SetMeshGeometry('default', slotName, attName, geometryOf(welded)),
+              );
+              state().setError(`Welded ${merged} vertex${merged > 1 ? 'es' : ''}.`);
+            }
+          } catch (err) {
+            state().setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+      >
+        Weld
+      </button>
+      <button
+        disabled={!setup || !att.width || !att.height}
+        title="Replace geometry with a fresh 3×3 grid (clears weights + deform keys)"
+        onClick={() => {
+          const grid = buildGridMeshAttachment(att.width!, att.height!);
+          state().execute(new SetMeshGeometry('default', slotName, attName, geometryOf(grid)));
+        }}
+      >
+        Reset
+      </button>
+    </div>
+  );
 }
 
 /** Weights controls for the mesh being edited (bind bones, pick paint bone). */
@@ -255,6 +330,9 @@ function AttachmentsSection({ slotName }: { slotName: string }) {
         ) : att.type === 'point' ? (
           <PointFields key={name} slotName={slotName} attName={name} att={att} />
         ) : null,
+      )}
+      {meshEdit?.slot === slotName && (
+        <MeshToolsRow slotName={slotName} attName={meshEdit.attachment} />
       )}
       {meshEdit?.slot === slotName && (
         <WeightsSection slotName={slotName} attName={meshEdit.attachment} />
