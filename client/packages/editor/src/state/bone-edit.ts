@@ -38,8 +38,9 @@ export function applyBoneEdit(boneName: string, patch: BonePatch): boolean {
     return s.execute(new SetBoneTransform(boneName, p as BoneTransformPatch));
   }
   if (!s.autoKey) {
-    s.setError('Auto Key is off — enable it to key changes in animate mode.');
-    return false;
+    // Transient pose: preview the values without keying them.
+    s.setPosePreview(boneName, patch as Record<string, number>);
+    return true;
   }
   const t = s.anim.time;
   const cmds: Command[] = [];
@@ -107,4 +108,20 @@ export function parseNumeric(input: string, current: number): number | null {
   if (m[1] === '*') return current * v;
   if (m[1] === '/') return v === 0 ? null : current / v;
   return v;
+}
+
+/** Keys absolute locals at the playhead even while Auto Key is off, then drops that bone's preview. */
+export function keyPoseNow(boneName: string, patch: BonePatch): boolean {
+  const s = useEditor.getState();
+  const prevAuto = s.autoKey;
+  if (!prevAuto) s.setAutoKey(true);
+  const ok = applyBoneEdit(boneName, patch);
+  if (!prevAuto) s.setAutoKey(false);
+  const preview = useEditor.getState().posePreview;
+  if (ok && preview?.[boneName]) {
+    const rest = { ...preview };
+    delete rest[boneName];
+    useEditor.setState({ posePreview: Object.keys(rest).length ? rest : null });
+  }
+  return ok;
 }

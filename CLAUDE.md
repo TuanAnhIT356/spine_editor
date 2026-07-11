@@ -64,7 +64,12 @@ colored type icons, search) with the bone/slot properties dock at its bottom —
 HierarchyPanel/PropertiesPanel removed; 16b — dock editors for all constraint types
 (new Set\*ConstraintProperties + SetBoneColor core commands), event/animation docks,
 set_*_constraint MCP tools (59 total), tree context menus + inline rename.
-Next: PLAN.md §8 phases 17–22.
+**Phase 17 done**: Spine-style animate dock — Graph/Dopesheet tabs with Sync,
+toolbar (Filter by timeline type, Lock rows, Shift selected keys, Offset all keys),
+Current/Loop Start/End fields with loop-range playback, full transport, colored key
+ticks + per-bone summary rows (white on multi-type frames) + red summary diamonds +
+interpolation connectors, and transient posing when Auto Key is off (key buttons
+commit the pose). Next: PLAN.md §8 phases 18–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

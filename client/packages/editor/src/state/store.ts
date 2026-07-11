@@ -67,6 +67,9 @@ export interface AnimationUiState {
   speed: number;
   /** Onion-skin ghosting of nearby frames while animating. */
   ghost: boolean;
+  /** Editor-only playback loop range (seconds); null = full duration. */
+  loopStart: number | null;
+  loopEnd: number | null;
 }
 
 export interface LayoutState {
@@ -157,6 +160,11 @@ interface EditorState {
   savedRevision: number;
   /** Editor-only viewport hiding (never serialized): bone gizmos / slot sprites. */
   hiddenBones: string[];
+  /** Transient pose overlay while Auto Key is off (editor-only, never serialized). */
+  posePreview: Record<
+    string,
+    Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'shearX' | 'shearY', number>>
+  > | null;
   hiddenSlots: string[];
 
   setTool(tool: Tool): void;
@@ -184,6 +192,9 @@ interface EditorState {
   toggleViewFilter(group: keyof ViewFilters, key: keyof GroupFilter): void;
   setAutoKey(on: boolean): void;
   togglePanel(panel: 'tree' | 'timeline'): void;
+  setLoopRange(start: number | null, end: number | null): void;
+  setPosePreview(bone: string, patch: Record<string, number>): void;
+  clearPosePreview(): void;
   toggleBoneHidden(name: string): void;
   toggleSlotHidden(name: string): void;
   /** Marks the current revision as saved (clears the dirty indicator). */
@@ -218,7 +229,16 @@ export const useEditor = create<EditorState>()((set, get) => ({
   activeSkin: 'default',
   assets: {},
   error: null,
-  anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
+  anim: {
+    current: null,
+    time: 0,
+    playing: false,
+    loop: true,
+    speed: 1,
+    ghost: false,
+    loopStart: null,
+    loopEnd: null,
+  },
   axesMode: 'local',
   viewFilters: {
     bones: { select: true, visible: true, labels: false },
@@ -230,6 +250,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   savedRevision: 0,
   hiddenBones: [],
   hiddenSlots: [],
+  posePreview: null,
 
   setTool: (tool) => set({ tool }),
   setMode: (mode) =>
@@ -238,7 +259,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       const names = Object.keys(s.doc.data.animations);
       const current =
         mode === 'animate' && s.anim.current === null ? (names[0] ?? null) : s.anim.current;
-      return { mode, anim: { ...s.anim, current, playing: false } };
+      return { mode, anim: { ...s.anim, current, playing: false }, posePreview: null };
     }),
   select: (item) => set({ selection: item ? [item] : [] }),
   toggleSelection: (item) =>
@@ -299,8 +320,12 @@ export const useEditor = create<EditorState>()((set, get) => ({
     }),
   setError: (error) => set({ error }),
   setAnimation: (name) =>
-    set((s) => ({ anim: { ...s.anim, current: name, time: 0, playing: false } })),
-  setAnimTime: (time) => set((s) => ({ anim: { ...s.anim, time: Math.max(0, time) } })),
+    set((s) => ({
+      anim: { ...s.anim, current: name, time: 0, playing: false, loopStart: null, loopEnd: null },
+      posePreview: null,
+    })),
+  setAnimTime: (time) =>
+    set((s) => ({ anim: { ...s.anim, time: Math.max(0, time) }, posePreview: null })),
   setPlaying: (playing) => set((s) => ({ anim: { ...s.anim, playing } })),
   setLoop: (loop) => set((s) => ({ anim: { ...s.anim, loop } })),
   setSpeed: (speed) =>
@@ -319,6 +344,16 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set((s) => ({
       panelVisibility: { ...s.panelVisibility, [panel]: !s.panelVisibility[panel] },
     })),
+  setLoopRange: (start, end) =>
+    set((s) => ({ anim: { ...s.anim, loopStart: start, loopEnd: end } })),
+  setPosePreview: (bone, patch) =>
+    set((s) => ({
+      posePreview: {
+        ...(s.posePreview ?? {}),
+        [bone]: { ...(s.posePreview?.[bone] ?? {}), ...patch },
+      },
+    })),
+  clearPosePreview: () => set({ posePreview: null }),
   toggleBoneHidden: (name) =>
     set((s) => ({
       hiddenBones: s.hiddenBones.includes(name)
@@ -428,7 +463,16 @@ export const useEditor = create<EditorState>()((set, get) => ({
       error: null,
       revision: s.revision + 1,
       savedRevision: s.revision + 1,
-      anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
+      anim: {
+        current: null,
+        time: 0,
+        playing: false,
+        loop: true,
+        speed: 1,
+        ghost: false,
+        loopStart: null,
+        loopEnd: null,
+      },
     }));
     return issues;
   },

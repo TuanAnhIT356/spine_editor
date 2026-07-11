@@ -60,6 +60,18 @@ const sameKey = (a: KeyRef, b: KeyRef) =>
 const TICK_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60];
 
 /** Ruler tick times, spaced so ticks stay ~60px apart regardless of zoom. */
+const TIMELINE_TYPES = [
+  'rotate',
+  'translate',
+  'scale',
+  'shear',
+  'color',
+  'attachment',
+  'deform',
+  'draworder',
+  'event',
+];
+
 function tickTimes(span: number, pps: number): number[] {
   const targetPx = 60;
   const rawInterval = targetPx / pps;
@@ -88,7 +100,15 @@ export function TimelinePanel() {
   const [dragKeys, setDragKeys] = useState<{ grabTime: number; delta: number } | null>(null);
   const [boxSel, setBoxSel] = useState<BoxSelState | null>(null);
   const [pps, setPps] = useState(DEFAULT_PPS);
-  const [showGraph, setShowGraph] = useState(false);
+  const [tab, setTab] = useState<'dopesheet' | 'graph'>('dopesheet');
+  const [sync, setSync] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<Set<string> | null>(null);
+  const [locked, setLocked] = useState<string[] | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [shiftText, setShiftText] = useState('1');
+  const [offsetText, setOffsetText] = useState('1');
+  /** Key shown in the Graph tab; frozen while Sync is off. */
+  const graphKeyRef = useRef<KeyRef | null>(null);
   const [scaleText, setScaleText] = useState('1.5');
   const [exporting, setExporting] = useState(false);
   const tracksRef = useRef<HTMLDivElement | null>(null);
@@ -107,8 +127,14 @@ export function TimelinePanel() {
       keys: timelines[tl]!,
     })),
   );
-  const drawOrderKeys = animation?.drawOrder ?? [];
-  const eventKeys = animation?.events ?? [];
+  const visibleTracks = boneTracks.filter((t) => {
+    if (typeFilter && !typeFilter.has(t.timeline)) return false;
+    if (locked && !locked.includes(`${t.bone}.${t.timeline}`)) return false;
+    return true;
+  });
+  const drawOrderKeys =
+    typeFilter && !typeFilter.has('draworder') ? [] : (animation?.drawOrder ?? []);
+  const eventKeys = typeFilter && !typeFilter.has('event') ? [] : (animation?.events ?? []);
   const primaryKey = selectedKeys.length > 0 ? selectedKeys[selectedKeys.length - 1]! : null;
 
   /** Zooms the timeline, keeping the time under `anchorClientX` fixed on screen. */
@@ -167,11 +193,13 @@ export function TimelinePanel() {
       const s = useEditor.getState();
       const a = s.anim.current ? s.doc.getAnimation(s.anim.current) : undefined;
       const dur = a ? Math.max(getAnimationDuration(a), 0.001) : 1;
+      const start = s.anim.loopStart ?? 0;
+      const end = s.anim.loopEnd ?? dur;
       let t = s.anim.time + dt * s.anim.speed;
-      if (t > dur) {
-        if (s.anim.loop) t %= dur;
+      if (t > end) {
+        if (s.anim.loop) t = start + ((t - start) % Math.max(end - start, 0.001));
         else {
-          s.setAnimTime(dur);
+          s.setAnimTime(end);
           s.setPlaying(false);
           return;
         }
@@ -249,6 +277,18 @@ export function TimelinePanel() {
     }
     setSelectedKeys(next);
     return next;
+  }
+
+  if (sync && primaryKey) graphKeyRef.current = primaryKey;
+
+  function jumpToKey(dir: -1 | 1) {
+    const times = [...new Set(boneTracks.flatMap((t) => t.keys.map((k) => k.time ?? 0)))].sort(
+      (a, b) => a - b,
+    );
+    const t = useEditor.getState().anim.time;
+    const next =
+      dir === 1 ? times.find((x) => x > t + 1e-6) : [...times].reverse().find((x) => x < t - 1e-6);
+    if (next !== undefined) useEditor.getState().setAnimTime(next);
   }
 
   function deleteSelectedKeys() {
@@ -476,6 +516,99 @@ export function TimelinePanel() {
 
   return (
     <div className="timeline" style={{ height: layout.timelineHeight }}>
+      <div className="tl-tabs">
+        <button
+          className={tab === 'graph' ? 'tl-tab active' : 'tl-tab'}
+          onClick={() => setTab('graph')}
+        >
+          Graph
+        </button>
+        <button
+          className={tab === 'dopesheet' ? 'tl-tab active' : 'tl-tab'}
+          onClick={() => setTab('dopesheet')}
+        >
+          Dopesheet
+        </button>
+        <button
+          className={sync ? 'tl-sync active' : 'tl-sync'}
+          title="Sync the Graph tab to the dopesheet selection"
+          onClick={() => setSync(!sync)}
+        >
+          Sync
+        </button>
+        <div className="menu-wrap">
+          <button
+            className={typeFilter ? 'tl-sync active' : 'tl-sync'}
+            onClick={() => setShowFilter((v) => !v)}
+          >
+            Filter ▾
+          </button>
+          {showFilter && (
+            <div className="dropdown">
+              {TIMELINE_TYPES.map((t) => (
+                <label key={t} className="views-item">
+                  <input
+                    type="checkbox"
+                    checked={!typeFilter || typeFilter.has(t)}
+                    onChange={(e) => {
+                      const next = new Set(typeFilter ?? TIMELINE_TYPES);
+                      if (e.target.checked) next.add(t);
+                      else next.delete(t);
+                      setTypeFilter(next.size === TIMELINE_TYPES.length ? null : next);
+                    }}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          className={locked ? 'tl-sync active' : 'tl-sync'}
+          title="Freeze the current row list"
+          onClick={() =>
+            setLocked(locked ? null : boneTracks.map((t) => `${t.bone}.${t.timeline}`))
+          }
+        >
+          Lock
+        </button>
+        <span className="tl-field">
+          <span>Shift</span>
+          <input value={shiftText} onChange={(e) => setShiftText(e.target.value)} />
+          <button
+            disabled={selectedKeys.length === 0}
+            title="Move the selected keys by ±frames"
+            onClick={() => {
+              const frames = Number(shiftText);
+              if (Number.isFinite(frames) && frames !== 0) commitKeyDrag(frames / 30);
+            }}
+          >
+            Apply
+          </button>
+        </span>
+        <span className="tl-field">
+          <span>Offset</span>
+          <input value={offsetText} onChange={(e) => setOffsetText(e.target.value)} />
+          <button
+            disabled={!anim.current}
+            title="Shift every bone key of the animation by ±frames (fails on collisions)"
+            onClick={() => {
+              const frames = Number(offsetText);
+              if (!Number.isFinite(frames) || frames === 0 || !anim.current) return;
+              const refs = boneTracks.flatMap((t) =>
+                t.keys.map((k) => ({ bone: t.bone, timeline: t.timeline, time: k.time ?? 0 })),
+              );
+              if (refs.length > 0) {
+                useEditor
+                  .getState()
+                  .execute(new TransformBoneKeys(anim.current, refs, { offset: frames / 30 }));
+              }
+            }}
+          >
+            Apply
+          </button>
+        </span>
+      </div>
       <div className="timeline-header">
         <select
           value={anim.current ?? ''}
@@ -493,6 +626,16 @@ export function TimelinePanel() {
           Delete
         </button>
         <span className="sep" />
+        <button
+          disabled={!anim.current}
+          title="Go to start"
+          onClick={() => useEditor.getState().setAnimTime(useEditor.getState().anim.loopStart ?? 0)}
+        >
+          ⏮
+        </button>
+        <button disabled={!anim.current} title="Previous key" onClick={() => jumpToKey(-1)}>
+          ◀|
+        </button>
         <button
           disabled={!anim.current}
           title="Previous frame (←)"
@@ -513,6 +656,16 @@ export function TimelinePanel() {
           onClick={() => useEditor.getState().stepFrame(1)}
         >
           ⏵
+        </button>
+        <button disabled={!anim.current} title="Next key" onClick={() => jumpToKey(1)}>
+          |▶
+        </button>
+        <button
+          disabled={!anim.current}
+          title="Go to end"
+          onClick={() => useEditor.getState().setAnimTime(duration)}
+        >
+          ⏭
         </button>
         <button
           className={anim.loop ? 'active' : ''}
@@ -541,6 +694,54 @@ export function TimelinePanel() {
         <span className="time-display">
           {anim.time.toFixed(2)}s · f{frame} / {duration.toFixed(2)}s
         </span>
+        <label className="tl-field">
+          <span>Current</span>
+          <input
+            type="number"
+            value={frame}
+            onChange={(e) => useEditor.getState().setAnimTime(Number(e.target.value) / 30)}
+          />
+        </label>
+        <label className="tl-field">
+          <span>Loop Start</span>
+          <input
+            type="number"
+            value={anim.loopStart !== null ? Math.round(anim.loopStart * 30) : ''}
+            placeholder="—"
+            onChange={(e) =>
+              useEditor
+                .getState()
+                .setLoopRange(
+                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                  anim.loopEnd,
+                )
+            }
+          />
+        </label>
+        <label className="tl-field">
+          <span>End</span>
+          <input
+            type="number"
+            value={anim.loopEnd !== null ? Math.round(anim.loopEnd * 30) : ''}
+            placeholder="—"
+            onChange={(e) =>
+              useEditor
+                .getState()
+                .setLoopRange(
+                  anim.loopStart,
+                  e.target.value === '' ? null : Number(e.target.value) / 30,
+                )
+            }
+          />
+        </label>
+        {(anim.loopStart !== null || anim.loopEnd !== null) && (
+          <button
+            title="Clear loop range"
+            onClick={() => useEditor.getState().setLoopRange(null, null)}
+          >
+            ✕
+          </button>
+        )}
         <span className="sep" />
         <button onClick={() => zoomBy(1 / 1.2)} title="Zoom out (Ctrl/Cmd+Scroll)">
           −
@@ -607,13 +808,8 @@ export function TimelinePanel() {
                   </option>
                 </select>
                 <button
-                  className={showGraph ? 'active' : ''}
-                  onClick={() => {
-                    // Grow the panel so the graph doesn't squeeze out the dopesheet.
-                    useEditor.getState().resizeTimeline(showGraph ? 185 : -185);
-                    setShowGraph(!showGraph);
-                  }}
-                  title="Edit the bezier curve toward the next key"
+                  onClick={() => setTab('graph')}
+                  title="Edit the bezier curve toward the next key (Graph tab)"
                 >
                   Curve
                 </button>
@@ -648,7 +844,7 @@ export function TimelinePanel() {
         </div>
       )}
 
-      {anim.current && (
+      {anim.current && tab === 'dopesheet' && (
         <div className="timeline-body" ref={tracksRef}>
           <div
             className="tracks"
@@ -669,17 +865,89 @@ export function TimelinePanel() {
               onPointerMove={(e) => scrubbing.current && onScrub(e)}
               onPointerUp={() => (scrubbing.current = false)}
             >
+              {anim.loopEnd !== null && (
+                <span
+                  className="loop-range"
+                  style={{
+                    left: PAD + (anim.loopStart ?? 0) * pps,
+                    width: Math.max((anim.loopEnd - (anim.loopStart ?? 0)) * pps, 0),
+                  }}
+                />
+              )}
               {tickTimes(span, pps).map((t) => (
                 <span key={t} className="tick" style={{ left: PAD + t * pps }}>
                   {t.toFixed(2)}
                 </span>
               ))}
             </div>
-            {boneTracks.map((track) => (
+            <div className="track summary-row">
+              <span className="track-label">{anim.current}</span>
+              {[
+                ...new Set([
+                  ...visibleTracks.flatMap((t) => t.keys.map((k) => k.time ?? 0)),
+                  ...drawOrderKeys.map((k) => k.time ?? 0),
+                  ...eventKeys.map((k) => k.time ?? 0),
+                ]),
+              ].map((t) => (
+                <span key={t} className="summary-diamond" style={{ left: PAD + t * pps - 3 }} />
+              ))}
+            </div>
+            {Object.entries(
+              visibleTracks.reduce<Record<string, Map<number, Set<string>>>>((acc, t) => {
+                const m = (acc[t.bone] ??= new Map());
+                for (const k of t.keys) {
+                  const time = k.time ?? 0;
+                  if (!m.has(time)) m.set(time, new Set());
+                  m.get(time)!.add(t.timeline);
+                }
+                return acc;
+              }, {}),
+            ).map(([bone, times]) => (
+              <div key={`sum-${bone}`} className="track bone-summary">
+                <span className="track-label">{bone}</span>
+                {[...times.entries()].map(([t, types]) => (
+                  <span
+                    key={t}
+                    className={`key ${types.size > 1 ? 'key-multi' : `key-${[...types][0]}`}`}
+                    style={{ left: PAD + t * pps - 5 }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      const refs = [...types].map((timeline) => ({
+                        bone,
+                        timeline: timeline as KeyRef['timeline'],
+                        time: t,
+                      }));
+                      setSelectedKeys(refs);
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+            {visibleTracks.map((track) => (
               <div key={`${track.bone}.${track.timeline}`} className="track">
                 <span className="track-label">
                   {track.bone} · {track.timeline}
                 </span>
+                <svg className="track-lines">
+                  {track.keys.slice(0, -1).map((key, i) => {
+                    const a = (key.time ?? 0) * pps + PAD;
+                    const b = (track.keys[i + 1]!.time ?? 0) * pps + PAD;
+                    const stepped = key.curve === 'stepped';
+                    const bezier = Array.isArray(key.curve);
+                    return (
+                      <line
+                        key={i}
+                        x1={a}
+                        y1={12}
+                        x2={b}
+                        y2={12}
+                        className={`conn conn-${track.timeline}`}
+                        strokeDasharray={stepped ? '3 3' : undefined}
+                        strokeWidth={bezier ? 2 : 1}
+                      />
+                    );
+                  })}
+                </svg>
                 {track.keys.map((key) => {
                   const t = key.time ?? 0;
                   const ref: KeyRef = { bone: track.bone, timeline: track.timeline, time: t };
@@ -689,7 +957,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={t}
-                      className={`key ${isSelected ? 'selected' : ''}`}
+                      className={`key key-${track.timeline} ${isSelected ? 'selected' : ''}`}
                       style={{ left: x - 5 }}
                       onPointerDown={(e) => {
                         e.stopPropagation();
@@ -733,7 +1001,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={t}
-                      className={`key draworder ${isSelected ? 'selected' : ''}`}
+                      className={`key draworder key-draworder ${isSelected ? 'selected' : ''}`}
                       title={`draw order (${key.offsets?.length ?? 0} offsets)`}
                       style={{ left: PAD + t * pps - 5 }}
                       onPointerDown={(e) => {
@@ -758,7 +1026,7 @@ export function TimelinePanel() {
                   return (
                     <span
                       key={`${key.name}@${t}`}
-                      className={`key event ${isSelected ? 'selected' : ''}`}
+                      className={`key event key-event ${isSelected ? 'selected' : ''}`}
                       title={key.name}
                       style={{ left: PAD + t * pps - 5 }}
                       onPointerDown={(e) => {
@@ -792,13 +1060,16 @@ export function TimelinePanel() {
         </div>
       )}
 
-      {anim.current && showGraph && primaryKey && (
+      {anim.current && tab === 'graph' && graphKeyRef.current && (
         <GraphEditor
           animation={anim.current}
-          bone={primaryKey.bone}
-          timeline={primaryKey.timeline}
-          time={primaryKey.time}
+          bone={graphKeyRef.current.bone}
+          timeline={graphKeyRef.current.timeline}
+          time={graphKeyRef.current.time}
         />
+      )}
+      {anim.current && tab === 'graph' && !graphKeyRef.current && (
+        <div className="empty">Select a key in the Dopesheet to edit its curve here.</div>
       )}
     </div>
   );

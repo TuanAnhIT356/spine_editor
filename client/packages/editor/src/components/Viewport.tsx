@@ -120,17 +120,23 @@ export function Viewport() {
   const viewFilters = useEditor((s) => s.viewFilters);
   const hiddenBones = useEditor((s) => s.hiddenBones);
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
+  const posePreview = useEditor((s) => s.posePreview);
 
   /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
   function baseLocals(): BoneData[] {
     const state = useEditor.getState();
     const { doc, mode: m, anim } = state;
+    const overlay = (locals: BoneData[]): BoneData[] => {
+      const preview = state.posePreview;
+      if (!preview) return locals;
+      return locals.map((b) => (preview[b.name] ? { ...b, ...preview[b.name] } : b));
+    };
     if (m === 'animate' && anim.current && doc.data.animations[anim.current]) {
       if (doc.data.physics.length > 0) {
         physicsRef.current ??= new PhysicsSimulator(doc.data);
-        return physicsRef.current.localsAt(anim.current, anim.time);
+        return overlay(physicsRef.current.localsAt(anim.current, anim.time));
       }
-      return computeAnimatedLocals(doc.data, anim.current, anim.time);
+      return overlay(computeAnimatedLocals(doc.data, anim.current, anim.time));
     }
     return doc.data.bones;
   }
@@ -246,6 +252,7 @@ export function Viewport() {
     viewFilters,
     hiddenBones,
     hiddenSlots,
+    posePreview,
   ]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
@@ -647,16 +654,30 @@ export function Viewport() {
     if (!drag || drag.kind === 'pan') return;
     const state = useEditor.getState();
     const animating = state.mode === 'animate' && state.anim.current !== null;
+    if (animating && !state.autoKey && drag.kind === 'vertex') {
+      state.setError('Auto Key is off — enable it to key deform changes.');
+      redraw();
+      return;
+    }
     if (
       animating &&
       !state.autoKey &&
       (drag.kind === 'translate' ||
         drag.kind === 'rotate' ||
         drag.kind === 'scale' ||
-        drag.kind === 'shear' ||
-        drag.kind === 'vertex')
+        drag.kind === 'shear') &&
+      override
     ) {
-      state.setError('Auto Key is off — enable it to key changes in animate mode.');
+      // Transient pose (Spine-style): show the pose without keying it.
+      for (const boneName of drag.bones) {
+        const b = override.find((x) => x.name === boneName);
+        if (!b) continue;
+        if (drag.kind === 'translate') state.setPosePreview(boneName, { x: b.x, y: b.y });
+        else if (drag.kind === 'rotate') state.setPosePreview(boneName, { rotation: b.rotation });
+        else if (drag.kind === 'scale')
+          state.setPosePreview(boneName, { scaleX: b.scaleX, scaleY: b.scaleY });
+        else state.setPosePreview(boneName, { shearX: b.shearX, shearY: b.shearY });
+      }
       redraw();
       return;
     }
