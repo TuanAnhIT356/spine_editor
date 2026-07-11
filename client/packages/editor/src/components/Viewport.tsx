@@ -115,6 +115,7 @@ export function Viewport() {
   const animCurrent = useEditor((s) => s.anim.current);
   const animTime = useEditor((s) => s.anim.time);
   const animGhost = useEditor((s) => s.anim.ghost);
+  const viewFilters = useEditor((s) => s.viewFilters);
 
   /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
   function baseLocals(): BoneData[] {
@@ -191,6 +192,7 @@ export function Viewport() {
   function redraw() {
     const r = rendererRef.current;
     if (!r?.ready) return;
+    r.setViewFilters(useEditor.getState().viewFilters);
     void r.render(buildRenderInput());
   }
 
@@ -235,6 +237,7 @@ export function Viewport() {
     animCurrent,
     animTime,
     animGhost,
+    viewFilters,
   ]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
@@ -381,7 +384,8 @@ export function Viewport() {
     }
 
     const base = baseLocals();
-    const hit = r.hitTest(p.x, p.y);
+    // Selection filter: bones ignored by picking when their select dot is off.
+    const hit = state.viewFilters.bones.select ? r.hitTest(p.x, p.y) : null;
     const world = r.screenToWorld(p.x, p.y);
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
     const primary = primarySelection(state.selection);
@@ -548,8 +552,38 @@ export function Viewport() {
     const world = r.screenToWorld(p.x, p.y);
     const base = baseLocals();
     if (drag.kind === 'translate') {
-      const wx = world.x - drag.startWorld.x;
-      const wy = world.y - drag.startWorld.y;
+      let wx = world.x - drag.startWorld.x;
+      let wy = world.y - drag.startWorld.y;
+      if (e.shiftKey) {
+        // Shift constrains the drag to the dominant axis of the chosen frame
+        // (Local = bone axes, Parent = parent axes, World = screen axes).
+        const s = useEditor.getState();
+        let ax = { x: 1, y: 0 };
+        let ay = { x: 0, y: 1 };
+        if (s.axesMode !== 'world') {
+          const ref =
+            s.axesMode === 'local'
+              ? drag.bones[0]!
+              : (s.doc.findBone(drag.bones[0]!)?.parent ?? null);
+          const m = ref ? r.getBoneWorld(ref) : undefined;
+          if (m) {
+            const lx = Math.hypot(m.a, m.b) || 1;
+            const ly = Math.hypot(m.c, m.d) || 1;
+            ax = { x: m.a / lx, y: m.b / lx };
+            ay = { x: m.c / ly, y: m.d / ly };
+          }
+        }
+        const dot = (v: { x: number; y: number }) => wx * v.x + wy * v.y;
+        const px = dot(ax);
+        const py = dot(ay);
+        if (Math.abs(px) >= Math.abs(py)) {
+          wx = ax.x * px;
+          wy = ax.y * px;
+        } else {
+          wx = ay.x * py;
+          wy = ay.y * py;
+        }
+      }
       overrideRef.current = base.map((b) => {
         const start = drag.startLocals.get(b.name);
         const inv = drag.invParents.get(b.name);
@@ -658,6 +692,7 @@ export function Viewport() {
       const y1 = Math.max(drag.startY, drag.endY);
       if (x1 - x0 < 2 && y1 - y0 < 2) return; // treat as a plain click, already handled
       const hits: SelectionItem[] = [];
+      if (!state.viewFilters.bones.select) return;
       for (const bone of state.doc.data.bones) {
         const w = r.getBoneWorld(bone.name);
         if (!w) continue;

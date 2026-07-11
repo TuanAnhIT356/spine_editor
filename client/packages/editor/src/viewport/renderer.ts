@@ -26,9 +26,10 @@ import {
   MeshSimple,
   Rectangle,
   Sprite,
+  Text,
   Texture,
 } from 'pixi.js';
-import type { ImageAsset, Selection } from '../state/store.js';
+import type { ImageAsset, Selection, ViewFilters } from '../state/store.js';
 
 export interface RenderInput {
   data: SkeletonData;
@@ -174,6 +175,10 @@ export class SceneRenderer {
   private textures = new Map<string, Texture>();
   private lastPose = new Map<string, Mat2D>();
   private disposed = false;
+  /** Name labels drawn in screen space (the world container is y-flipped). */
+  private labelLayer = new Container();
+  private labels = new Map<string, Text>();
+  private viewFilters: ViewFilters | null = null;
 
   ready = false;
   offsetX = 0;
@@ -196,6 +201,7 @@ export class SceneRenderer {
       this.overlayLayer,
     );
     this.app.stage.addChild(this.world);
+    this.app.stage.addChild(this.labelLayer);
     this.offsetX = host.clientWidth / 2;
     this.offsetY = host.clientHeight * 0.75;
     this.drawGrid();
@@ -237,6 +243,10 @@ export class SceneRenderer {
 
   getBoneWorld(name: string): Mat2D | undefined {
     return this.lastPose.get(name);
+  }
+
+  setViewFilters(f: ViewFilters): void {
+    this.viewFilters = f;
   }
 
   /** PNG data URL of the current viewport (used by the MCP bridge). */
@@ -432,8 +442,48 @@ export class SceneRenderer {
       endClipAfter(slot.name);
     }
 
+    this.spriteLayer.visible = this.viewFilters?.images.visible !== false;
+    this.boneLayer.visible = this.viewFilters?.bones.visible !== false;
+    this.overlayLayer.visible = this.viewFilters?.others.visible !== false;
     this.drawBones(data.bones, pose, input.selection);
     this.drawOverlays(data, pose, input);
+    this.updateLabels(data, pose);
+  }
+
+  /** Screen-space name tags for bones/attachments, driven by the filter matrix. */
+  private updateLabels(data: SkeletonData, pose: Map<string, Mat2D>): void {
+    const seen = new Set<string>();
+    const put = (id: string, text: string, wx: number, wy: number, dy: number) => {
+      let t = this.labels.get(id);
+      if (!t) {
+        t = new Text({ text, style: { fontSize: 11, fill: 0xd8d8d8 } });
+        this.labels.set(id, t);
+        this.labelLayer.addChild(t);
+      }
+      if (t.text !== text) t.text = text;
+      const s = this.worldToScreen(wx, wy);
+      t.position.set(s.x + 8, s.y + dy);
+      seen.add(id);
+    };
+    if (this.viewFilters?.bones.labels) {
+      for (const b of data.bones) {
+        const m = pose.get(b.name);
+        if (m) put(`bone:${b.name}`, b.name, m.tx, m.ty, -18);
+      }
+    }
+    if (this.viewFilters?.images.labels) {
+      for (const s of data.slots) {
+        if (!s.attachment) continue;
+        const m = pose.get(s.bone);
+        if (m) put(`slot:${s.name}`, s.attachment, m.tx, m.ty, 6);
+      }
+    }
+    for (const [id, t] of this.labels) {
+      if (!seen.has(id)) {
+        t.destroy();
+        this.labels.delete(id);
+      }
+    }
   }
 
   /**
