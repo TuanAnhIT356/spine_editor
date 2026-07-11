@@ -42,14 +42,14 @@ Segment dialog (mask review with point prompts, per-part re-run, inpaint toggle)
 importing parts as assets with source `origin` + optional place-on-canvas; strategy A
 via `POST /api/generate/part-set` + "Generate part set" in the Generate dialog; MCP tool
 `segment_image` shares `src/segment/import-parts.ts` with the dialog —
-**55 MCP tools total**. `SPINE_SERVER_SEGMENT_FAKE=1` gives deterministic engines for
+**59 MCP tools total**. `SPINE_SERVER_SEGMENT_FAKE=1` gives deterministic engines for
 tests/e2e/CI.
 **Phase 14 done**: slice 1 — `rig_from_parts` (auto-skeleton from placed parts —
 joints from box geometry via `core/src/autorig.ts`, 2-bone IK, one undo step) and
 `apply_preset_animation` (idle/walk/wave from `core/src/presets.ts`, retargeted with
 length-scaled translates); slice 2 — AI chat: tool defs live in shared (`TOOL_DEFS`,
-55 tools, mcp-server registers from it), the editor's floating ChatWindow connects to
-`ws /api/chat/ws`, sends the 55 JSON Schemas in `hello`, and executes dispatched ops
+59 tools, mcp-server registers from it), the editor's floating ChatWindow connects to
+`ws /api/chat/ws`, sends the 59 JSON Schemas in `hello`, and executes dispatched ops
 via the bridge op layer; FastAPI runs the anthropic streaming loop (claude-opus-4-8,
 adaptive thinking, BYOK vault key) with history in `conversations`/`messages`
 (content blocks verbatim — resume replays exact context).
@@ -58,12 +58,13 @@ real). **Phase 15 (Spine-parity U1) done**: Spine-style shell — theme tokens, 
 file menu + icon actions + dirty star + Views dropdown, in-viewport SETUP/ANIMATE
 banner, bottom tool cluster (live numeric transforms with `+`/`*`/`/` entry, new
 scale/shear tools, Local/Parent/World axes with Shift-constrain, selection/visibility/
-label filters, Auto Key toggle), bone breadcrumb, zoom slider. **Phase 16a done**:
-unified right-side TreePanel (bones▸slots▸attachments nesting, Constraints/Skins/
+label filters, Auto Key toggle), bone breadcrumb, zoom slider. **Phase 16 done** (both slices): unified right-side TreePanel (bones▸slots▸attachments nesting, Constraints/Skins/
 Events/Animations/Images sections, per-item visibility dots wired into the renderer,
 colored type icons, search) with the bone/slot properties dock at its bottom —
-HierarchyPanel/PropertiesPanel removed. Next: Phase 16b (constraint/event/animation
-editors, context menu, inline rename), then PLAN.md §8 phases 17–22.
+HierarchyPanel/PropertiesPanel removed; 16b — dock editors for all constraint types
+(new Set\*ConstraintProperties + SetBoneColor core commands), event/animation docks,
+set_*_constraint MCP tools (59 total), tree context menus + inline rename.
+Next: PLAN.md §8 phases 17–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
