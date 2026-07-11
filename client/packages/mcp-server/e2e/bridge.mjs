@@ -258,7 +258,7 @@ await call('set_event_keyframe', { animation: 'walk', name: 'footstep', time: 0.
 const exported2 = await call('export_spine_json');
 const exportedEvents = JSON.parse(exported2.json);
 
-// 9c3. Audio asset + event audio (Phase 20).
+// 10b. Audio asset + event audio (Phase 20).
 function tinyWavDataUrl() {
   const rate = 8000;
   const samples = Math.floor(rate * 0.2);

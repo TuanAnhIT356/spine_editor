@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BRIDGE_OPS, TOOL_DEFS, toolJsonSchemas } from '../src/index.js';
 
 describe('TOOL_DEFS', () => {
-  it('has 55 uniquely named tools with valid ops and descriptions', () => {
+  it('has 62 uniquely named tools with valid ops and descriptions', () => {
     expect(TOOL_DEFS).toHaveLength(62);
     const names = TOOL_DEFS.map((d) => d.name);
     expect(new Set(names).size).toBe(62);
