@@ -4,19 +4,19 @@ import {
   Composite,
   RemoveSkinAttachment,
   ReorderSlot,
-  SetAttachmentVertices,
+  SetMeshGeometry,
   SetSlotProperties,
-  autoWeightVertices,
+  buildGridMeshAttachment,
   createSlot,
   isWeightedVertices,
   meshVertexCount,
+  weldMeshVertices,
   type Command,
   type SpineAttachment,
   type SpineBlendMode,
   type SpineClippingAttachment,
   type SpinePointAttachment,
 } from '@spine-editor/core';
-import { useState } from 'react';
 import { uniqueName, useEditor } from '../../../state/store.js';
 import { NumField } from './fields.js';
 
@@ -24,113 +24,96 @@ const BLEND_MODES: SpineBlendMode[] = ['normal', 'additive', 'multiply', 'screen
 
 const VERTEX_TYPES = new Set(['mesh', 'boundingbox', 'clipping', 'path']);
 
-/** Unique bone indices influencing a weighted vertex array. */
-function influenceBoneIndices(vertices: number[]): number[] {
-  const out = new Set<number>();
-  let vi = 0;
-  while (vi < vertices.length) {
-    const count = vertices[vi++] ?? 0;
-    for (let b = 0; b < count; b++) {
-      out.add(vertices[vi] ?? 0);
-      vi += 4;
-    }
-  }
-  return [...out].sort((a, b) => a - b);
+/** Mode + action row for the mesh being edited (setup-mode geometry tools). */
+function MeshToolsRow({ slotName, attName }: { slotName: string; attName: string }) {
+  const meshEdit = useEditor((s) => s.meshEdit);
+  const mode = useEditor((s) => s.mode);
+  const doc = useEditor((s) => s.doc);
+  if (!meshEdit) return null;
+  const att = doc.data.skins.find((s) => s.name === 'default')?.attachments?.[slotName]?.[attName];
+  if (!att || att.type !== 'mesh') return null;
+  const setup = mode === 'setup';
+  const state = () => useEditor.getState();
+  const geometryOf = (m: {
+    vertices: number[];
+    uvs: number[];
+    triangles: number[];
+    hull?: number;
+  }) => ({
+    vertices: m.vertices,
+    uvs: m.uvs,
+    triangles: m.triangles,
+    hull: m.hull ?? m.uvs.length / 2,
+  });
+  const modes = [
+    ['vertices', 'Modify'],
+    ['create', 'Create'],
+    ['delete', 'Delete'],
+    ['weights', 'Weights'],
+  ] as const;
+  return (
+    <div className="mesh-tools">
+      {modes.map(([m, label]) => (
+        <button
+          key={m}
+          className={meshEdit.mode === m ? 'active' : ''}
+          disabled={!setup && (m === 'create' || m === 'delete')}
+          onClick={() => state().setMeshEditMode(m)}
+        >
+          {label}
+        </button>
+      ))}
+      <button
+        disabled={!setup}
+        title="Merge vertices closer than 1 unit"
+        onClick={() => {
+          try {
+            const { mesh: welded, merged } = weldMeshVertices(state().doc.data, slotName, att, 1);
+            if (merged > 0) {
+              state().execute(
+                new SetMeshGeometry('default', slotName, attName, geometryOf(welded)),
+              );
+              state().setError(`Welded ${merged} vertex${merged > 1 ? 'es' : ''}.`);
+            }
+          } catch (err) {
+            state().setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+      >
+        Weld
+      </button>
+      <button
+        disabled={!setup || !att.width || !att.height}
+        title="Replace geometry with a fresh 3×3 grid (clears weights + deform keys)"
+        onClick={() => {
+          const grid = buildGridMeshAttachment(att.width!, att.height!);
+          state().execute(new SetMeshGeometry('default', slotName, attName, geometryOf(grid)));
+        }}
+      >
+        Reset
+      </button>
+    </div>
+  );
 }
 
-/** Weights controls for the mesh being edited (bind bones, pick paint bone). */
+/** Weights status + shortcut to the floating Weights window. */
 function WeightsSection({ slotName, attName }: { slotName: string; attName: string }) {
   const revision = useEditor((s) => s.revision);
+  void revision;
   const doc = useEditor((s) => s.doc);
   const meshEdit = useEditor((s) => s.meshEdit);
-  void revision;
-  const [chosen, setChosen] = useState<string[]>([]);
-
   const att = doc.data.skins.find((s) => s.name === 'default')?.attachments?.[slotName]?.[attName];
   if (!att || att.type !== 'mesh' || !meshEdit) return null;
-  const count = meshVertexCount(att);
-  const weighted = isWeightedVertices(att.vertices, count);
-  const bones = doc.data.bones;
-
-  if (!weighted) {
-    return (
-      <>
-        <div className="panel-title">Weights</div>
-        <div className="empty">
-          Pick bones, then bind — vertices get distance-based weights and follow the bones.
-        </div>
-        <div className="bone-checks">
-          {bones.map((b) => (
-            <label key={b.name}>
-              <input
-                type="checkbox"
-                checked={chosen.includes(b.name)}
-                onChange={(e) =>
-                  setChosen((prev) =>
-                    e.target.checked ? [...prev, b.name] : prev.filter((n) => n !== b.name),
-                  )
-                }
-              />
-              {b.name}
-            </label>
-          ))}
-        </div>
-        <button
-          disabled={chosen.length === 0}
-          onClick={() => {
-            const state = useEditor.getState();
-            try {
-              const weightedVerts = autoWeightVertices(
-                state.doc.data,
-                slotName,
-                att.vertices,
-                chosen,
-              );
-              if (
-                state.execute(
-                  new SetAttachmentVertices('default', slotName, attName, weightedVerts),
-                )
-              ) {
-                state.setMeshEditMode('weights');
-                state.setPaintBone(chosen[0] ?? null);
-              }
-            } catch (err) {
-              state.setError(err instanceof Error ? err.message : String(err));
-            }
-          }}
-        >
-          Bind + Auto Weights
-        </button>
-      </>
-    );
-  }
-
-  const influences = influenceBoneIndices(att.vertices)
-    .map((i) => bones[i]?.name)
-    .filter((n): n is string => n !== undefined);
+  const weighted = isWeightedVertices(att.vertices, meshVertexCount(att));
   return (
     <>
       <div className="panel-title">Weights</div>
       <div className="empty">
-        Pick a bone and drag over vertices in the viewport to paint its influence (blue = 0, red =
-        1).
+        {weighted
+          ? 'Weighted mesh — use the Weights window to paint and adjust.'
+          : 'Unweighted — open the Weights window to bind bones.'}
       </div>
-      <div className="bone-checks">
-        {influences.map((name) => (
-          <label key={name}>
-            <input
-              type="radio"
-              name="paint-bone"
-              checked={meshEdit.paintBone === name}
-              onChange={() => {
-                useEditor.getState().setPaintBone(name);
-                useEditor.getState().setMeshEditMode('weights');
-              }}
-            />
-            {name}
-          </label>
-        ))}
-      </div>
+      <button onClick={() => useEditor.getState().setMeshEditMode('weights')}>Weights…</button>
     </>
   );
 }
@@ -255,6 +238,9 @@ function AttachmentsSection({ slotName }: { slotName: string }) {
         ) : att.type === 'point' ? (
           <PointFields key={name} slotName={slotName} attName={name} att={att} />
         ) : null,
+      )}
+      {meshEdit?.slot === slotName && (
+        <MeshToolsRow slotName={slotName} attName={meshEdit.attachment} />
       )}
       {meshEdit?.slot === slotName && (
         <WeightsSection slotName={slotName} attName={meshEdit.attachment} />

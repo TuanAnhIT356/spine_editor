@@ -3,7 +3,7 @@
  */
 
 import type { BoneData, SkeletonData, SlotData } from '../model/types.js';
-import type { SpineAttachment, SpineSkin } from '../spine-json/types.js';
+import type { SpineAttachment, SpineAttachmentTimelines, SpineSkin } from '../spine-json/types.js';
 import type { Command } from './history.js';
 
 /** Stable topological sort keeping parents before children. */
@@ -257,6 +257,100 @@ export class SetAttachmentVertices implements Command {
     if (!this.before) return;
     const idx = data.skins.findIndex((s) => s.name === this.skinName);
     if (idx >= 0) data.skins[idx] = this.before;
+  }
+}
+
+export interface MeshGeometry {
+  vertices: number[];
+  uvs: number[];
+  triangles: number[];
+  hull: number;
+}
+
+/**
+ * Replaces a mesh attachment's full geometry (vertices/uvs/triangles/hull).
+ * Changing the vertex count invalidates deform keys, so every deform/sequence
+ * timeline for this attachment is removed in the same undo step (Spine warns
+ * and does the same).
+ */
+export class SetMeshGeometry implements Command {
+  readonly label: string;
+  private beforeSkin: SpineSkin | undefined;
+  private beforeTimelines: Record<string, SpineAttachmentTimelines> | undefined;
+
+  constructor(
+    private readonly skinName: string,
+    private readonly slotName: string,
+    private readonly attachmentName: string,
+    private readonly geometry: MeshGeometry,
+  ) {
+    this.label = `Edit mesh geometry of "${attachmentName}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const skin = data.skins.find((s) => s.name === this.skinName);
+    if (!skin) throw new Error(`Skin "${this.skinName}" does not exist.`);
+    const att = skin.attachments?.[this.slotName]?.[this.attachmentName];
+    if (!att || att.type !== 'mesh') {
+      throw new Error(`Attachment "${this.attachmentName}" is not a mesh.`);
+    }
+    const g = this.geometry;
+    const count = g.uvs.length / 2;
+    if (!Number.isInteger(count) || count < 3) throw new Error('Mesh needs at least 3 vertices.');
+    if (g.vertices.length !== count * 2) {
+      let vi = 0;
+      let seen = 0;
+      while (vi < g.vertices.length) {
+        const n = g.vertices[vi];
+        if (typeof n !== 'number' || n < 1 || !Number.isInteger(n)) break;
+        vi += 1 + n * 4;
+        seen++;
+      }
+      if (vi !== g.vertices.length || seen !== count) {
+        throw new Error(`Vertex array does not match ${count} vertices.`);
+      }
+    }
+    if (
+      g.triangles.length === 0 ||
+      g.triangles.length % 3 !== 0 ||
+      g.triangles.some((t) => !Number.isInteger(t) || t < 0 || t >= count)
+    ) {
+      throw new Error('Triangles reference missing vertices.');
+    }
+    if (!Number.isInteger(g.hull) || g.hull < 3 || g.hull > count) {
+      throw new Error(`Hull must be between 3 and ${count}.`);
+    }
+    this.beforeSkin = structuredClone(skin);
+    this.beforeTimelines = {};
+    for (const [animName, anim] of Object.entries(data.animations)) {
+      const bySkin = anim.attachments?.[this.skinName];
+      const timelines = bySkin?.[this.slotName]?.[this.attachmentName];
+      if (!timelines) continue;
+      this.beforeTimelines[animName] = structuredClone(timelines);
+      delete bySkin![this.slotName]![this.attachmentName];
+      if (Object.keys(bySkin![this.slotName]!).length === 0) delete bySkin![this.slotName];
+      if (Object.keys(bySkin!).length === 0) delete anim.attachments![this.skinName];
+      if (Object.keys(anim.attachments!).length === 0) delete anim.attachments;
+    }
+    att.vertices = [...g.vertices];
+    att.uvs = [...g.uvs];
+    att.triangles = [...g.triangles];
+    att.hull = g.hull;
+  }
+
+  undo(data: SkeletonData): void {
+    if (this.beforeSkin) {
+      const idx = data.skins.findIndex((s) => s.name === this.skinName);
+      if (idx >= 0) data.skins[idx] = this.beforeSkin;
+    }
+    for (const [animName, timelines] of Object.entries(this.beforeTimelines ?? {})) {
+      const anim = data.animations[animName];
+      if (!anim) continue;
+      anim.attachments ??= {};
+      anim.attachments[this.skinName] ??= {};
+      anim.attachments[this.skinName]![this.slotName] ??= {};
+      anim.attachments[this.skinName]![this.slotName]![this.attachmentName] = timelines;
+    }
   }
 }
 

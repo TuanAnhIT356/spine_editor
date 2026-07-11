@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  pruneWeights,
+  removeBoneFromWeights,
+  smoothWeights,
+  swapWeights,
+  type SpineMeshAttachment,
   SetAttachmentVertices,
   SpineDocument,
   adjustVertexWeight,
@@ -137,5 +142,82 @@ describe('SetAttachmentVertices', () => {
     expect(
       (doc.data.skins[0]!.attachments!['skin-slot']!['img'] as { vertices: number[] }).vertices,
     ).toEqual(weighted);
+  });
+});
+
+/** Mesh lưới 2×1 (6 vertex) weighted trên 2 bone; helper lấy attachment đã ép kiểu. */
+function weightedRig() {
+  const data = rig();
+  const mesh = data.skins[0]!.attachments!['skin-slot']!['img']! as SpineMeshAttachment;
+  mesh.vertices = autoWeightVertices(data, 'skin-slot', mesh.vertices, ['left', 'right']);
+  return { data, mesh, count: mesh.uvs.length / 2 };
+}
+
+describe('weight ops (P19)', () => {
+  it('smoothWeights pulls weights toward neighbors and keeps sums at 1', () => {
+    const { data, mesh, count } = weightedRig();
+    const leftIdx = data.bones.findIndex((b) => b.name === 'left');
+    const before = boneWeightPerVertex(mesh.vertices, count, leftIdx);
+    const smoothed = smoothWeights(data, 'skin-slot', mesh, 1);
+    const after = boneWeightPerVertex(smoothed, count, leftIdx);
+    const rightIdx = data.bones.findIndex((b) => b.name === 'right');
+    const afterR = boneWeightPerVertex(smoothed, count, rightIdx);
+    for (let v = 0; v < count; v++) {
+      expect(after[v]! + afterR[v]!).toBeCloseTo(1, 2);
+    }
+    // Vertex có weight left lớn nhất giảm về phía trung bình (láng giềng nhỏ hơn).
+    const beforeArr = Array.from(before);
+    const maxV = beforeArr.indexOf(Math.max(...beforeArr));
+    expect(after[maxV]!).toBeLessThan(before[maxV]!);
+  });
+
+  it('pruneWeights drops small influences and renormalizes', () => {
+    const vertices = [2, 0, 10, 0, 0.97, 1, -10, 0, 0.03];
+    const pruned = pruneWeights(vertices, 1, { threshold: 0.05 });
+    expect(pruned).toEqual([1, 0, 10, 0, 1]);
+  });
+
+  it('swapWeights exchanges influence and keeps world positions', () => {
+    const { data, mesh, count } = weightedRig();
+    const pose = computeSetupPose(data);
+    const rootWorld = pose.get('root')!;
+    const before = computeVertexWorldPositions(mesh.vertices, count, rootWorld, data.bones, pose);
+    const leftIdx = data.bones.findIndex((b) => b.name === 'left');
+    const rightIdx = data.bones.findIndex((b) => b.name === 'right');
+    const wLeftBefore = boneWeightPerVertex(mesh.vertices, count, leftIdx);
+    const swapped = swapWeights(data, 'skin-slot', mesh, 'left', 'right');
+    const after = computeVertexWorldPositions(swapped, count, rootWorld, data.bones, pose);
+    for (let i = 0; i < before.length; i++) expect(after[i]!).toBeCloseTo(before[i]!, 0);
+    const wRightAfter = boneWeightPerVertex(swapped, count, rightIdx);
+    for (let v = 0; v < count; v++) expect(wRightAfter[v]!).toBeCloseTo(wLeftBefore[v]!, 3);
+  });
+
+  it('removeBoneFromWeights rebinds orphan vertices to remaining bones', () => {
+    const { data, mesh, count } = weightedRig();
+    const leftIdx = data.bones.findIndex((b) => b.name === 'left');
+    const out = removeBoneFromWeights(data, 'skin-slot', mesh, 'left');
+    expect(isWeightedVertices(out, count)).toBe(true);
+    expect(Array.from(boneWeightPerVertex(out, count, leftIdx)).every((w) => w === 0)).toBe(true);
+    const rightIdx = data.bones.findIndex((b) => b.name === 'right');
+    const wRight = boneWeightPerVertex(out, count, rightIdx);
+    for (let v = 0; v < count; v++) expect(wRight[v]!).toBeCloseTo(1, 3);
+  });
+
+  it('removing the last bone returns unweighted local pairs preserving positions', () => {
+    const { data, count } = weightedRig();
+    const mesh = data.skins[0]!.attachments!['skin-slot']!['img']! as SpineMeshAttachment;
+    mesh.vertices = autoWeightVertices(
+      data,
+      'skin-slot',
+      buildGridMeshAttachment(200, 40, 2, 1).vertices,
+      ['left'],
+    );
+    const pose = computeSetupPose(data);
+    const rootWorld = pose.get('root')!;
+    const before = computeVertexWorldPositions(mesh.vertices, count, rootWorld, data.bones, pose);
+    const out = removeBoneFromWeights(data, 'skin-slot', mesh, 'left');
+    expect(out.length).toBe(count * 2);
+    const after = computeVertexWorldPositions(out, count, rootWorld, data.bones, pose);
+    for (let i = 0; i < before.length; i++) expect(after[i]!).toBeCloseTo(before[i]!, 0);
   });
 });

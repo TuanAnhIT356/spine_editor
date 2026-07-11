@@ -9,6 +9,7 @@ import {
   boneWeightPerVertex,
   computePose,
   computeVertexWorldPositions,
+  isWeightedVertices,
   mulMat,
   type BoneData,
   type Mat2D,
@@ -60,6 +61,8 @@ export interface RenderInput {
     overrideVertices?: number[];
     /** Bone name whose weights color the handles blue→red. */
     weightBone?: string | null;
+    /** Bound bone → overlay color; blends vertex handles when no heatmap bone is set. */
+    weightColors?: ReadonlyMap<string, number>;
   };
   assets: Record<string, ImageAsset>;
   selection: Selection;
@@ -186,6 +189,8 @@ export class SceneRenderer {
   private hiddenSlots: Set<string> | null = null;
 
   ready = false;
+  /** Weight-mode overlay colors for bound bones (set per render). */
+  private weightTint: ReadonlyMap<string, number> | null = null;
   offsetX = 0;
   offsetY = 0;
   zoom = 1;
@@ -319,6 +324,7 @@ export class SceneRenderer {
     this.hiddenBones = input.hiddenBones ?? null;
     this.hiddenSlots = input.hiddenSlots ?? null;
     const data = input.bonesOverride ? { ...input.data, bones: input.bonesOverride } : input.data;
+    this.weightTint = input.editTarget?.weightColors ?? null;
     const pose = computePose(data, undefined, undefined, input.pathOverrides);
     this.lastPose = pose;
 
@@ -591,6 +597,17 @@ export class SceneRenderer {
       const boneIndex = data.bones.findIndex((b) => b.name === edit.weightBone);
       if (boneIndex >= 0) weights = boneWeightPerVertex(vertices, count, boneIndex);
     }
+    let blend: Float32Array[] | null = null;
+    const blendColors: number[] = [];
+    if (!edit.weightBone && edit.weightColors && isWeightedVertices(vertices, count)) {
+      blend = [];
+      for (const [boneName, c] of edit.weightColors) {
+        const bi = data.bones.findIndex((b) => b.name === boneName);
+        if (bi < 0) continue;
+        blend.push(boneWeightPerVertex(vertices, count, bi));
+        blendColors.push(c);
+      }
+    }
     for (let v = 0; v < count; v++) {
       const x = positions[v * 2]!;
       const y = positions[v * 2 + 1]!;
@@ -599,6 +616,21 @@ export class SceneRenderer {
         const w = weights[v]!;
         color =
           (Math.round(w * 255) << 16) | (Math.round((1 - w) * 96) << 8) | Math.round((1 - w) * 255);
+      } else if (blend && blend.length > 0) {
+        let rr = 0;
+        let gg = 0;
+        let bb = 0;
+        for (let k = 0; k < blend.length; k++) {
+          const w = blend[k]![v]!;
+          const c = blendColors[k]!;
+          rr += w * ((c >> 16) & 255);
+          gg += w * ((c >> 8) & 255);
+          bb += w * (c & 255);
+        }
+        color =
+          (Math.min(255, Math.round(rr)) << 16) |
+          (Math.min(255, Math.round(gg)) << 8) |
+          Math.min(255, Math.round(bb));
       }
       g.circle(x, y, 4.5 / this.zoom)
         .fill({ color, alpha: 0.95 })
@@ -672,7 +704,7 @@ export class SceneRenderer {
       const m = pose.get(bone.name);
       if (!m) continue;
       const selected = selection.some((s) => s.kind === 'bone' && s.name === bone.name);
-      const color = selected ? 0xffcc33 : 0x7fb2e5;
+      const color = selected ? 0xffcc33 : (this.weightTint?.get(bone.name) ?? 0x7fb2e5);
       const ox = m.tx;
       const oy = m.ty;
       if (bone.length > 0) {

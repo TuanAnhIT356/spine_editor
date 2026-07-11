@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the 55 editor tools: name, description, zod
+ * Single source of truth for the 61 editor tools: name, description, zod
  * params shape, the bridge op that implements it, and how to present the
  * result. Consumed by the MCP server (registers them as MCP tools) and by
  * the editor's chat client (sends JSON Schemas to the chat loop and
@@ -310,6 +310,48 @@ export const TOOL_DEFS: ToolDef[] = [
       slot: z.string(),
       attachment: z.string().optional(),
       bones: z.array(z.string()).describe('Bone names to bind (e.g. a limb chain).'),
+    },
+  ),
+  def(
+    'edit_mesh',
+    "Edit mesh geometry: add/remove a vertex (automatic Delaunay retriangulation), weld near-duplicate vertices, or reset to a fresh 3x3 grid. Geometry changes clear the mesh's deform keys (one undo step, like Spine). Coordinates are in the slot bone's local space.",
+    {
+      slot: z.string().describe('Slot whose mesh attachment to edit'),
+      attachment: z
+        .string()
+        .optional()
+        .describe('Attachment name (defaults to the active attachment)'),
+      action: z.enum(['add_vertex', 'remove_vertex', 'weld', 'reset']),
+      x: z.number().optional().describe('add_vertex: local x'),
+      y: z.number().optional().describe('add_vertex: local y'),
+      vertexIndex: z.number().int().optional().describe('remove_vertex: vertex index to remove'),
+      threshold: z.number().optional().describe('weld: merge distance (default 1)'),
+    },
+  ),
+  def(
+    'adjust_weights',
+    'Weight tools for a mesh: auto (recompute distance-based weights), smooth (average with neighbors), prune (drop small influences), swap (exchange two bones), remove_bone (unbind one bone, re-normalizing the rest).',
+    {
+      slot: z.string().describe('Slot whose mesh attachment to adjust'),
+      attachment: z
+        .string()
+        .optional()
+        .describe('Attachment name (defaults to the active attachment)'),
+      action: z.enum(['auto', 'smooth', 'prune', 'swap', 'remove_bone']),
+      bones: z
+        .array(z.string())
+        .optional()
+        .describe('auto: bones to bind (defaults to currently bound)'),
+      iterations: z.number().int().optional().describe('smooth: passes (default 1)'),
+      maxInfluences: z
+        .number()
+        .int()
+        .optional()
+        .describe('auto/prune: max bones per vertex (default 4)'),
+      threshold: z.number().optional().describe('prune: drop influences below this (default 0.01)'),
+      boneA: z.string().optional().describe('swap: first bone'),
+      boneB: z.string().optional().describe('swap: second bone'),
+      bone: z.string().optional().describe('remove_bone: bone to unbind'),
     },
   ),
   def(

@@ -43,9 +43,21 @@ import {
   UpsertSlotAttachmentKeyframe,
   UpsertSlotColorKeyframe,
   PRESET_NAMES,
+  SetMeshGeometry,
+  addMeshVertex,
   autoWeightVertices,
+  boundBoneIndices,
   buildGridMeshAttachment,
   buildRigFromParts,
+  isWeightedVertices,
+  meshLocalPositions,
+  meshVertexCount,
+  pruneWeights,
+  removeBoneFromWeights,
+  removeMeshVertex,
+  smoothWeights,
+  swapWeights,
+  weldMeshVertices,
   createBone,
   createEmptySkeleton,
   createSlot,
@@ -758,6 +770,129 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       );
       executeOrThrow(new SetAttachmentVertices('default', slotName, attName, weighted));
       return { ok: true, influences: boneNames };
+    }
+
+    case 'edit_mesh': {
+      const s = state();
+      const slotName = str(params, 'slot');
+      const attName =
+        optStr(params, 'attachment') ?? s.doc.findSlot(slotName)?.attachment ?? undefined;
+      if (!attName) throw new Error(`Slot "${slotName}" has no active attachment; pass one.`);
+      const att = s.doc.data.skins.find((sk) => sk.name === 'default')?.attachments?.[slotName]?.[
+        attName
+      ];
+      if (!att || att.type !== 'mesh') {
+        throw new Error(`Attachment "${attName}" is not a mesh (create_mesh first).`);
+      }
+      const action = str(params, 'action');
+      let next = att;
+      let merged = 0;
+      if (action === 'add_vertex') {
+        const x = optNum(params, 'x');
+        const y = optNum(params, 'y');
+        if (x === undefined || y === undefined) {
+          throw new Error('add_vertex needs "x" and "y" (slot-bone local space).');
+        }
+        next = addMeshVertex(s.doc.data, slotName, att, x, y);
+      } else if (action === 'remove_vertex') {
+        const idx = optNum(params, 'vertexIndex');
+        if (idx === undefined) throw new Error('remove_vertex needs "vertexIndex".');
+        next = removeMeshVertex(s.doc.data, slotName, att, Math.round(idx));
+      } else if (action === 'weld') {
+        const res = weldMeshVertices(s.doc.data, slotName, att, optNum(params, 'threshold') ?? 1);
+        if (res.merged === 0) {
+          return { merged: 0, vertexCount: meshVertexCount(att) };
+        }
+        next = res.mesh;
+        merged = res.merged;
+      } else if (action === 'reset') {
+        if (!att.width || !att.height) throw new Error('Mesh has no width/height; cannot reset.');
+        next = buildGridMeshAttachment(att.width, att.height);
+      } else {
+        throw new Error(`Unknown edit_mesh action "${action}".`);
+      }
+      executeOrThrow(
+        new SetMeshGeometry('default', slotName, attName, {
+          vertices: next.vertices,
+          uvs: next.uvs,
+          triangles: next.triangles,
+          hull: next.hull ?? next.uvs.length / 2,
+        }),
+      );
+      return {
+        vertexCount: meshVertexCount(next),
+        hull: next.hull ?? null,
+        triangles: next.triangles.length / 3,
+        ...(action === 'weld' ? { merged } : {}),
+      };
+    }
+
+    case 'adjust_weights': {
+      const s = state();
+      const slotName = str(params, 'slot');
+      const attName =
+        optStr(params, 'attachment') ?? s.doc.findSlot(slotName)?.attachment ?? undefined;
+      if (!attName) throw new Error(`Slot "${slotName}" has no active attachment; pass one.`);
+      const att = s.doc.data.skins.find((sk) => sk.name === 'default')?.attachments?.[slotName]?.[
+        attName
+      ];
+      if (!att || att.type !== 'mesh') {
+        throw new Error(`Attachment "${attName}" is not a mesh (create_mesh first).`);
+      }
+      const count = meshVertexCount(att);
+      const action = str(params, 'action');
+      let vertices: number[];
+      if (action === 'auto') {
+        const passed = params['bones'];
+        const bones =
+          Array.isArray(passed) && passed.every((b): b is string => typeof b === 'string')
+            ? passed
+            : boundBoneIndices(att.vertices, count)
+                .map((i) => s.doc.data.bones[i]?.name)
+                .filter((n): n is string => n !== undefined);
+        if (bones.length === 0) throw new Error('Pass "bones" — the mesh has none bound yet.');
+        vertices = autoWeightVertices(
+          s.doc.data,
+          slotName,
+          meshLocalPositions(s.doc.data, slotName, att),
+          bones,
+          Math.round(optNum(params, 'maxInfluences') ?? 4),
+        );
+      } else if (action === 'smooth') {
+        vertices = smoothWeights(
+          s.doc.data,
+          slotName,
+          att,
+          Math.round(optNum(params, 'iterations') ?? 1),
+        );
+      } else if (action === 'prune') {
+        vertices = pruneWeights(att.vertices, count, {
+          maxInfluences: Math.round(optNum(params, 'maxInfluences') ?? 4),
+          threshold: optNum(params, 'threshold') ?? 0.01,
+        });
+      } else if (action === 'swap') {
+        vertices = swapWeights(
+          s.doc.data,
+          slotName,
+          att,
+          str(params, 'boneA'),
+          str(params, 'boneB'),
+        );
+      } else if (action === 'remove_bone') {
+        vertices = removeBoneFromWeights(s.doc.data, slotName, att, str(params, 'bone'));
+      } else {
+        throw new Error(`Unknown adjust_weights action "${action}".`);
+      }
+      executeOrThrow(new SetAttachmentVertices('default', slotName, attName, vertices));
+      const after = s.doc.data.skins.find((sk) => sk.name === 'default')?.attachments?.[slotName]?.[
+        attName
+      ] as { vertices: number[] };
+      return {
+        weighted: isWeightedVertices(after.vertices, count),
+        bones: boundBoneIndices(after.vertices, count)
+          .map((i) => s.doc.data.bones[i]?.name)
+          .filter((n): n is string => n !== undefined),
+      };
     }
 
     case 'add_clipping': {
