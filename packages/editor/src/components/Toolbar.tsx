@@ -15,6 +15,7 @@ import { useEditor, type Tool } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
+import { ChatWindow } from './ChatWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
@@ -35,6 +36,7 @@ export function Toolbar() {
   const [showProjects, setShowProjects] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [showSegment, setShowSegment] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
@@ -213,6 +215,15 @@ export function Toolbar() {
         >
           Segment
         </button>
+        <button
+          disabled={!serverUser}
+          title={
+            serverUser ? 'AI chat: rig and animate by talking to Claude' : 'Sign in first (Server)'
+          }
+          onClick={() => setShowChat((v) => !v)}
+        >
+          Chat
+        </button>
       </div>
       <div className="group modes">
         <button
@@ -274,6 +285,7 @@ export function Toolbar() {
       {showProjects && <ProjectsModal onClose={() => setShowProjects(false)} />}
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
       {showSegment && <SegmentModal onClose={() => setShowSegment(false)} />}
+      {showChat && <ChatWindow onClose={() => setShowChat(false)} />}
     </div>
   );
 }
