@@ -65,6 +65,8 @@ export const BRIDGE_OPS = [
   'add_clipping',
   'add_bounding_box',
   'add_point',
+  'rig_from_parts',
+  'apply_preset_animation',
   'create_skin',
   'switch_skin',
   'import_atlas',

@@ -504,7 +504,7 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 5. UI review masks: overlay từng part, sửa nhanh (thêm/bớt point prompt), đặt tên part
    → "Import parts" thành assets kèm vị trí gốc.
 
-#### Phase 14 — AI chat auto-rig & auto-animate
+#### Phase 14 — AI chat auto-rig & auto-animate — ✅ Slice 1 (07/2026)
 
 1. Chat panel trong editor (streaming, hiển thị tool call, lưu/khôi phục history);
    server chạy vòng lặp tool-use anthropic SDK (`claude-opus-4-8`, adaptive thinking)
@@ -514,6 +514,19 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 4. Nghiệm thu end-to-end: một câu chat "tạo nhân vật hiệp sĩ và cho nó đi bộ" → gen ảnh
    → tách part → rig → walk cycle trong viewport; e2e Chromium thật (mock provider để
    CI không cần key/GPU).
+
+> **Ghi chú thực hiện slice 1 (07/2026):** mục 2–3 xong, chạy hoàn toàn client-side
+> (không cần server): `packages/core/src/autorig.ts` — `buildRigFromParts` suy khớp từ
+> hộp part thẳng trục theo luật mép-gần-nhất (hip/neck/shoulder/elbow/wrist/knee/ankle),
+> dựng hip→spine→head + 8 xương chi (+X dọc xương), 4 IK 2-bone với target
+> `ik_hand/ik_foot`, rebind slot giữ ảnh thẳng (attachment.rotation = −world rot), throw
+> khi thiếu torso; `packages/core/src/presets.ts` — 3 preset offset-theo-setup-pose
+> (idle/walk/wave, loop kín) + `retargetPreset` bỏ track thiếu bone và scale translate
+> theo `length/100`. Ops `rig_from_parts` (một `Composite` — 1 bước undo) +
+> `apply_preset_animation`; **BRIDGE_OPS 62, MCP 55 tools**; e2e `bridge.mjs` xác nhận
+> `rigFromPartsWorks` + `presetWalkWorks` (fixture part-box seed qua
+> `window.__spineEditor`). Slice 2 còn lại: mục 1 + 4 (chat ws, bảng
+> conversations/messages, vòng lặp anthropic, e2e chat).
 
 ### 7.7. Rủi ro & giảm thiểu
 

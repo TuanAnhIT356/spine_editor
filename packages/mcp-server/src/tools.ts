@@ -459,6 +459,24 @@ export function registerTools(server: McpServer, bridge: BridgeServer): void {
   );
 
   server.tool(
+    'rig_from_parts',
+    'Auto-rig: builds a full skeleton (hip/spine/head + limbs, 2-bone IK with targets, correct draw order) from canonically named parts placed on the canvas (head, torso, upper/lower_arm_l/r, upper/lower_leg_l/r — e.g. from segment_image with place_on_canvas). One undo step. Requires a torso part.',
+    { ik: z.boolean().optional().describe('Add IK constraints (default true)') },
+    forward('rig_from_parts'),
+  );
+
+  server.tool(
+    'apply_preset_animation',
+    'Create a preset animation (idle | walk | wave) retargeted to the current rig. Works out of the box on rigs built by rig_from_parts; for custom rigs pass bone_map (canonical name -> your bone name). Rotations copy as setup-pose offsets; translations scale with bone length.',
+    {
+      preset: z.enum(['idle', 'walk', 'wave']),
+      animation: z.string().optional().describe('Animation name (default = preset name)'),
+      bone_map: z.record(z.string()).optional(),
+    },
+    forward('apply_preset_animation'),
+  );
+
+  server.tool(
     'add_path',
     "Add a path attachment (composite bezier spline) to a slot. Vertices are 6 floats per point: in-handle x,y, anchor x,y, out-handle x,y in the slot bone's space. Target it with add_path_constraint to make bones follow the curve.",
     {

@@ -42,10 +42,13 @@ Segment dialog (mask review with point prompts, per-part re-run, inpaint toggle)
 importing parts as assets with source `origin` + optional place-on-canvas; strategy A
 via `POST /api/generate/part-set` + "Generate part set" in the Generate dialog; MCP tool
 `segment_image` shares `src/segment/import-parts.ts` with the dialog —
-**53 MCP tools total**. `SPINE_SERVER_SEGMENT_FAKE=1` gives deterministic engines for
+**55 MCP tools total**. `SPINE_SERVER_SEGMENT_FAKE=1` gives deterministic engines for
 tests/e2e/CI.
-Phase 14 planned: chat history tables and an AI chat that auto-rigs/animates by driving
-the existing bridge ops over WebSocket.
+Phase 14 slice 1 done: `rig_from_parts` (auto-skeleton from placed parts — joints from
+box geometry via `core/src/autorig.ts`, 2-bone IK, one undo step) and
+`apply_preset_animation` (idle/walk/wave from `core/src/presets.ts`, retargeted with
+length-scaled translates). Remaining slice 2: chat history tables and an AI chat that
+auto-rigs/animates by driving the existing bridge ops over WebSocket.
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
