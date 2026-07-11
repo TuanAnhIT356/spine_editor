@@ -270,6 +270,23 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       return { name: asset.name, width: asset.width, height: asset.height };
     }
 
+    case 'import_psd': {
+      const dataUrl = str(params, 'dataUrl');
+      const comma = dataUrl.indexOf(',');
+      if (!dataUrl.startsWith('data:') || comma < 0) {
+        throw new Error('Param "dataUrl" must be a base64 data URL of a .psd file.');
+      }
+      const binary = atob(dataUrl.slice(comma + 1));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = binary.charCodeAt(i);
+      const { parsePsdToCuts } = await import('../state/psd-import.js');
+      const { importParts } = await import('../segment/import-parts.js');
+      const { cuts, width, height } = await parsePsdToCuts(bytes.buffer);
+      const place = params['place_on_canvas'] !== false;
+      const result = importParts(cuts, { w: width, h: height }, place);
+      return { ...result, width, height };
+    }
+
     case 'import_audio': {
       const s = state();
       const dataUrl = str(params, 'dataUrl');

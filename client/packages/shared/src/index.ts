@@ -27,6 +27,7 @@ export const BRIDGE_OPS = [
   'remove_bone',
   'reparent_bone',
   'import_image',
+  'import_psd',
   'generate_image',
   'segment_image',
   'attach_image',

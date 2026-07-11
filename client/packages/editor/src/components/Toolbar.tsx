@@ -1,8 +1,10 @@
 import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
-import { buildAtlas } from '../state/atlas.js';
+import { buildAtlas, type AtlasOptions } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
 import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/actions.js';
+import { parsePsdToCuts } from '../state/psd-import.js';
+import { importParts } from '../segment/import-parts.js';
 import {
   downloadDataUrl,
   downloadText,
@@ -13,6 +15,8 @@ import {
 import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
+import { AtlasDialog } from './AtlasDialog.js';
+import { ExportAnimationDialog } from './ExportAnimationDialog.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
@@ -43,6 +47,9 @@ export function Toolbar() {
   const [showSettings, setShowSettings] = useState(false);
   const [showColor, setShowColor] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [showAtlas, setShowAtlas] = useState(false);
+  const [showExportAnim, setShowExportAnim] = useState(false);
+  const animCurrent = useEditor((s) => s.anim.current);
   useEffect(() => {
     const open = () => setShowColor(true);
     window.addEventListener('spine-editor:open-color', open);
@@ -61,6 +68,7 @@ export function Toolbar() {
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
   const atlasInput = useRef<HTMLInputElement | null>(null);
+  const psdInput = useRef<HTMLInputElement | null>(null);
   void revision; // subscribe so undo/redo enabled state stays fresh
 
   async function onImportImages(files: FileList | null) {
@@ -114,14 +122,25 @@ export function Toolbar() {
     useEditor.getState().replaceProject(serializeSpineJson(createEmptySkeleton()), [], []);
   }
 
-  async function onExportAtlas() {
+  async function onExportAtlas(options?: AtlasOptions) {
     const state = useEditor.getState();
     try {
-      const built = await buildAtlas(Object.values(state.assets), 'skeleton.png');
+      const built = await buildAtlas(Object.values(state.assets), 'skeleton.png', options);
       downloadText('skeleton.atlas', built.atlasText, 'text/plain');
       downloadDataUrl('skeleton.png', built.pngDataUrl);
     } catch (err) {
       state.setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function onImportPsd(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    try {
+      const { cuts, width, height } = await parsePsdToCuts(await file.arrayBuffer());
+      importParts(cuts, { w: width, h: height }, true);
+    } catch (err) {
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -151,9 +170,16 @@ export function Toolbar() {
             <button onClick={() => imagesInput.current?.click()}>Import Images</button>
             <button onClick={() => spineJsonInput.current?.click()}>Import JSON</button>
             <button onClick={() => atlasInput.current?.click()}>Import Atlas</button>
+            <button onClick={() => psdInput.current?.click()}>Import PSD</button>
             <hr />
             <button onClick={onExportJson}>Export JSON</button>
-            <button onClick={() => void onExportAtlas()}>Export Atlas</button>
+            <button onClick={() => setShowAtlas(true)}>Export Atlas</button>
+            <button
+              disabled={mode !== 'animate' || !animCurrent}
+              onClick={() => setShowExportAnim(true)}
+            >
+              Export Animation…
+            </button>
           </div>
         )}
       </div>
@@ -336,6 +362,16 @@ export function Toolbar() {
           e.target.value = '';
         }}
       />
+      <input
+        ref={psdInput}
+        type="file"
+        accept=".psd"
+        hidden
+        onChange={(e) => {
+          void onImportPsd(e.target.files);
+          e.target.value = '';
+        }}
+      />
       {showServer && <ServerModal onClose={() => setShowServer(false)} />}
       {showProjects && <ProjectsModal onClose={() => setShowProjects(false)} />}
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} />}
@@ -347,6 +383,16 @@ export function Toolbar() {
       {showSettings && <SettingsWindow onClose={() => setShowSettings(false)} />}
       {showColor && <ColorWindow onClose={() => setShowColor(false)} />}
       {showMetrics && <MetricsWindow onClose={() => setShowMetrics(false)} />}
+      {showExportAnim && <ExportAnimationDialog onClose={() => setShowExportAnim(false)} />}
+      {showAtlas && (
+        <AtlasDialog
+          onExport={(o) => {
+            setShowAtlas(false);
+            void onExportAtlas(o);
+          }}
+          onClose={() => setShowAtlas(false)}
+        />
+      )}
     </div>
   );
 }

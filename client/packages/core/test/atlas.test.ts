@@ -44,3 +44,30 @@ describe('atlasToText', () => {
     expect(text).toContain('  size: 64, 128');
   });
 });
+
+describe('atlas options (P22a)', () => {
+  it('powerOfTwo: false keeps exact page size', () => {
+    const layout = packAtlas([{ name: 'a', width: 30, height: 20 }], {
+      padding: 2,
+      powerOfTwo: false,
+    });
+    expect(layout.width).toBe(34); // 30 + 2*2 padding
+    expect(layout.height).toBe(24);
+  });
+
+  it('powerOfTwo default rounds up (existing behavior)', () => {
+    const layout = packAtlas([{ name: 'a', width: 30, height: 20 }], { padding: 2 });
+    expect(layout.width).toBe(64);
+    expect(Math.log2(layout.height) % 1).toBe(0);
+  });
+
+  it('writes orig/offset from trim metadata', () => {
+    const layout = packAtlas(
+      [{ name: 'a', width: 10, height: 8, origWidth: 20, origHeight: 16, offsetX: 3, offsetY: 4 }],
+      { padding: 0, powerOfTwo: false },
+    );
+    const text = atlasToText('page.png', layout);
+    expect(text).toContain('orig: 20, 16');
+    expect(text).toContain('offset: 3, 4');
+  });
+});

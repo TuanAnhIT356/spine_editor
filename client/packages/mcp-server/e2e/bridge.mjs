@@ -10,7 +10,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { URL, fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const OUT = process.argv[2] ?? 'e2e-out';
@@ -308,6 +308,16 @@ await call('set_slot_color_keyframe', {
 const p21Export = JSON.parse((await call('export_spine_json')).json);
 const p21Slot = (p21Export.slots ?? []).find((sl) => sl.name === flagSlot.slot);
 
+// 10d. PSD import (Phase 22a).
+const psdB64 = fs.readFileSync(new URL('./fixtures/tiny.psd', import.meta.url)).toString('base64');
+const psdRes = await call('import_psd', {
+  dataUrl: `data:image/vnd.adobe.photoshop;base64,${psdB64}`,
+});
+const psdState = await call('get_project_state');
+const psdSlotOrder = (psdState.spine.slots ?? [])
+  .map((sl) => sl.name)
+  .filter((n) => psdRes.slots.includes(n));
+
 // ---- Phase 14: auto-rig from parts + preset walk
 console.error('[e2e] auto-rig flow');
 const PART_BOXES = [
@@ -405,6 +415,13 @@ console.log(
         (p21Export.animations?.flutter?.slots?.[flagSlot.slot]?.rgba2 ?? []).some(
           (k) => k.light === '00ff00ff' && k.dark === 'ffffff',
         ),
+      psdImportWorks:
+        psdRes.assets.length === 2 &&
+        psdRes.slots.length === 2 &&
+        psdRes.width === 32 &&
+        psdRes.assets.every((a) => (psdState.assets ?? []).some((x) => x.name === a)) &&
+        psdSlotOrder[0]?.startsWith('bg') &&
+        psdSlotOrder[1]?.startsWith('fg'),
       rigFromPartsWorks:
         rigRes.bones.includes('spine') &&
         rigBoneNames.includes('upper_leg_l') &&
