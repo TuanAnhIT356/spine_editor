@@ -44,16 +44,23 @@ via `POST /api/generate/part-set` + "Generate part set" in the Generate dialog; 
 `segment_image` shares `src/segment/import-parts.ts` with the dialog —
 **55 MCP tools total**. `SPINE_SERVER_SEGMENT_FAKE=1` gives deterministic engines for
 tests/e2e/CI.
-Phase 14 slice 1 done: `rig_from_parts` (auto-skeleton from placed parts — joints from
-box geometry via `core/src/autorig.ts`, 2-bone IK, one undo step) and
+**Phase 14 done**: slice 1 — `rig_from_parts` (auto-skeleton from placed parts —
+joints from box geometry via `core/src/autorig.ts`, 2-bone IK, one undo step) and
 `apply_preset_animation` (idle/walk/wave from `core/src/presets.ts`, retargeted with
-length-scaled translates). Remaining slice 2: chat history tables and an AI chat that
-auto-rigs/animates by driving the existing bridge ops over WebSocket.
+length-scaled translates); slice 2 — AI chat: tool defs live in shared (`TOOL_DEFS`,
+55 tools, mcp-server registers from it), the editor's floating ChatWindow connects to
+`ws /api/chat/ws`, sends the 55 JSON Schemas in `hello`, and executes dispatched ops
+via the bridge op layer; FastAPI runs the anthropic streaming loop (claude-opus-4-8,
+adaptive thinking, BYOK vault key) with history in `conversations`/`messages`
+(content blocks verbatim — resume replays exact context).
+`SPINE_SERVER_CHAT_FAKE=1` scripts the model for tests/e2e (the pipeline itself runs
+real). **The PLAN.md roadmap is complete.**
 Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
 real-Chromium scripts: `packages/editor/e2e/smoke.mjs` (setup mode), `packages/editor/e2e/anim.mjs`
-(animate mode), `packages/mcp-server/e2e/bridge.mjs` (full MCP chain).
+(animate mode), `packages/mcp-server/e2e/bridge.mjs` (full MCP chain),
+`packages/editor/e2e/chat.mjs` (chat pipeline; server with SPINE_SERVER_CHAT_FAKE=1).
 
 ## Commands
 

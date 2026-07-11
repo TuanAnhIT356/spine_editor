@@ -174,6 +174,45 @@ export function deleteProject(id: number): Promise<void> {
   return request(`/api/projects/${id}`, { method: 'DELETE' });
 }
 
+/** Current short-lived access token (the chat ws authenticates with it). */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export interface ConversationInfo {
+  id: number;
+  title: string;
+  project_id: number | null;
+  updated_at: string;
+}
+
+export interface StoredMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  content: Record<string, unknown>[];
+  created_at: string;
+}
+
+export function listConversations(projectId?: number | null): Promise<ConversationInfo[]> {
+  const q = projectId != null ? `?project_id=${projectId}` : '';
+  return request(`/api/chat/conversations${q}`);
+}
+
+export function createConversation(projectId?: number | null): Promise<ConversationInfo> {
+  return request('/api/chat/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId ?? null }),
+  });
+}
+
+export function deleteConversation(id: number): Promise<void> {
+  return request(`/api/chat/conversations/${id}`, { method: 'DELETE' });
+}
+
+export function getMessages(id: number): Promise<StoredMessage[]> {
+  return request(`/api/chat/conversations/${id}/messages`);
+}
+
 export interface ProviderInfo {
   name: string;
   supports_transparent: boolean;

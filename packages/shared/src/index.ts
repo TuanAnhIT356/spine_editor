@@ -105,3 +105,6 @@ export type BridgeResponse = BridgeResponseOk | BridgeResponseErr;
 export interface BridgeNotice {
   notice: 'replaced';
 }
+
+export * from './tools.js';
+export * from './chat.js';
