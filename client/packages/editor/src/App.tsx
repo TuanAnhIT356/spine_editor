@@ -80,10 +80,18 @@ export function App() {
   useEffect(() => {
     let timer: number | undefined;
     void loadAutosave().then((payload) => {
-      if (payload) useEditor.getState().replaceProject(payload.spine, payload.assets);
+      if (payload)
+        useEditor
+          .getState()
+          .replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
     });
     const unsub = useEditor.subscribe((state, prev) => {
-      if (state.revision === prev.revision && state.assets === prev.assets) return;
+      if (
+        state.revision === prev.revision &&
+        state.assets === prev.assets &&
+        state.audioAssets === prev.audioAssets
+      )
+        return;
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const s = useEditor.getState();
@@ -92,6 +100,7 @@ export function App() {
           version: 1,
           spine: s.doc.toJson(),
           assets: Object.values(s.assets),
+          audioAssets: Object.values(s.audioAssets),
         }).catch(() => undefined);
       }, 800);
     });

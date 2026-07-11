@@ -50,7 +50,9 @@ export function ProjectsModal({ onClose }: { onClose: () => void }) {
   function onOpen(project: ProjectSummary) {
     void run(async () => {
       const full = await getProject(project.id);
-      useEditor.getState().replaceProject(full.data.spine, full.data.assets);
+      useEditor
+        .getState()
+        .replaceProject(full.data.spine, full.data.assets, full.data.audioAssets ?? []);
       useServer.getState().bindProject(full.id, full.name);
       onClose();
     });

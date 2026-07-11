@@ -96,7 +96,7 @@ export function Toolbar() {
     try {
       const payload = JSON.parse(await readFileAsText(file)) as ProjectPayload;
       if (payload.format !== 'spine-editor-project') throw new Error('Not a project file.');
-      state.replaceProject(payload.spine, payload.assets);
+      state.replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
     } catch (err) {
       state.setError(err instanceof Error ? err.message : String(err));
     }
@@ -104,7 +104,7 @@ export function Toolbar() {
 
   function onNewProject() {
     if (!window.confirm('Start a new project? Unsaved work is replaced.')) return;
-    useEditor.getState().replaceProject(serializeSpineJson(createEmptySkeleton()), []);
+    useEditor.getState().replaceProject(serializeSpineJson(createEmptySkeleton()), [], []);
   }
 
   async function onExportAtlas() {
@@ -126,7 +126,11 @@ export function Toolbar() {
       const json = JSON.parse(await readFileAsText(file)) as SpineJson;
       if (!json.skeleton) throw new Error('Not a Spine JSON file (missing "skeleton").');
       // Keep imported images so same-named attachments keep rendering.
-      const issues = state.replaceProject(json, Object.values(state.assets));
+      const issues = state.replaceProject(
+        json,
+        Object.values(state.assets),
+        Object.values(state.audioAssets),
+      );
       const errors = issues.filter((i) => i.severity === 'error');
       if (errors.length > 0) {
         state.setError(`Imported with errors: ${errors.map((e) => e.message).join(' | ')}`);

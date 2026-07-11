@@ -23,6 +23,12 @@ export interface ImageAsset {
   origin?: { x: number; y: number; sourceWidth: number; sourceHeight: number };
 }
 
+/** Imported audio clip (event sounds); dataUrl is persisted in the project file. */
+export interface AudioAsset {
+  name: string;
+  dataUrl: string;
+}
+
 export type Tool = 'select' | 'translate' | 'rotate' | 'scale' | 'shear' | 'create';
 
 export type AxesMode = 'local' | 'parent' | 'world';
@@ -158,6 +164,7 @@ interface EditorState {
   /** Skin used to resolve attachments in the viewport ('default' built-in). */
   activeSkin: string;
   assets: Record<string, ImageAsset>;
+  audioAssets: Record<string, AudioAsset>;
   error: string | null;
   anim: AnimationUiState;
   /** Onion-skin ghosting knobs (editor-only, never serialized). */
@@ -221,9 +228,15 @@ interface EditorState {
   undo(): void;
   redo(): void;
   addAssets(assets: ImageAsset[]): void;
+  addAudioAssets(assets: AudioAsset[]): void;
+  removeAudioAsset(name: string): void;
   attachAsset(assetName: string, boneName: string): void;
   removeSlotCascade(slotName: string): void;
-  replaceProject(json: SpineJson, assets: ImageAsset[]): ValidationIssue[];
+  replaceProject(
+    json: SpineJson,
+    assets: ImageAsset[],
+    audioAssets?: AudioAsset[],
+  ): ValidationIssue[];
 }
 
 export function uniqueName(base: string, exists: (name: string) => boolean): string {
@@ -244,6 +257,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   meshEdit: null,
   activeSkin: 'default',
   assets: {},
+  audioAssets: {},
   error: null,
   anim: {
     current: null,
@@ -444,6 +458,19 @@ export const useEditor = create<EditorState>()((set, get) => ({
       return { assets: next };
     }),
 
+  addAudioAssets: (assets) =>
+    set((s) => {
+      const next = { ...s.audioAssets };
+      for (const asset of assets) next[asset.name] = asset;
+      return { audioAssets: next };
+    }),
+  removeAudioAsset: (name) =>
+    set((s) => {
+      const next = { ...s.audioAssets };
+      delete next[name];
+      return { audioAssets: next };
+    }),
+
   attachAsset: (assetName, boneName) => {
     const { doc, assets, execute, activeSkin } = get();
     const asset = assets[assetName];
@@ -482,11 +509,12 @@ export const useEditor = create<EditorState>()((set, get) => ({
     }
   },
 
-  replaceProject: (json, assets) => {
+  replaceProject: (json, assets, audioAssets = []) => {
     const { data, issues } = parseSpineJson(json);
     set((s) => ({
       doc: new SpineDocument(data),
       assets: Object.fromEntries(assets.map((a) => [a.name, a])),
+      audioAssets: Object.fromEntries(audioAssets.map((a) => [a.name, a])),
       selection: [],
       meshEdit: null,
       error: null,
