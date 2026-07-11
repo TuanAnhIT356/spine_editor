@@ -119,6 +119,7 @@ class AudioEngine {
 
   remove(name: string): void {
     this.buffers.delete(name);
+    this.urls.delete(name);
     for (const key of this.peaksCache.keys()) {
       if (key.startsWith(`${name}#`)) this.peaksCache.delete(key);
     }
