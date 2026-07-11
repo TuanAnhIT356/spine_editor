@@ -36,3 +36,5 @@ export * from './autorig.js';
 export * from './mixer.js';
 export * from './presets.js';
 export * from './mesh-edit.js';
+export * from './spine-binary/write.js';
+export * from './spine-binary/read.js';
