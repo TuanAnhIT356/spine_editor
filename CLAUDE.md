@@ -74,7 +74,14 @@ crossfade/speed/loop/alpha/hold-previous/additive on bone locals), floating Prev
 window (own SceneRenderer + RAF, animation list click-assign, per-track Speed/Mix/
 Repeat + Alpha/Hold/Additive), configurable onion-skin ghosting (store `ghostConfig`
 before/after/spacing/opacity + Ghosting window; Playback view folded into the P17
-transport + Preview). Next: PLAN.md §8 phases 19–22.
+transport + Preview). **Phase 19 done**: mesh vertex add/remove/weld/reset with
+Delaunay retriangulation (`core/src/mesh-edit.ts`, delaunator; `SetMeshGeometry`
+clears deform keys in the same undo step; grid builder now emits the Spine-convention
+hull ring), weight ops smooth/prune/swap/remove-bone (`weights.ts`), floating Weights
+window (bone palette + %, Bind/Remove/Swap, Auto/Smooth/Prune, brush Amount +
+Add/Replace with Shift-subtract, multi-color vertex overlay + bone tint), mesh tool
+row Modify/Create/Delete/Weights/Weld/Reset (geometry edits setup-mode only), MCP
+`edit_mesh` + `adjust_weights` — **61 MCP tools total**. Next: PLAN.md §8 phases 20–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
