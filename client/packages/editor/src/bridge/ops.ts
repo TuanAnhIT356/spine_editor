@@ -710,6 +710,22 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
       return { ok: true };
     }
 
+    case 'set_slot_color': {
+      const s = state();
+      const slotName = str(params, 'slot');
+      const patch: { color?: string; dark?: string | null } = {};
+      const color = optStr(params, 'color');
+      if (color !== undefined) patch.color = color;
+      const dark = optStr(params, 'dark');
+      if (dark !== undefined) patch.dark = dark === 'none' || dark === '' ? null : dark;
+      if (patch.color === undefined && patch.dark === undefined) {
+        throw new Error('Pass "color" and/or "dark".');
+      }
+      executeOrThrow(new SetSlotProperties(slotName, patch));
+      const after = s.doc.findSlot(slotName)!;
+      return { color: after.color, dark: after.dark };
+    }
+
     case 'set_slot_color_keyframe': {
       const key: Record<string, unknown> = { color: str(params, 'color') };
       const time = optNum(params, 'time');
@@ -721,6 +737,7 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
           str(params, 'animation'),
           str(params, 'slot'),
           key as { color: string },
+          optStr(params, 'dark'),
         ),
       );
       return { ok: true };

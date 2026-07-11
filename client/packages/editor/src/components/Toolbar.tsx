@@ -1,15 +1,14 @@
-import { createEmptySkeleton, serializeSpineJson, type SpineJson } from '@spine-editor/core';
+import { createEmptySkeleton, serializeSpineJson } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
 import { buildAtlas } from '../state/atlas.js';
 import { sliceAtlas } from '../state/atlas-slice.js';
-import { saveProjectFile } from '../state/actions.js';
+import { importSpineJsonFile, openProjectFile, saveProjectFile } from '../state/actions.js';
 import {
   downloadDataUrl,
   downloadText,
   loadImageAsset,
   readFileAsDataUrl,
   readFileAsText,
-  type ProjectPayload,
 } from '../state/persistence.js';
 import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
@@ -19,6 +18,9 @@ import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
 import { GhostingWindow } from './GhostingWindow.js';
 import { PreviewWindow } from './PreviewWindow.js';
+import { ColorWindow } from './ColorWindow.js';
+import { MetricsWindow } from './MetricsWindow.js';
+import { SettingsWindow } from './SettingsWindow.js';
 import { WeightsWindow } from './WeightsWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
@@ -38,6 +40,14 @@ export function Toolbar() {
   const [showPreview, setShowPreview] = useState(false);
   const [showGhosting, setShowGhosting] = useState(false);
   const [showWeights, setShowWeights] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showColor, setShowColor] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
+  useEffect(() => {
+    const open = () => setShowColor(true);
+    window.addEventListener('spine-editor:open-color', open);
+    return () => window.removeEventListener('spine-editor:open-color', open);
+  }, []);
   const meshEditMode = useEditor((s) => s.meshEdit?.mode ?? null);
   const hasMeshEdit = meshEditMode !== null;
   useEffect(() => {
@@ -92,13 +102,10 @@ export function Toolbar() {
   async function onOpenProject(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const state = useEditor.getState();
     try {
-      const payload = JSON.parse(await readFileAsText(file)) as ProjectPayload;
-      if (payload.format !== 'spine-editor-project') throw new Error('Not a project file.');
-      state.replaceProject(payload.spine, payload.assets, payload.audioAssets ?? []);
+      await openProjectFile(file);
     } catch (err) {
-      state.setError(err instanceof Error ? err.message : String(err));
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -121,22 +128,10 @@ export function Toolbar() {
   async function onImportSpineJson(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const state = useEditor.getState();
     try {
-      const json = JSON.parse(await readFileAsText(file)) as SpineJson;
-      if (!json.skeleton) throw new Error('Not a Spine JSON file (missing "skeleton").');
-      // Keep imported images so same-named attachments keep rendering.
-      const issues = state.replaceProject(
-        json,
-        Object.values(state.assets),
-        Object.values(state.audioAssets),
-      );
-      const errors = issues.filter((i) => i.severity === 'error');
-      if (errors.length > 0) {
-        state.setError(`Imported with errors: ${errors.map((e) => e.message).join(' | ')}`);
-      }
+      await importSpineJsonFile(file);
     } catch (err) {
-      state.setError(err instanceof Error ? err.message : String(err));
+      useEditor.getState().setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -276,6 +271,26 @@ export function Toolbar() {
               />
               Weights
             </label>
+            <label className="views-item">
+              <input
+                type="checkbox"
+                checked={showSettings}
+                onChange={() => setShowSettings((v) => !v)}
+              />
+              Settings
+            </label>
+            <label className="views-item">
+              <input type="checkbox" checked={showColor} onChange={() => setShowColor((v) => !v)} />
+              Color
+            </label>
+            <label className="views-item">
+              <input
+                type="checkbox"
+                checked={showMetrics}
+                onChange={() => setShowMetrics((v) => !v)}
+              />
+              Metrics
+            </label>
           </div>
         )}
       </div>
@@ -329,6 +344,9 @@ export function Toolbar() {
       {showPreview && <PreviewWindow onClose={() => setShowPreview(false)} />}
       {showGhosting && <GhostingWindow onClose={() => setShowGhosting(false)} />}
       {showWeights && <WeightsWindow onClose={() => setShowWeights(false)} />}
+      {showSettings && <SettingsWindow onClose={() => setShowSettings(false)} />}
+      {showColor && <ColorWindow onClose={() => setShowColor(false)} />}
+      {showMetrics && <MetricsWindow onClose={() => setShowMetrics(false)} />}
     </div>
   );
 }

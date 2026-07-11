@@ -24,6 +24,12 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(String(e)));
 
+await page.addInitScript(() =>
+  window.localStorage.setItem(
+    'spine-editor.settings',
+    JSON.stringify({ fps: 30, autosave: true, welcome: false }),
+  ),
+);
 await page.goto(BASE);
 await page.waitForTimeout(1200);
 

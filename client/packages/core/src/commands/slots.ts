@@ -137,6 +137,16 @@ export class SetSlotProperties implements Command {
     if (this.patch.bone !== undefined && !data.bones.some((b) => b.name === this.patch.bone)) {
       throw new Error(`Bone "${this.patch.bone}" does not exist.`);
     }
+    if (this.patch.color !== undefined && !/^[0-9a-fA-F]{8}$/.test(this.patch.color)) {
+      throw new Error('Slot color must be 8-digit rgba hex, e.g. "ff8800ff".');
+    }
+    if (
+      this.patch.dark !== undefined &&
+      this.patch.dark !== null &&
+      !/^[0-9a-fA-F]{6}$/.test(this.patch.dark)
+    ) {
+      throw new Error('Dark color must be 6-digit rgb hex, e.g. "332211" (or null to disable).');
+    }
     this.previous = {};
     for (const key of Object.keys(this.patch) as (keyof SlotPatch)[]) {
       (this.previous as Record<string, unknown>)[key] = slot[key];

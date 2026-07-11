@@ -24,6 +24,12 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 
+await page.addInitScript(() =>
+  window.localStorage.setItem(
+    'spine-editor.settings',
+    JSON.stringify({ fps: 30, autosave: true, welcome: false }),
+  ),
+);
 await page.goto(BASE);
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${OUT}/01-initial.png` });

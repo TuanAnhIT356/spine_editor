@@ -5,6 +5,7 @@ import type {
   SpineBoneKey,
   SpineBoneTimelineName,
   SpineColorKey,
+  SpineTwoColorKey,
   SpineDeformKey,
   SpineDrawOrderKey,
 } from '../spine-json/types.js';
@@ -249,7 +250,7 @@ export class UpsertSlotAttachmentKeyframe implements Command {
   }
 }
 
-/** Inserts or replaces a key on a slot's rgba color timeline. */
+/** Inserts or replaces a key on a slot's rgba (or, with dark, rgba2) timeline. */
 export class UpsertSlotColorKeyframe implements Command {
   readonly label: string;
   private before: SpineAnimation | undefined;
@@ -258,6 +259,7 @@ export class UpsertSlotColorKeyframe implements Command {
     private readonly animation: string,
     private readonly slot: string,
     private readonly key: SpineColorKey,
+    private readonly dark?: string,
   ) {
     this.label = `Key color on "${slot}"`;
   }
@@ -270,16 +272,32 @@ export class UpsertSlotColorKeyframe implements Command {
     if (!/^[0-9a-fA-F]{8}$/.test(this.key.color ?? '')) {
       throw new Error('Color must be 8-digit rgba hex, e.g. "ff0000ff".');
     }
+    if (this.dark !== undefined && !/^[0-9a-fA-F]{6}$/.test(this.dark)) {
+      throw new Error('Dark must be 6-digit rgb hex, e.g. "332211".');
+    }
     this.before = structuredClone(anim);
     const slots = (anim.slots ??= {});
     const timelines = (slots[this.slot] ??= {});
-    const keys = (timelines.rgba ??= []);
     const time = this.key.time ?? 0;
-    const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
-    if (existing >= 0) keys[existing] = this.key;
-    else {
-      keys.push(this.key);
-      keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+    if (this.dark !== undefined) {
+      const keys = (timelines.rgba2 ??= []);
+      const twoKey: SpineTwoColorKey = { light: this.key.color, dark: this.dark };
+      if (time > 0) twoKey.time = time;
+      if (this.key.curve !== undefined) twoKey.curve = this.key.curve;
+      const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
+      if (existing >= 0) keys[existing] = twoKey;
+      else {
+        keys.push(twoKey);
+        keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+      }
+    } else {
+      const keys = (timelines.rgba ??= []);
+      const existing = keys.findIndex((k) => Math.abs((k.time ?? 0) - time) < TIME_EPSILON);
+      if (existing >= 0) keys[existing] = this.key;
+      else {
+        keys.push(this.key);
+        keys.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+      }
     }
   }
 

@@ -33,6 +33,7 @@ export const BRIDGE_OPS = [
   'add_slot',
   'set_slot_properties',
   'set_draw_order',
+  'set_slot_color',
   'add_ik_constraint',
   'add_transform_constraint',
   'add_path',

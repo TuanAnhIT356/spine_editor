@@ -369,6 +369,12 @@ export function SlotDock({ name }: { name: string }) {
         <span>Attachment</span>
         <input value={slot.attachment ?? ''} disabled />
       </label>
+      <button
+        title="Open the Color window (setup color + tint black)"
+        onClick={() => window.dispatchEvent(new CustomEvent('spine-editor:open-color'))}
+      >
+        Color…
+      </button>
       <AttachmentsSection slotName={name} />
       <button className="danger" onClick={() => useEditor.getState().removeSlotCascade(name)}>
         Delete Slot

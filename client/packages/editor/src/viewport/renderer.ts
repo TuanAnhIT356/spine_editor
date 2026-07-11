@@ -21,6 +21,7 @@ import {
 } from '@spine-editor/core';
 import {
   Application,
+  ColorMatrixFilter,
   Container,
   Graphics,
   Matrix,
@@ -40,6 +41,8 @@ export interface RenderInput {
   slotAttachments?: ReadonlyMap<string, string | null>;
   /** Animated slot rgba colors (animate mode). */
   slotColors?: ReadonlyMap<string, string>;
+  /** Animated dark (tint-black) colors per slot (animate mode). */
+  slotDarks?: ReadonlyMap<string, string>;
   /** Animated deform offsets per slot → attachment (animate mode). */
   deforms?: ReadonlyMap<string, ReadonlyMap<string, Float32Array>>;
   /** Slot names back-to-front when a draw order key is active (animate mode). */
@@ -75,6 +78,19 @@ export function attachmentVertexCount(att: SpineAttachment): number | null {
     return att.vertexCount;
   }
   return null;
+}
+
+/** Spine two-color tint: out = tex×light + (1−tex)×dark, as a color matrix. */
+function twoColorMatrix(light: string, dark: string): number[] {
+  const l = [0, 1, 2].map((i) => parseInt(light.slice(i * 2, i * 2 + 2), 16) / 255);
+  const d = [0, 1, 2].map((i) => parseInt(dark.slice(i * 2, i * 2 + 2), 16) / 255);
+  // prettier-ignore
+  return [
+    l[0]! - d[0]!, 0, 0, 0, d[0]!,
+    0, l[1]! - d[1]!, 0, 0, d[1]!,
+    0, 0, l[2]! - d[2]!, 0, d[2]!,
+    0, 0, 0, 1, 0,
+  ];
 }
 
 function tintOf(color: string): { tint: number; alpha: number } {
@@ -191,6 +207,8 @@ export class SceneRenderer {
   ready = false;
   /** Weight-mode overlay colors for bound bones (set per render). */
   private weightTint: ReadonlyMap<string, number> | null = null;
+  /** Two-color tint filters, one per slot with an active dark color. */
+  private darkFilters = new Map<string, ColorMatrixFilter>();
   offsetX = 0;
   offsetY = 0;
   zoom = 1;
@@ -221,6 +239,7 @@ export class SceneRenderer {
 
   destroy(): void {
     this.disposed = true;
+    this.darkFilters.clear();
     if (this.ready) this.app.destroy(true, true);
     this.ready = false;
   }
@@ -394,6 +413,7 @@ export class SceneRenderer {
 
       const animColor = input.slotColors?.get(slot.name) ?? slot.color;
       const { tint, alpha } = tintOf(animColor);
+      const dark = input.slotDarks?.get(slot.name) ?? slot.dark;
 
       if (att.type === 'mesh') {
         // Region lookup order mirrors the runtime: path, then the attachment's
@@ -421,6 +441,7 @@ export class SceneRenderer {
         }
         mesh.tint = tint;
         mesh.alpha = alpha;
+        this.applyDark(mesh, slot.name, animColor, dark);
         addDrawable(mesh);
         endClipAfter(slot.name);
         continue;
@@ -463,6 +484,7 @@ export class SceneRenderer {
       };
       sprite.setFromMatrix(toPixiMatrix(mulMat(mulMat(boneWorld, local), FLIP_Y)));
       sprite.tint = tint;
+      this.applyDark(sprite, slot.name, animColor, dark);
       const slotIsSelected = input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
       sprite.alpha = alpha * (slotIsSelected ? 1 : 0.9);
       addDrawable(sprite);
@@ -639,6 +661,28 @@ export class SceneRenderer {
   }
 
   /** Faint skeleton outlines for onion skinning (bones only, cheap to draw). */
+  /** Attaches/updates the two-color tint filter, or removes it when dark is off. */
+  private applyDark(
+    target: MeshSimple | Sprite,
+    slotName: string,
+    light: string,
+    dark: string | null | undefined,
+  ): void {
+    if (dark) {
+      let filter = this.darkFilters.get(slotName);
+      if (!filter) {
+        filter = new ColorMatrixFilter();
+        this.darkFilters.set(slotName, filter);
+      }
+      filter.matrix = twoColorMatrix(light, dark) as unknown as ColorMatrixFilter['matrix'];
+      target.filters = [filter];
+      target.tint = 0xffffff;
+    } else if (this.darkFilters.has(slotName)) {
+      target.filters = [];
+      this.darkFilters.delete(slotName);
+    }
+  }
+
   private drawGhosts(data: SkeletonData, ghosts: RenderInput['ghosts']): void {
     const g = this.ghostLayer;
     g.clear();
