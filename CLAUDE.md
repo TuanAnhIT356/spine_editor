@@ -58,8 +58,12 @@ real). **Phase 15 (Spine-parity U1) done**: Spine-style shell — theme tokens, 
 file menu + icon actions + dirty star + Views dropdown, in-viewport SETUP/ANIMATE
 banner, bottom tool cluster (live numeric transforms with `+`/`*`/`/` entry, new
 scale/shear tools, Local/Parent/World axes with Shift-constrain, selection/visibility/
-label filters, Auto Key toggle), bone breadcrumb, zoom slider. Next: PLAN.md §8
-Spine-parity roadmap (Phase 16 Unified Tree → Phase 22 IO pack).
+label filters, Auto Key toggle), bone breadcrumb, zoom slider. **Phase 16a done**:
+unified right-side TreePanel (bones▸slots▸attachments nesting, Constraints/Skins/
+Events/Animations/Images sections, per-item visibility dots wired into the renderer,
+colored type icons, search) with the bone/slot properties dock at its bottom —
+HierarchyPanel/PropertiesPanel removed. Next: Phase 16b (constraint/event/animation
+editors, context menu, inline rename), then PLAN.md §8 phases 17–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
