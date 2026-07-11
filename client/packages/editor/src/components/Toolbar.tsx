@@ -13,6 +13,7 @@ import {
 } from '../state/persistence.js';
 import { useEditor, type Tool } from '../state/store.js';
 import { useServer } from '../server/api.js';
+import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
 import { GenerateModal } from './GenerateModal.js';
 import { SegmentModal } from './SegmentModal.js';
 import { ChatWindow } from './ChatWindow.js';
@@ -37,6 +38,12 @@ export function Toolbar() {
   const [showGenerate, setShowGenerate] = useState(false);
   const [showSegment, setShowSegment] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showViews, setShowViews] = useState(false);
+  const dirty = useEditor((s) => s.revision !== s.savedRevision);
+  const panels = useEditor((s) => s.panelVisibility);
+  const serverProjectName = useServer((s) => s.projectName);
+  const projectName = serverProjectName || 'untitled';
   const imagesInput = useRef<HTMLInputElement | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
   const spineJsonInput = useRef<HTMLInputElement | null>(null);
@@ -127,8 +134,57 @@ export function Toolbar() {
   }
 
   return (
-    <div className="toolbar">
-      <span className="brand">Spine Editor</span>
+    <div className="toolbar titlebar">
+      <span className="brand">spine editor</span>
+      <div className="menu-wrap">
+        <button className="icon-btn" title="Menu" onClick={() => setShowMenu((v) => !v)}>
+          <MenuIcon />
+        </button>
+        {showMenu && (
+          <div className="dropdown" onClick={() => setShowMenu(false)}>
+            <button onClick={onNewProject}>New</button>
+            <button onClick={() => projectInput.current?.click()}>Open Project</button>
+            <button onClick={saveProjectFile}>Save Project</button>
+            <hr />
+            <button onClick={() => imagesInput.current?.click()}>Import Images</button>
+            <button onClick={() => spineJsonInput.current?.click()}>Import JSON</button>
+            <button onClick={() => atlasInput.current?.click()}>Import Atlas</button>
+            <hr />
+            <button onClick={onExportJson}>Export JSON</button>
+            <button onClick={() => void onExportAtlas()}>Export Atlas</button>
+          </div>
+        )}
+      </div>
+      <button
+        className="icon-btn"
+        title="Open Project"
+        onClick={() => projectInput.current?.click()}
+      >
+        <OpenIcon />
+      </button>
+      <button className="icon-btn" title="Save Project (Ctrl+S)" onClick={saveProjectFile}>
+        <SaveIcon />
+      </button>
+      <button
+        className="icon-btn"
+        disabled={!doc.history.canUndo}
+        onClick={() => useEditor.getState().undo()}
+        title="Undo (Ctrl+Z)"
+      >
+        <UndoIcon />
+      </button>
+      <button
+        className="icon-btn"
+        disabled={!doc.history.canRedo}
+        onClick={() => useEditor.getState().redo()}
+        title="Redo (Ctrl+Shift+Z)"
+      >
+        <RedoIcon />
+      </button>
+      <span className="project-name">
+        {dirty ? '*' : ''}
+        {projectName}
+      </span>
       <div className="group">
         {TOOLS.map((t) => (
           <button
@@ -142,48 +198,7 @@ export function Toolbar() {
           </button>
         ))}
       </div>
-      <div className="group">
-        <button
-          disabled={!doc.history.canUndo}
-          onClick={() => useEditor.getState().undo()}
-          title="Ctrl+Z"
-        >
-          Undo
-        </button>
-        <button
-          disabled={!doc.history.canRedo}
-          onClick={() => useEditor.getState().redo()}
-          title="Ctrl+Shift+Z"
-        >
-          Redo
-        </button>
-      </div>
-      <div className="group">
-        <button onClick={() => imagesInput.current?.click()}>Import Images</button>
-        <button onClick={() => spineJsonInput.current?.click()} title="Load a Spine JSON skeleton">
-          Import JSON
-        </button>
-        <button
-          onClick={() => atlasInput.current?.click()}
-          title="Pick a .atlas file plus its PNG page(s) — regions become separate images"
-        >
-          Import Atlas
-        </button>
-        <button onClick={onExportJson}>Export JSON</button>
-        <button
-          onClick={() => void onExportAtlas()}
-          title="Pack images into skeleton.atlas + skeleton.png"
-        >
-          Export Atlas
-        </button>
-      </div>
-      <div className="group">
-        <button onClick={onNewProject}>New</button>
-        <button onClick={saveProjectFile} title="Ctrl+S">
-          Save Project
-        </button>
-        <button onClick={() => projectInput.current?.click()}>Open Project</button>
-      </div>
+      <div className="spacer" />
       <div className="group">
         <button
           className={serverUser ? 'server-on' : ''}
@@ -238,6 +253,26 @@ export function Toolbar() {
         >
           Animate
         </button>
+      </div>
+      <div className="menu-wrap">
+        <button className="icon-btn views-btn" onClick={() => setShowViews((v) => !v)}>
+          Views ▾
+        </button>
+        {showViews && (
+          <div className="dropdown">
+            {(['hierarchy', 'properties', 'timeline'] as const).map((p) => (
+              <label key={p} className="views-item">
+                <input
+                  type="checkbox"
+                  checked={panels[p]}
+                  disabled={p === 'timeline' && mode === 'setup'}
+                  onChange={() => useEditor.getState().togglePanel(p)}
+                />
+                {p === 'hierarchy' ? 'Tree' : p[0]!.toUpperCase() + p.slice(1)}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
       <input
         ref={imagesInput}

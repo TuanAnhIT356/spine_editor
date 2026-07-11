@@ -1050,3 +1050,66 @@ button.danger {
   height: 14px;
   cursor: nwse-resize;
 }
+
+/* ---- titlebar ---- */
+
+.titlebar {
+  gap: 4px;
+}
+
+.titlebar .brand {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.project-name {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.menu-wrap {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  min-width: 160px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.dropdown button {
+  text-align: left;
+}
+
+.dropdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+.views-item {
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px;
+  align-items: center;
+}

@@ -16,6 +16,7 @@ import { useEditor } from './state/store.js';
 export function App() {
   const error = useEditor((s) => s.error);
   const mode = useEditor((s) => s.mode);
+  const panels = useEditor((s) => s.panelVisibility);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
@@ -110,13 +111,21 @@ export function App() {
     <div className="app">
       <Toolbar />
       <div className="main">
-        <HierarchyPanel />
-        <Resizer axis="x" onResize={(d) => useEditor.getState().resizeHierarchy(d)} />
+        {panels.hierarchy && (
+          <>
+            <HierarchyPanel />
+            <Resizer axis="x" onResize={(d) => useEditor.getState().resizeHierarchy(d)} />
+          </>
+        )}
         <Viewport />
-        <Resizer axis="x" onResize={(d) => useEditor.getState().resizeProperties(d)} />
-        <PropertiesPanel />
+        {panels.properties && (
+          <>
+            <Resizer axis="x" onResize={(d) => useEditor.getState().resizeProperties(d)} />
+            <PropertiesPanel />
+          </>
+        )}
       </div>
-      {mode === 'animate' && (
+      {mode === 'animate' && panels.timeline && (
         <>
           <Resizer axis="y" onResize={(d) => useEditor.getState().resizeTimeline(d)} />
           <TimelinePanel />
