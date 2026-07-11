@@ -21,11 +21,11 @@ gifenc, hierarchy search — 47 MCP tools total). Remaining gaps, tracked in PLA
 binary .skel, PSD import, video/PNG-sequence export, add/remove mesh vertices, dockable
 panels; physics preview is an approximation (exports run the real runtime simulation).
 PLAN.md §7 covers the opt-in Python backend in `server/` (FastAPI; repo splits into
-frontend `packages/` + `server/`). **Phase 11 done**: accounts (register/login/logout/
+frontend `client/` + `server/`). **Phase 11 done**: accounts (register/login/logout/
 forgot+reset password, argon2id + rotating httpOnly refresh cookie), per-user project
 list with viewport thumbnails + 3s-debounced server autosave, BYOK key vault
 (AES-256-GCM, masked), per-user settings endpoint; editor gets Server/Projects toolbar
-modals (`src/server/api.ts`, e2e: `packages/editor/e2e/server.mjs`, needs the server on
+modals (`src/server/api.ts`, e2e: `client/packages/editor/e2e/server.mjs`, needs the server on
 :8100). **Phase 12 done**: BYOK image-gen — `server/app/providers/` adapters (openai
 gpt-image-1.5 transparent, stability, runware LayerDiffuse, fal, mock for free local
 tests), `/api/generate` + per-user gallery stored in the DB, editor Generate dialog with
@@ -55,16 +55,16 @@ adaptive thinking, BYOK vault key) with history in `conversations`/`messages`
 (content blocks verbatim — resume replays exact context).
 `SPINE_SERVER_CHAT_FAKE=1` scripts the model for tests/e2e (the pipeline itself runs
 real). **The PLAN.md roadmap is complete.**
-Architecture: AI ⇄ MCP (stdio, `packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
+Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
-real-Chromium scripts: `packages/editor/e2e/smoke.mjs` (setup mode), `packages/editor/e2e/anim.mjs`
-(animate mode), `packages/mcp-server/e2e/bridge.mjs` (full MCP chain),
-`packages/editor/e2e/chat.mjs` (chat pipeline; server with SPINE_SERVER_CHAT_FAKE=1).
+real-Chromium scripts: `client/packages/editor/e2e/smoke.mjs` (setup mode), `client/packages/editor/e2e/anim.mjs`
+(animate mode), `client/packages/mcp-server/e2e/bridge.mjs` (full MCP chain),
+`client/packages/editor/e2e/chat.mjs` (chat pipeline; server with SPINE_SERVER_CHAT_FAKE=1).
 
 ## Commands
 
-pnpm monorepo (Node >= 22). Run from the repo root:
+pnpm monorepo (Node >= 22) living in `client/`. Run from `client/`:
 
 - `pnpm install` — install all workspace dependencies
 - `pnpm build` — build all packages (editor runs `tsc --noEmit && vite build`; others typecheck)
@@ -89,24 +89,26 @@ The repo registers [codegraph](https://github.com/colbymchenry/codegraph) as a
 project-scoped MCP server (`.mcp.json`). Prefer its `codegraph_explore` tool for
 structure/flow questions ("how does X reach Y", "what calls Z") before manual
 grep/read — one call returns the relevant symbols' source plus the call paths
-between them. One-time setup after `pnpm install`: `pnpm exec codegraph init .`
-(index in `.codegraph/`, gitignored, auto-syncs on file changes). Maintenance:
-`pnpm exec codegraph index . --force` rebuilds, `pnpm exec codegraph unlock`
-clears a stale lock, `pnpm exec codegraph telemetry off` disables telemetry.
+between them. One-time setup after `cd client && pnpm install`: from the repo
+root run `client/node_modules/.bin/codegraph init .` (index in `.codegraph/`,
+gitignored, auto-syncs on file changes). Maintenance (same bin, from the root):
+`... index . --force` rebuilds, `... unlock` clears a stale lock,
+`... telemetry off` disables telemetry.
 
 ## Architecture
 
 ```
-packages/
-├── core/        # Framework-agnostic heart: document model, command system (undo/redo),
-│                # animation evaluator, Spine JSON serializer/parser. NO UI dependencies.
-├── editor/      # React + Vite app (viewport, hierarchy, inspector, timeline panels)
-├── mcp-server/  # MCP server exposing editor operations to AI (Phase 5 placeholder)
-└── shared/      # Constants and editor↔MCP protocol types shared by all packages
-skills/          # SKILL.md files teaching AI agents rigging/animating workflows (Phase 5)
-examples/        # Hand-written Spine JSON fixtures used by core round-trip tests
-server/          # Opt-in Python backend (FastAPI): accounts, projects, BYOK key vault;
-                 # editor talks to it via REST (src/server/api.ts), default :8100
+client/            # pnpm workspace — all Node/TS code
+├── packages/
+│   ├── core/        # Framework-agnostic heart: document model, command system (undo/redo),
+│   │                # animation evaluator, Spine JSON serializer/parser. NO UI dependencies.
+│   ├── editor/      # React + Vite app (viewport, hierarchy, inspector, timeline panels)
+│   ├── mcp-server/  # MCP server exposing editor operations to AI over the ws bridge
+│   └── shared/      # Constants, TOOL_DEFS and editor↔MCP/chat protocol types
+└── examples/        # Hand-written Spine JSON fixtures used by core round-trip tests
+skills/            # SKILL.md files teaching AI agents rigging/animating workflows
+server/            # Opt-in Python backend (FastAPI): accounts, projects, BYOK key vault,
+                   # image gen/segment, AI chat; editor talks REST/ws (src/server/api.ts), :8100
 ```
 
 Key invariants:

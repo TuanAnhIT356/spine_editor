@@ -11,14 +11,16 @@ Chromium, not by unit tests.
 ## Recipe
 
 ```bash
+cd client
 pnpm --filter @spine-editor/editor build
 (cd packages/editor && npx vite preview --port 4173 &)   # serve the built app
 node packages/editor/e2e/smoke.mjs <outDir>              # setup mode: rig + attach + export
 node packages/editor/e2e/anim.mjs <outDir>               # animate mode: keys + playback
 node packages/mcp-server/e2e/bridge.mjs <outDir>         # full MCP chain (spawns MCP server itself)
+node packages/editor/e2e/chat.mjs <outDir>               # chat pipeline (server :8100, SPINE_SERVER_CHAT_FAKE=1)
 ```
 
-`packages/editor/e2e/smoke.mjs` uses playwright-core with the pre-installed
+`client/packages/editor/e2e/smoke.mjs` uses playwright-core with the pre-installed
 Chromium (`CHROMIUM_PATH`, default `/opt/pw-browsers/chromium`). It creates
 bones by mouse-dragging on the canvas, imports a generated PNG, attaches it to
 a bone, translates, undoes, probes deleting the root bone (must error), dumps
