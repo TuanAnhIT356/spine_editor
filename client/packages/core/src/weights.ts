@@ -9,6 +9,7 @@
 
 import type { BoneData, SkeletonData } from './model/types.js';
 import { applyMat, computeSetupPose, invertMat, type Mat2D } from './pose.js';
+import type { SpineMeshAttachment } from './spine-json/types.js';
 
 export function isWeightedVertices(vertices: number[], vertexCount: number): boolean {
   return vertices.length !== vertexCount * 2;
@@ -243,4 +244,204 @@ export function adjustVertexWeight(
   const sum = kept.reduce((s, inf) => s + inf.weight, 0);
   if (sum > 0) for (const inf of kept) inf.weight = Math.round((inf.weight / sum) * 10000) / 10000;
   return packInfluences(perVertex);
+}
+
+const round4 = (n: number) => Math.round(n * 10000) / 10000;
+
+/** World positions + slot-bone context for a mesh (setup pose). */
+function meshSetupContext(data: SkeletonData, slotName: string, mesh: SpineMeshAttachment) {
+  const slot = data.slots.find((s) => s.name === slotName);
+  if (!slot) throw new Error(`Slot "${slotName}" does not exist.`);
+  const pose = computeSetupPose(data);
+  const boneWorld = pose.get(slot.bone);
+  if (!boneWorld) throw new Error(`Bone "${slot.bone}" has no pose.`);
+  const count = mesh.uvs.length / 2;
+  const world = computeVertexWorldPositions(mesh.vertices, count, boneWorld, data.bones, pose);
+  return { pose, boneWorld, count, world };
+}
+
+/**
+ * Averages weights with triangle-edge neighbors (60% own + 40% neighbor mean
+ * per iteration). New influences get bone-local coords from the setup pose.
+ */
+export function smoothWeights(
+  data: SkeletonData,
+  slotName: string,
+  mesh: SpineMeshAttachment,
+  iterations = 1,
+): number[] {
+  const { pose, count, world } = meshSetupContext(data, slotName, mesh);
+  if (!isWeightedVertices(mesh.vertices, count)) throw new Error('Mesh is not weighted.');
+  const neighbors: Set<number>[] = Array.from({ length: count }, () => new Set());
+  for (let t = 0; t < mesh.triangles.length; t += 3) {
+    const tri = [mesh.triangles[t]!, mesh.triangles[t + 1]!, mesh.triangles[t + 2]!];
+    for (const a of tri) for (const b of tri) if (a !== b) neighbors[a]?.add(b);
+  }
+  const invCache = new Map<number, Mat2D>();
+  const invFor = (boneIdx: number): Mat2D | null => {
+    const cached = invCache.get(boneIdx);
+    if (cached) return cached;
+    const m = pose.get(data.bones[boneIdx]?.name ?? '');
+    if (!m) return null;
+    const inv = invertMat(m);
+    invCache.set(boneIdx, inv);
+    return inv;
+  };
+  let per = parseInfluences(mesh.vertices, count);
+  for (let it = 0; it < iterations; it++) {
+    const current = per;
+    const weightOf = (v: number, bone: number) =>
+      current[v]!.find((inf) => inf.bone === bone)?.weight ?? 0;
+    const next: Influence[][] = [];
+    for (let v = 0; v < count; v++) {
+      const bones = new Set(current[v]!.map((inf) => inf.bone));
+      for (const n of neighbors[v]!) for (const inf of current[n]!) bones.add(inf.bone);
+      const list: Influence[] = [];
+      for (const b of bones) {
+        const around = [...neighbors[v]!];
+        const avg =
+          around.length > 0
+            ? around.reduce((s, n) => s + weightOf(n, b), 0) / around.length
+            : weightOf(v, b);
+        const w = 0.6 * weightOf(v, b) + 0.4 * avg;
+        if (w <= 0.001) continue;
+        const existing = current[v]!.find((inf) => inf.bone === b);
+        if (existing) {
+          list.push({ ...existing, weight: w });
+        } else {
+          const inv = invFor(b);
+          if (!inv) continue;
+          const p = applyMat(inv, world[v * 2]!, world[v * 2 + 1]!);
+          list.push({
+            bone: b,
+            x: Math.round(p.x * 100) / 100,
+            y: Math.round(p.y * 100) / 100,
+            weight: w,
+          });
+        }
+      }
+      const sum = list.reduce((s, inf) => s + inf.weight, 0);
+      if (sum > 0) for (const inf of list) inf.weight = round4(inf.weight / sum);
+      next.push(list.length > 0 ? list : current[v]!);
+    }
+    per = next;
+  }
+  return packInfluences(per);
+}
+
+/** Drops influences below `threshold`, caps at `maxInfluences`, renormalizes. */
+export function pruneWeights(
+  vertices: number[],
+  vertexCount: number,
+  opts: { maxInfluences?: number; threshold?: number } = {},
+): number[] {
+  if (!isWeightedVertices(vertices, vertexCount)) throw new Error('Mesh is not weighted.');
+  const maxInfluences = opts.maxInfluences ?? 4;
+  const threshold = opts.threshold ?? 0.01;
+  const per = parseInfluences(vertices, vertexCount);
+  const out = per.map((list) => {
+    let kept = list.filter((inf) => inf.weight >= threshold);
+    kept.sort((a, b) => b.weight - a.weight);
+    kept = kept.slice(0, Math.max(1, maxInfluences));
+    if (kept.length === 0) {
+      const biggest = [...list].sort((a, b) => b.weight - a.weight)[0];
+      kept = biggest ? [biggest] : [];
+    }
+    const sum = kept.reduce((s, inf) => s + inf.weight, 0);
+    if (sum > 0) for (const inf of kept) inf.weight = round4(inf.weight / sum);
+    return kept;
+  });
+  return packInfluences(out);
+}
+
+/** Exchanges two bones' influence (weights swap; local coords recomputed). */
+export function swapWeights(
+  data: SkeletonData,
+  slotName: string,
+  mesh: SpineMeshAttachment,
+  boneA: string,
+  boneB: string,
+): number[] {
+  const { pose, count, world } = meshSetupContext(data, slotName, mesh);
+  if (!isWeightedVertices(mesh.vertices, count)) throw new Error('Mesh is not weighted.');
+  const idxA = data.bones.findIndex((b) => b.name === boneA);
+  const idxB = data.bones.findIndex((b) => b.name === boneB);
+  if (idxA < 0) throw new Error(`Bone "${boneA}" does not exist.`);
+  if (idxB < 0) throw new Error(`Bone "${boneB}" does not exist.`);
+  const invA = invertMat(pose.get(boneA)!);
+  const invB = invertMat(pose.get(boneB)!);
+  const per = parseInfluences(mesh.vertices, count);
+  const out = per.map((list, v) => {
+    const wA = list.find((inf) => inf.bone === idxA)?.weight ?? 0;
+    const wB = list.find((inf) => inf.bone === idxB)?.weight ?? 0;
+    const rest = list.filter((inf) => inf.bone !== idxA && inf.bone !== idxB);
+    const wx = world[v * 2]!;
+    const wy = world[v * 2 + 1]!;
+    if (wB > 0) {
+      const p = applyMat(invA, wx, wy);
+      rest.push({
+        bone: idxA,
+        x: Math.round(p.x * 100) / 100,
+        y: Math.round(p.y * 100) / 100,
+        weight: wB,
+      });
+    }
+    if (wA > 0) {
+      const p = applyMat(invB, wx, wy);
+      rest.push({
+        bone: idxB,
+        x: Math.round(p.x * 100) / 100,
+        y: Math.round(p.y * 100) / 100,
+        weight: wA,
+      });
+    }
+    return rest;
+  });
+  return packInfluences(out);
+}
+
+/**
+ * Unbinds one bone. Vertices it influenced renormalize over their remaining
+ * bones; orphaned vertices re-auto-weight over the other bound bones. When it
+ * was the only bound bone, returns unweighted slot-bone-space pairs.
+ */
+export function removeBoneFromWeights(
+  data: SkeletonData,
+  slotName: string,
+  mesh: SpineMeshAttachment,
+  boneName: string,
+): number[] {
+  const { boneWorld, count, world } = meshSetupContext(data, slotName, mesh);
+  if (!isWeightedVertices(mesh.vertices, count)) throw new Error('Mesh is not weighted.');
+  const idx = data.bones.findIndex((b) => b.name === boneName);
+  if (idx < 0) throw new Error(`Bone "${boneName}" does not exist.`);
+  const remaining = boundBoneIndices(mesh.vertices, count)
+    .filter((i) => i !== idx)
+    .map((i) => data.bones[i]?.name)
+    .filter((n): n is string => n !== undefined);
+  const invSlot = invertMat(boneWorld);
+  const localPairs: number[] = [];
+  for (let v = 0; v < count; v++) {
+    const p = applyMat(invSlot, world[v * 2]!, world[v * 2 + 1]!);
+    localPairs.push(Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100);
+  }
+  if (remaining.length === 0) return localPairs;
+  const per = parseInfluences(mesh.vertices, count);
+  const out = per.map((list, v) => {
+    const kept = list.filter((inf) => inf.bone !== idx);
+    if (kept.length === 0) {
+      // Orphan: re-bind this vertex over the remaining bones by distance.
+      const block = autoWeightVertices(
+        data,
+        slotName,
+        [localPairs[v * 2]!, localPairs[v * 2 + 1]!],
+        remaining,
+      );
+      return parseInfluences(block, 1)[0]!;
+    }
+    const sum = kept.reduce((s, inf) => s + inf.weight, 0);
+    if (sum > 0) for (const inf of kept) inf.weight = round4(inf.weight / sum);
+    return kept;
+  });
+  return packInfluences(out);
 }
