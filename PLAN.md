@@ -504,7 +504,7 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 5. UI review masks: overlay từng part, sửa nhanh (thêm/bớt point prompt), đặt tên part
    → "Import parts" thành assets kèm vị trí gốc.
 
-#### Phase 14 — AI chat auto-rig & auto-animate — ✅ Slice 1 (07/2026)
+#### Phase 14 — AI chat auto-rig & auto-animate — ✅ (07/2026, cả 2 slice)
 
 1. Chat panel trong editor (streaming, hiển thị tool call, lưu/khôi phục history);
    server chạy vòng lặp tool-use anthropic SDK (`claude-opus-4-8`, adaptive thinking)
@@ -525,8 +525,26 @@ Sau khi có parts (PNG rời + vị trí gốc + landmark khớp):
 > theo `length/100`. Ops `rig_from_parts` (một `Composite` — 1 bước undo) +
 > `apply_preset_animation`; **BRIDGE_OPS 62, MCP 55 tools**; e2e `bridge.mjs` xác nhận
 > `rigFromPartsWorks` + `presetWalkWorks` (fixture part-box seed qua
-> `window.__spineEditor`). Slice 2 còn lại: mục 1 + 4 (chat ws, bảng
-> conversations/messages, vòng lặp anthropic, e2e chat).
+> `window.__spineEditor`).
+
+> **Ghi chú thực hiện slice 2 (07/2026):** mục 1 + 4 xong. 55 tool defs (name,
+> description, zod shape, op, loại kết quả) chuyển vào `@spine-editor/shared`
+> (`TOOL_DEFS`) — mcp-server đăng ký từ đó (parity giữ nguyên, `bridge.mjs` không đổi);
+> editor convert sang JSON Schema (`toolJsonSchemas`) và gửi trong message `hello` khi
+> mở `ws /api/chat/ws` → server không bao giờ drift schema. FastAPI chạy vòng lặp
+> streaming anthropic (`app/chat/loop.py`: claude-opus-4-8, adaptive thinking, mọi
+> tool_result của một vòng trong MỘT user message, pause_turn tự tiếp, cap 40 vòng,
+> stop hủy giữa chừng) với key anthropic từ vault BYOK; mỗi `tool_use` dispatch xuống
+> editor tab dạng `op {id, tool, params}`, editor resolve qua TOOL_DEFS rồi chạy
+> `dispatchOp` (đúng con đường undoable của MCP) và trả content blocks anthropic-ready
+> (screenshot → image block để model nhìn thấy rig). Lịch sử: bảng `conversations` +
+> `messages` (content blocks verbatim → mở lại phiên là tiếp tục đúng ngữ cảnh);
+> REST `/api/chat/conversations` CRUD; ChatWindow nổi kéo-thả (transcript bubble +
+> thinking thu gọn + chip tool, chuyển/tạo/xóa conversation). `SPINE_SERVER_CHAT_FAKE=1`
+> thay model bằng kịch bản cố định (gen mock → segment mock → rig → walk → screenshot)
+> cho pytest/e2e; e2e `packages/editor/e2e/chat.mjs`: một câu "tạo hiệp sĩ và cho nó
+> đi bộ" → nhân vật đi bộ trong viewport (`chatRigWorks: true`). Roadmap PLAN.md
+> hoàn thành; nghiệm thu mục 4 bản key thật: smoke tay với key anthropic trong vault.
 
 ### 7.7. Rủi ro & giảm thiểu
 
