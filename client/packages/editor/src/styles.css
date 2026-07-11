@@ -1372,3 +1372,30 @@ button.active {
   font-size: 12px;
   margin-bottom: 8px;
 }
+
+/* ---- tree context menu + inline rename ---- */
+
+.context-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 150px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  text-align: left;
+}
+
+.context-menu button.danger {
+  color: #e07a7a;
+}
+
+.rename-input {
+  font-size: 12px;
+  width: 120px;
+}

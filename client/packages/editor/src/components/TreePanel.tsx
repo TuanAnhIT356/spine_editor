@@ -1,5 +1,15 @@
-import { CreateSkin, RemoveSkin } from '@spine-editor/core';
-import { useState } from 'react';
+import {
+  CreateSkin,
+  RemoveAnimation,
+  RemoveEventDef,
+  RemoveIkConstraint,
+  RemovePathConstraint,
+  RemovePhysicsConstraint,
+  RemoveSkin,
+  RemoveTransformConstraint,
+  type Command,
+} from '@spine-editor/core';
+import { useCallback, useState } from 'react';
 import { useServer } from '../server/api.js';
 import { primarySelection, uniqueName, useEditor } from '../state/store.js';
 import {
@@ -12,6 +22,7 @@ import {
   TransformIcon,
 } from './icons.js';
 import { Resizer } from './Resizer.js';
+import { ContextMenu, type MenuItem } from './tree/ContextMenu.js';
 import { clickSelect } from './tree/tree-actions.js';
 import { TreeRows } from './tree/TreeRows.js';
 import { AnimationDock } from './tree/dock/AnimationDock.js';
@@ -19,6 +30,8 @@ import { BoneDock } from './tree/dock/BoneDock.js';
 import { ConstraintDock } from './tree/dock/ConstraintDock.js';
 import { EventDock } from './tree/dock/EventDock.js';
 import { SlotDock } from './tree/dock/SlotDock.js';
+
+type OpenMenu = (e: React.MouseEvent, items: MenuItem[]) => void;
 
 /** Skin list: pick the active (rendered) skin, create/duplicate/remove skins. */
 function SkinsSection() {
@@ -87,7 +100,7 @@ const CONSTRAINT_GROUPS = [
   { kind: 'physics' as const, icon: PhysicsIcon },
 ];
 
-function ConstraintsSection() {
+function ConstraintsSection({ openMenu }: { openMenu: OpenMenu }) {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
@@ -112,6 +125,25 @@ function ConstraintsSection() {
             }`}
             style={{ paddingLeft: 16 }}
             onClick={(e) => clickSelect(e, { kind, name })}
+            onContextMenu={(e) =>
+              openMenu(e, [
+                {
+                  label: 'Delete',
+                  danger: true,
+                  onClick: () => {
+                    const cmd: Command =
+                      kind === 'ik'
+                        ? new RemoveIkConstraint(name)
+                        : kind === 'transform'
+                          ? new RemoveTransformConstraint(name)
+                          : kind === 'path'
+                            ? new RemovePathConstraint(name)
+                            : new RemovePhysicsConstraint(name);
+                    if (useEditor.getState().execute(cmd)) useEditor.getState().select(null);
+                  },
+                },
+              ])
+            }
           >
             <span className="type-icon">
               <Icon size={12} />
@@ -124,7 +156,7 @@ function ConstraintsSection() {
   );
 }
 
-function EventsSection() {
+function EventsSection({ openMenu }: { openMenu: OpenMenu }) {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
@@ -142,6 +174,19 @@ function EventsSection() {
           }`}
           style={{ paddingLeft: 16 }}
           onClick={(e) => clickSelect(e, { kind: 'event', name })}
+          onContextMenu={(e) =>
+            openMenu(e, [
+              {
+                label: 'Delete',
+                danger: true,
+                onClick: () => {
+                  if (useEditor.getState().execute(new RemoveEventDef(name))) {
+                    useEditor.getState().select(null);
+                  }
+                },
+              },
+            ])
+          }
         >
           <span className="type-icon">
             <EventIcon size={12} />
@@ -153,7 +198,7 @@ function EventsSection() {
   );
 }
 
-function AnimationsSection() {
+function AnimationsSection({ openMenu }: { openMenu: OpenMenu }) {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
@@ -172,6 +217,26 @@ function AnimationsSection() {
           style={{ paddingLeft: 16 }}
           title="Double-click to open in animate mode"
           onClick={(e) => clickSelect(e, { kind: 'animation', name })}
+          onContextMenu={(e) =>
+            openMenu(e, [
+              {
+                label: 'Open',
+                onClick: () => {
+                  useEditor.getState().setAnimation(name);
+                  useEditor.getState().setMode('animate');
+                },
+              },
+              {
+                label: 'Delete',
+                danger: true,
+                onClick: () => {
+                  const s = useEditor.getState();
+                  if (s.anim.current === name) s.setAnimation(null);
+                  if (s.execute(new RemoveAnimation(name))) s.select(null);
+                },
+              },
+            ])
+          }
           onDoubleClick={() => {
             useEditor.getState().setAnimation(name);
             useEditor.getState().setMode('animate');
@@ -230,6 +295,11 @@ export function TreePanel() {
   const [filter, setFilter] = useState('');
   const [show, setShow] = useState({ slots: true, attachments: true, constraints: true });
   const [dockHeight, setDockHeight] = useState(260);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const openMenu = useCallback<OpenMenu>((e, items) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, items });
+  }, []);
   const primary = primarySelection(selection);
   const projectName = useServer((s) => s.projectName) || 'untitled';
   const extraCount = selection.length > 1 ? selection.length - 1 : 0;
@@ -261,11 +331,11 @@ export function TreePanel() {
           </span>
           {projectName}
         </div>
-        <TreeRows query={filter.trim().toLowerCase()} show={show} />
-        {show.constraints && <ConstraintsSection />}
+        <TreeRows query={filter.trim().toLowerCase()} show={show} openMenu={openMenu} />
+        {show.constraints && <ConstraintsSection openMenu={openMenu} />}
         <SkinsSection />
-        <EventsSection />
-        <AnimationsSection />
+        <EventsSection openMenu={openMenu} />
+        <AnimationsSection openMenu={openMenu} />
         <ImagesSection />
       </div>
       <Resizer
@@ -285,6 +355,7 @@ export function TreePanel() {
         {primary?.kind === 'event' && <EventDock name={primary.name} />}
         {primary?.kind === 'animation' && <AnimationDock name={primary.name} />}
       </div>
+      {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
     </div>
   );
 }
