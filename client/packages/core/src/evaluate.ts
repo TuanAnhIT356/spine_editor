@@ -10,7 +10,7 @@
  * deform; draw order. Physics constraints preview via PhysicsSimulator.
  * Not evaluated (data round-trips untouched): events, animated
  * transform-constraint mix timelines, animated physics-property timelines,
- * bone inherit timelines, two-color (rgba2/rgb2) and sequence timelines.
+ * bone inherit timelines and sequence timelines.
  *
  * Spine timeline semantics: rotate/translate/shear values are OFFSETS added
  * to the setup pose; scale values are FACTORS multiplied with the setup pose.
@@ -29,6 +29,7 @@ import type {
   SpineCurve,
   SpineDeformKey,
   SpineDrawOrderKey,
+  SpineTwoColorKey,
   SpineIkKey,
   SpineValueKey,
 } from './spine-json/types.js';
@@ -274,6 +275,41 @@ export function sampleColorTimeline(keys: SpineColorKey[], time: number, setup: 
   return out.map(hexByte).join('');
 }
 
+/** Samples an rgba2/rgb2 timeline into interpolated light + dark hex strings. */
+function sampleTwoColor(
+  keys: SpineTwoColorKey[],
+  time: number,
+  lightLen: number, // 4 for rgba2, 3 for rgb2
+  setupLight: string,
+  setupDark: string,
+): { light: string; dark: string } {
+  const lightOf = (k: SpineTwoColorKey) => (k.light ?? setupLight).slice(0, lightLen * 2);
+  const darkOf = (k: SpineTwoColorKey) => k.dark ?? setupDark;
+  const first = keys[0];
+  if (!first) return { light: setupLight.slice(0, lightLen * 2), dark: setupDark };
+  const pick = (k: SpineTwoColorKey) => ({ light: lightOf(k), dark: darkOf(k) });
+  if (time <= (first.time ?? 0)) return pick(first);
+  let i = 0;
+  while (i < keys.length - 1 && (keys[i + 1]?.time ?? 0) <= time) i++;
+  const k1 = keys[i]!;
+  if (i === keys.length - 1) return pick(k1);
+  const k2 = keys[i + 1]!;
+  const channels = (k: SpineTwoColorKey) => [
+    ...parseHex(lightOf(k)).slice(0, lightLen),
+    ...parseHex(darkOf(k)).slice(0, 3),
+  ];
+  const c1 = channels(k1);
+  const c2 = channels(k2);
+  const t1 = k1.time ?? 0;
+  const t2 = k2.time ?? 0;
+  const out = c1.map((v, ch) => segmentValue(time, t1, v, t2, c2[ch] ?? v, k1.curve, ch));
+  const bytes = out.map(hexByte);
+  return {
+    light: bytes.slice(0, lightLen).join(''),
+    dark: bytes.slice(lightLen).join(''),
+  };
+}
+
 /** Final rgba color per slot with color/alpha timelines applied at time t. */
 export function computeAnimatedColors(
   data: SkeletonData,
@@ -285,9 +321,16 @@ export function computeAnimatedColors(
   if (!anim?.slots) return out;
   for (const slot of data.slots) {
     const timelines = anim.slots[slot.name];
-    if (!timelines?.rgba && !timelines?.alpha) continue;
+    if (!timelines?.rgba && !timelines?.alpha && !timelines?.rgba2 && !timelines?.rgb2) continue;
     let color = slot.color;
     if (timelines.rgba) color = sampleColorTimeline(timelines.rgba, time, slot.color);
+    if (timelines.rgba2?.length) {
+      color = sampleTwoColor(timelines.rgba2, time, 4, slot.color, slot.dark ?? '000000').light;
+    }
+    if (timelines.rgb2?.length) {
+      const rgb = sampleTwoColor(timelines.rgb2, time, 3, slot.color, slot.dark ?? '000000').light;
+      color = rgb + color.slice(6, 8);
+    }
     if (timelines.alpha) {
       const alphaKeys: SpineValueKey[] = timelines.alpha;
       const first = alphaKeys[0];
@@ -297,6 +340,28 @@ export function computeAnimatedColors(
       }
     }
     out.set(slot.name, color);
+  }
+  return out;
+}
+
+/** Dark (tint-black) color per slot from rgba2/rgb2 timelines at time t. */
+export function computeAnimatedDarkColors(
+  data: SkeletonData,
+  animationName: string,
+  time: number,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const anim = data.animations[animationName];
+  if (!anim?.slots) return out;
+  for (const slot of data.slots) {
+    const timelines = anim.slots[slot.name];
+    const keys = timelines?.rgba2?.length ? timelines.rgba2 : timelines?.rgb2;
+    if (!keys?.length) continue;
+    const lightLen = timelines?.rgba2?.length ? 4 : 3;
+    out.set(
+      slot.name,
+      sampleTwoColor(keys, time, lightLen, slot.color, slot.dark ?? '000000').dark,
+    );
   }
   return out;
 }
