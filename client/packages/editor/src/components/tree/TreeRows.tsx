@@ -1,5 +1,7 @@
-import { ReparentBone } from '@spine-editor/core';
-import { isSelected, useEditor } from '../../state/store.js';
+import { AddBone, RemoveBone, RenameBone, ReparentBone, createBone } from '@spine-editor/core';
+import { useState } from 'react';
+import { isSelected, uniqueName, useEditor } from '../../state/store.js';
+import type { MenuItem } from './ContextMenu.js';
 import {
   BBoxIcon,
   BoneIcon,
@@ -38,10 +40,13 @@ function VisDot({ hidden, onToggle }: { hidden: boolean; onToggle: () => void })
 export function TreeRows({
   query,
   show,
+  openMenu,
 }: {
   query: string;
   show: { slots: boolean; attachments: boolean; constraints: boolean };
+  openMenu: (e: React.MouseEvent, items: MenuItem[]) => void;
 }) {
+  const [renaming, setRenaming] = useState<string | null>(null);
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection);
@@ -87,6 +92,45 @@ export function TreeRows({
     );
   }
 
+  function commitBoneRename(from: string, to: string) {
+    setRenaming(null);
+    const trimmed = to.trim();
+    if (!trimmed || trimmed === from) return;
+    if (useEditor.getState().execute(new RenameBone(from, trimmed))) {
+      useEditor.getState().select({ kind: 'bone', name: trimmed });
+    }
+  }
+
+  function boneMenuItems(name: string): MenuItem[] {
+    const items: MenuItem[] = [
+      {
+        label: 'New Child Bone',
+        onClick: () => {
+          const s = useEditor.getState();
+          const child = uniqueName('bone', (n) => s.doc.data.bones.some((b) => b.name === n));
+          if (s.execute(new AddBone(createBone(child, name)))) {
+            s.select({ kind: 'bone', name: child });
+          }
+        },
+      },
+    ];
+    if (name !== 'root') {
+      items.push(
+        { label: 'Rename', onClick: () => setRenaming(name) },
+        {
+          label: 'Delete',
+          danger: true,
+          onClick: () => {
+            if (useEditor.getState().execute(new RemoveBone(name))) {
+              useEditor.getState().select(null);
+            }
+          },
+        },
+      );
+    }
+    return items;
+  }
+
   function BoneRow({ name, depth }: { name: string; depth: number }) {
     const selected = isSelected(selection, 'bone', name);
     const boneSlots = slots
@@ -97,8 +141,14 @@ export function TreeRows({
         <div
           className={`row bone ${selected ? 'selected' : ''}`}
           style={{ paddingLeft: 8 + depth * 14 }}
-          draggable={name !== 'root'}
+          draggable={name !== 'root' && renaming !== name}
+          tabIndex={0}
           onClick={(e) => clickSelect(e, { kind: 'bone', name })}
+          onDoubleClick={() => name !== 'root' && setRenaming(name)}
+          onKeyDown={(e) => {
+            if (e.key === 'F2' && name !== 'root') setRenaming(name);
+          }}
+          onContextMenu={(e) => openMenu(e, boneMenuItems(name))}
           onDragStart={(e) => e.dataTransfer.setData('text/bone', name)}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -116,7 +166,21 @@ export function TreeRows({
           <span className="type-icon" style={{ color: boneTint(name) }}>
             <BoneIcon size={12} />
           </span>
-          {name}
+          {renaming === name ? (
+            <input
+              className="rename-input"
+              autoFocus
+              defaultValue={name}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={(e) => commitBoneRename(name, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') setRenaming(null);
+              }}
+            />
+          ) : (
+            name
+          )}
         </div>
         {show.slots &&
           boneSlots.map(({ slot, index }) => {
@@ -127,6 +191,15 @@ export function TreeRows({
                   className={`row slot ${slotSelected ? 'selected' : ''}`}
                   style={{ paddingLeft: 22 + depth * 14 }}
                   onClick={(e) => clickSelect(e, { kind: 'slot', name: slot.name })}
+                  onContextMenu={(e) =>
+                    openMenu(e, [
+                      {
+                        label: 'Delete Slot',
+                        danger: true,
+                        onClick: () => useEditor.getState().removeSlotCascade(slot.name),
+                      },
+                    ])
+                  }
                 >
                   <VisDot
                     hidden={hiddenSlots.includes(slot.name)}

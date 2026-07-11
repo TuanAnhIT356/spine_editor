@@ -23,6 +23,10 @@ import {
   RemovePathConstraint,
   RemovePhysicsConstraint,
   RemoveTransformConstraint,
+  SetIkConstraintProperties,
+  SetPathConstraintProperties,
+  SetPhysicsConstraintProperties,
+  SetTransformConstraintProperties,
   AddSkinAttachment,
   RenameBone,
   ReorderSlot,
@@ -482,6 +486,26 @@ export async function dispatchOp(op: string, params: Params): Promise<unknown> {
     case 'remove_physics_constraint':
       executeOrThrow(new RemovePhysicsConstraint(str(params, 'name')));
       return { removed: str(params, 'name') };
+
+    case 'set_ik_constraint':
+    case 'set_transform_constraint':
+    case 'set_path_constraint':
+    case 'set_physics_constraint': {
+      const name = str(params, 'name');
+      const patch = Object.fromEntries(
+        Object.entries(params).filter(([k, v]) => k !== 'name' && v !== undefined),
+      );
+      const command =
+        knownOp === 'set_ik_constraint'
+          ? new SetIkConstraintProperties(name, patch)
+          : knownOp === 'set_transform_constraint'
+            ? new SetTransformConstraintProperties(name, patch)
+            : knownOp === 'set_path_constraint'
+              ? new SetPathConstraintProperties(name, patch)
+              : new SetPhysicsConstraintProperties(name, patch);
+      executeOrThrow(command);
+      return { ok: true };
+    }
 
     case 'create_animation': {
       const name = str(params, 'name');
