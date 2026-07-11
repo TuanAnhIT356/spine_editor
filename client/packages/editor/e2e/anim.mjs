@@ -48,7 +48,7 @@ await page.mouse.up();
 await page.waitForTimeout(200);
 
 // --- Switch to Animate, create animation "walk" (prompt auto-accepted)
-await page.click('.modes button:has-text("Animate")');
+await page.click('.mode-banner');
 await page.click('.timeline-header button:has-text("New")');
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/01-animate-mode.png` });

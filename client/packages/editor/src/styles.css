@@ -1113,3 +1113,124 @@ button.danger {
   padding: 4px 6px;
   align-items: center;
 }
+
+/* ---- viewport shell overlays ---- */
+
+.mode-banner {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.mode-banner:hover {
+  opacity: 1;
+}
+
+.tool-cluster {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.tool-cluster > div {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.tc-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tc-tools button {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.tc-transform {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tc-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.tc-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  width: 84px;
+  font-size: 11px;
+}
+
+.num-box {
+  width: 64px;
+  text-align: right;
+  font-size: 11px;
+}
+
+.tc-key {
+  opacity: 0.5;
+  padding: 2px 4px;
+}
+
+.tc-axes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tc-filters {
+  font-size: 11px;
+}
+
+.tc-filter-head,
+.tc-filter-row {
+  display: grid;
+  grid-template-columns: 52px 16px 16px 16px;
+  align-items: center;
+  gap: 2px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  padding: 0;
+  border: 1px solid var(--text-dim);
+  background: transparent;
+}
+
+.dot.on {
+  background: var(--text-dim);
+}
+
+button.active {
+  background: var(--accent-soft);
+}

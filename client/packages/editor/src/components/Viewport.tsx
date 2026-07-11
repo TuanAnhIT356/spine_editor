@@ -31,6 +31,8 @@ import { useEffect, useRef, useState } from 'react';
 import { bridgeRuntime } from '../bridge/runtime.js';
 import { primarySelection, uniqueName, useEditor, type SelectionItem } from '../state/store.js';
 import { SceneRenderer, attachmentVertexCount, type RenderInput } from '../viewport/renderer.js';
+import { ModeBanner } from './ModeBanner.js';
+import { ToolCluster } from './ToolCluster.js';
 
 const RAD_DEG = 180 / Math.PI;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -64,6 +66,20 @@ type DragState =
       origin: { x: number; y: number };
       startAngle: number;
       startRotations: Map<string, number>;
+    }
+  | {
+      kind: 'scale';
+      bones: string[];
+      startX: number;
+      startY: number;
+      startScales: Map<string, { x: number; y: number }>;
+    }
+  | {
+      kind: 'shear';
+      bones: string[];
+      startX: number;
+      startY: number;
+      startShears: Map<string, { x: number; y: number }>;
     }
   | {
       kind: 'create';
@@ -389,7 +405,9 @@ export function Viewport() {
         return;
       }
       case 'translate':
-      case 'rotate': {
+      case 'rotate':
+      case 'scale':
+      case 'shear': {
         const name = hit ?? (primary?.kind === 'bone' ? primary.name : null);
         if (!name) return;
         const alreadySelected = state.selection.some((s) => s.kind === 'bone' && s.name === name);
@@ -402,6 +420,37 @@ export function Viewport() {
           .selection.filter((s): s is SelectionItem & { kind: 'bone' } => s.kind === 'bone')
           .map((s) => s.name);
         const activeBones = bones.length > 0 ? bones : [name];
+
+        if (state.tool === 'scale' || state.tool === 'shear') {
+          const startVals = new Map<string, { x: number; y: number }>();
+          for (const boneName of activeBones) {
+            const bone = base.find((b) => b.name === boneName);
+            if (!bone) continue;
+            startVals.set(
+              boneName,
+              state.tool === 'scale'
+                ? { x: bone.scaleX, y: bone.scaleY }
+                : { x: bone.shearX, y: bone.shearY },
+            );
+          }
+          dragRef.current =
+            state.tool === 'scale'
+              ? {
+                  kind: 'scale',
+                  bones: [...startVals.keys()],
+                  startX: p.x,
+                  startY: p.y,
+                  startScales: startVals,
+                }
+              : {
+                  kind: 'shear',
+                  bones: [...startVals.keys()],
+                  startX: p.x,
+                  startY: p.y,
+                  startShears: startVals,
+                };
+          return;
+        }
 
         if (state.tool === 'translate') {
           const startLocals = new Map<string, { x: number; y: number }>();
@@ -515,6 +564,21 @@ export function Viewport() {
         const startRotation = drag.startRotations.get(b.name);
         return startRotation === undefined ? b : { ...b, rotation: startRotation + deltaDeg };
       });
+    } else if (drag.kind === 'scale') {
+      // Horizontal drag scales X, vertical scales Y (up = grow); 120px = ×2.
+      const fx = 1 + (p.x - drag.startX) / 120;
+      const fy = 1 + (drag.startY - p.y) / 120;
+      overrideRef.current = base.map((b) => {
+        const s0 = drag.startScales.get(b.name);
+        return s0 ? { ...b, scaleX: s0.x * fx, scaleY: s0.y * fy } : b;
+      });
+    } else if (drag.kind === 'shear') {
+      const dx = (p.x - drag.startX) / 2;
+      const dy = (drag.startY - p.y) / 2;
+      overrideRef.current = base.map((b) => {
+        const s0 = drag.startShears.get(b.name);
+        return s0 ? { ...b, shearX: s0.x + dx, shearY: s0.y + dy } : b;
+      });
     } else {
       const lp = applyMat(drag.invParent, world.x, world.y);
       const dx = lp.x - drag.start.x;
@@ -534,6 +598,19 @@ export function Viewport() {
     if (!drag || drag.kind === 'pan') return;
     const state = useEditor.getState();
     const animating = state.mode === 'animate' && state.anim.current !== null;
+    if (
+      animating &&
+      !state.autoKey &&
+      (drag.kind === 'translate' ||
+        drag.kind === 'rotate' ||
+        drag.kind === 'scale' ||
+        drag.kind === 'shear' ||
+        drag.kind === 'vertex')
+    ) {
+      state.setError('Auto Key is off — enable it to key changes in animate mode.');
+      redraw();
+      return;
+    }
 
     if (drag.kind === 'vertex' || drag.kind === 'paint') {
       const ctx = editContext();
@@ -648,6 +725,69 @@ export function Viewport() {
       if (commands.length === 1) state.execute(commands[0]!);
       else if (commands.length > 1)
         state.execute(new Composite(`Rotate ${commands.length} bones`, commands));
+    } else if (drag.kind === 'scale' && override) {
+      const commands: Command[] = [];
+      for (const boneName of drag.bones) {
+        const b = override.find((x) => x.name === boneName);
+        if (!b) continue;
+        if (animating && state.anim.current) {
+          const setup = state.doc.findBone(boneName);
+          if (!setup) continue;
+          // Scale keys are FACTORS multiplied with the setup scale.
+          commands.push(
+            new UpsertBoneKeyframe(
+              state.anim.current,
+              boneName,
+              'scale',
+              makeKey(state.anim.time, {
+                x: round2(b.scaleX / (setup.scaleX || 1)),
+                y: round2(b.scaleY / (setup.scaleY || 1)),
+              }),
+            ),
+          );
+        } else {
+          commands.push(
+            new SetBoneTransform(boneName, {
+              scaleX: round2(b.scaleX),
+              scaleY: round2(b.scaleY),
+            }),
+          );
+        }
+      }
+      if (commands.length === 1) state.execute(commands[0]!);
+      else if (commands.length > 1)
+        state.execute(new Composite(`Scale ${commands.length} bones`, commands));
+    } else if (drag.kind === 'shear' && override) {
+      const commands: Command[] = [];
+      for (const boneName of drag.bones) {
+        const b = override.find((x) => x.name === boneName);
+        if (!b) continue;
+        if (animating && state.anim.current) {
+          const setup = state.doc.findBone(boneName);
+          if (!setup) continue;
+          commands.push(
+            new UpsertBoneKeyframe(
+              state.anim.current,
+              boneName,
+              'shear',
+              makeKey(state.anim.time, {
+                x: round2(b.shearX - setup.shearX),
+                y: round2(b.shearY - setup.shearY),
+              }),
+            ),
+          );
+        } else {
+          commands.push(
+            new SetBoneTransform(boneName, {
+              shearX: round2(b.shearX),
+              shearY: round2(b.shearY),
+            }),
+          );
+        }
+      }
+      if (commands.length === 1) state.execute(commands[0]!);
+      else if (commands.length > 1)
+        state.execute(new Composite(`Shear ${commands.length} bones`, commands));
     } else if (drag.kind === 'create') {
       if (drag.temp.length > 4) {
         const ok = state.execute(
@@ -683,6 +823,8 @@ export function Viewport() {
           style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }}
         />
       )}
+      <ModeBanner />
+      <ToolCluster />
     </div>
   );
 }

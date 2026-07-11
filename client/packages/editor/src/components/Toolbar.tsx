@@ -11,7 +11,7 @@ import {
   readFileAsText,
   type ProjectPayload,
 } from '../state/persistence.js';
-import { useEditor, type Tool } from '../state/store.js';
+import { useEditor } from '../state/store.js';
 import { useServer } from '../server/api.js';
 import { MenuIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons.js';
 import { GenerateModal } from './GenerateModal.js';
@@ -20,15 +20,7 @@ import { ChatWindow } from './ChatWindow.js';
 import { ProjectsModal } from './ProjectsModal.js';
 import { ServerModal } from './ServerModal.js';
 
-const TOOLS: { id: Tool; label: string; hint: string }[] = [
-  { id: 'select', label: 'Select', hint: '1 — click bones, drag empty space to pan' },
-  { id: 'translate', label: 'Translate', hint: '2 — drag a bone to move it' },
-  { id: 'rotate', label: 'Rotate', hint: '3 — drag around a bone to rotate it' },
-  { id: 'create', label: 'Create', hint: '4 — drag from a bone to add a child bone' },
-];
-
 export function Toolbar() {
-  const tool = useEditor((s) => s.tool);
   const mode = useEditor((s) => s.mode);
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
@@ -185,19 +177,6 @@ export function Toolbar() {
         {dirty ? '*' : ''}
         {projectName}
       </span>
-      <div className="group">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            className={tool === t.id ? 'active' : ''}
-            title={t.id === 'create' && mode === 'animate' ? 'Setup mode only' : t.hint}
-            disabled={t.id === 'create' && mode === 'animate'}
-            onClick={() => useEditor.getState().setTool(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
       <div className="spacer" />
       <div className="group">
         <button
@@ -238,20 +217,6 @@ export function Toolbar() {
           onClick={() => setShowChat((v) => !v)}
         >
           Chat
-        </button>
-      </div>
-      <div className="group modes">
-        <button
-          className={mode === 'setup' ? 'active' : ''}
-          onClick={() => useEditor.getState().setMode('setup')}
-        >
-          Setup
-        </button>
-        <button
-          className={mode === 'animate' ? 'active' : ''}
-          onClick={() => useEditor.getState().setMode('animate')}
-        >
-          Animate
         </button>
       </div>
       <div className="menu-wrap">

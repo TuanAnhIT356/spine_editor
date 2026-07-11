@@ -41,7 +41,9 @@ export function App() {
       } else if (e.key === '1') s.setTool('select');
       else if (e.key === '2') s.setTool('translate');
       else if (e.key === '3') s.setTool('rotate');
-      else if (e.key === '4') s.setTool('create');
+      else if (e.key === '4') s.setTool('scale');
+      else if (e.key === '5') s.setTool('shear');
+      else if (e.key === '6') s.setTool('create');
       else if (e.key === ' ' && s.mode === 'animate' && s.anim.current) {
         e.preventDefault();
         s.setPlaying(!s.anim.playing);
