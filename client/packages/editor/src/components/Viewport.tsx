@@ -16,6 +16,7 @@ import {
   boundBoneIndices,
   computeAnimatedAttachments,
   computeAnimatedColors,
+  computeAnimatedDarkColors,
   computeAnimatedDeforms,
   computeAnimatedDrawOrder,
   computeAnimatedLocals,
@@ -207,6 +208,9 @@ export function Viewport() {
         : undefined,
       slotColors: animating
         ? computeAnimatedColors(state.doc.data, state.anim.current!, state.anim.time)
+        : undefined,
+      slotDarks: animating
+        ? computeAnimatedDarkColors(state.doc.data, state.anim.current!, state.anim.time)
         : undefined,
       deforms: animating
         ? computeAnimatedDeforms(state.doc.data, state.anim.current!, state.anim.time)
