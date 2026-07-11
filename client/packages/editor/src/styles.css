@@ -1733,3 +1733,10 @@ button.active {
 .asset-import {
   margin: 4px 0;
 }
+
+/* ---- Event audio waveform (P20) ---- */
+.track .wave {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}

@@ -15,8 +15,10 @@ import {
   type SpineBoneTimelineName,
 } from '@spine-editor/core';
 import { useEffect, useRef, useState } from 'react';
+import { audioEngine } from '../audio/engine.js';
 import { exportGif } from '../state/gif-export.js';
 import { uniqueName, useEditor } from '../state/store.js';
+import { EventWave } from './EventWave.js';
 import { GraphEditor } from './GraphEditor.js';
 
 const DEFAULT_PPS = 200; // pixels per second
@@ -88,11 +90,44 @@ interface BoxSelState {
   additive: boolean;
 }
 
+/** Plays audio of event keys crossed between prev and t (handles loop wrap). */
+function fireEventAudio(
+  s: ReturnType<typeof useEditor.getState>,
+  prev: number,
+  t: number,
+  loopStart: number,
+  loopEnd: number,
+): void {
+  const animName = s.anim.current;
+  if (!animName) return;
+  const animation = s.doc.getAnimation(animName);
+  const keys = animation?.events ?? [];
+  if (keys.length === 0) return;
+  const crossed = (kt: number): boolean => {
+    if (t >= prev) return prev < kt && kt <= t;
+    // Wrapped: (prev, loopEnd] ∪ [loopStart, t]
+    return (prev < kt && kt <= loopEnd) || (loopStart <= kt && kt <= t);
+  };
+  for (const key of keys) {
+    const kt = key.time ?? 0;
+    if (!crossed(kt)) continue;
+    const def = s.doc.data.events[key.name];
+    if (!def?.audio || !(def.audio in s.audioAssets)) continue;
+    audioEngine.ensure(def.audio, s.audioAssets[def.audio]!.dataUrl);
+    audioEngine.play(def.audio, {
+      volume: key.volume ?? def.volume ?? 1,
+      balance: key.balance ?? def.balance ?? 0,
+      rate: s.anim.speed,
+    });
+  }
+}
+
 export function TimelinePanel() {
   const revision = useEditor((s) => s.revision);
   const doc = useEditor((s) => s.doc);
   const anim = useEditor((s) => s.anim);
   const layout = useEditor((s) => s.layout);
+  const audioAssets = useEditor((s) => s.audioAssets);
   void revision;
 
   const [selectedKeys, setSelectedKeys] = useState<KeyRef[]>([]);
@@ -111,6 +146,7 @@ export function TimelinePanel() {
   const graphKeyRef = useRef<KeyRef | null>(null);
   const [scaleText, setScaleText] = useState('1.5');
   const [exporting, setExporting] = useState(false);
+  const [audioMuted, setAudioMuted] = useState(() => audioEngine.isMuted());
   const tracksRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const scrubbing = useRef(false);
@@ -187,6 +223,7 @@ export function TimelinePanel() {
     if (!anim.playing) return;
     let raf = 0;
     let last = performance.now();
+    let prevT = useEditor.getState().anim.time;
     const tick = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
@@ -199,16 +236,22 @@ export function TimelinePanel() {
       if (t > end) {
         if (s.anim.loop) t = start + ((t - start) % Math.max(end - start, 0.001));
         else {
+          fireEventAudio(s, prevT, end, start, end);
           s.setAnimTime(end);
           s.setPlaying(false);
           return;
         }
       }
+      fireEventAudio(s, prevT, t, start, end);
+      prevT = t;
       s.setAnimTime(t);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      audioEngine.stopAll();
+    };
   }, [anim.playing]);
 
   function timeFromEvent(e: React.PointerEvent): number {
@@ -226,8 +269,19 @@ export function TimelinePanel() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  const scrubPrev = useRef<number | null>(null);
+
   function onScrub(e: React.PointerEvent) {
-    useEditor.getState().setAnimTime(Math.min(timeFromEvent(e), span));
+    const s = useEditor.getState();
+    const t = Math.min(timeFromEvent(e), span);
+    const prev = scrubPrev.current;
+    if (prev !== null && prev !== t) {
+      const lo = Math.min(prev, t);
+      const hi = Math.max(prev, t);
+      fireEventAudio({ ...s, anim: { ...s.anim, speed: 1 } }, lo, hi, lo, hi);
+    }
+    scrubPrev.current = t;
+    s.setAnimTime(t);
   }
 
   function onNewAnimation() {
@@ -645,7 +699,10 @@ export function TimelinePanel() {
         </button>
         <button
           disabled={!anim.current}
-          onClick={() => useEditor.getState().setPlaying(!anim.playing)}
+          onClick={() => {
+            if (anim.playing) audioEngine.stopAll();
+            useEditor.getState().setPlaying(!anim.playing);
+          }}
           title="Space"
         >
           {anim.playing ? '❚❚ Pause' : '▶ Play'}
@@ -656,6 +713,15 @@ export function TimelinePanel() {
           onClick={() => useEditor.getState().stepFrame(1)}
         >
           ⏵
+        </button>
+        <button
+          title="Mute event audio"
+          onClick={() => {
+            audioEngine.setMuted(!audioMuted);
+            setAudioMuted(!audioMuted);
+          }}
+        >
+          {audioMuted ? '🔇' : '🔊'}
         </button>
         <button disabled={!anim.current} title="Next key" onClick={() => jumpToKey(1)}>
           |▶
@@ -860,6 +926,8 @@ export function TimelinePanel() {
                 e.stopPropagation();
                 e.currentTarget.setPointerCapture(e.pointerId);
                 scrubbing.current = true;
+                scrubPrev.current = null;
+                audioEngine.stopAll();
                 onScrub(e);
               }}
               onPointerMove={(e) => scrubbing.current && onScrub(e)}
@@ -1017,6 +1085,23 @@ export function TimelinePanel() {
             {eventKeys.length > 0 && (
               <div className="track special">
                 <span className="track-label">events</span>
+                {eventKeys.map((key) => {
+                  const def = useEditor.getState().doc.data.events[key.name];
+                  const asset = def?.audio ? audioAssets[def.audio] : undefined;
+                  if (!asset) return null;
+                  audioEngine.ensure(asset.name, asset.dataUrl);
+                  const t = key.time ?? 0;
+                  return (
+                    <EventWave
+                      key={`wave-${key.name}@${t}`}
+                      name={asset.name}
+                      left={PAD + t * pps}
+                      pxPerSecond={pps}
+                      height={ROW_H}
+                      maxWidth={Math.max(0, (span - t) * pps)}
+                    />
+                  );
+                })}
                 {eventKeys.map((key) => {
                   const t = key.time ?? 0;
                   const isSelected =
