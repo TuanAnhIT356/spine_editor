@@ -3,9 +3,9 @@ import { BRIDGE_OPS, TOOL_DEFS, toolJsonSchemas } from '../src/index.js';
 
 describe('TOOL_DEFS', () => {
   it('has 55 uniquely named tools with valid ops and descriptions', () => {
-    expect(TOOL_DEFS).toHaveLength(61);
+    expect(TOOL_DEFS).toHaveLength(62);
     const names = TOOL_DEFS.map((d) => d.name);
-    expect(new Set(names).size).toBe(61);
+    expect(new Set(names).size).toBe(62);
     for (const d of TOOL_DEFS) {
       expect(BRIDGE_OPS).toContain(d.op);
       expect(d.description.length).toBeGreaterThan(10);
@@ -22,7 +22,7 @@ describe('TOOL_DEFS', () => {
 
   it('produces anthropic-ready object schemas', () => {
     const schemas = toolJsonSchemas();
-    expect(schemas).toHaveLength(61);
+    expect(schemas).toHaveLength(62);
     for (const s of schemas) {
       expect(s.input_schema['type']).toBe('object');
       expect(s.input_schema['$schema']).toBeUndefined();

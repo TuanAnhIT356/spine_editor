@@ -68,6 +68,7 @@ export const BRIDGE_OPS = [
   'bind_weights',
   'edit_mesh',
   'adjust_weights',
+  'import_audio',
   'add_clipping',
   'add_bounding_box',
   'add_point',

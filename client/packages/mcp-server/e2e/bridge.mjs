@@ -258,6 +258,34 @@ await call('set_event_keyframe', { animation: 'walk', name: 'footstep', time: 0.
 const exported2 = await call('export_spine_json');
 const exportedEvents = JSON.parse(exported2.json);
 
+// 9c3. Audio asset + event audio (Phase 20).
+function tinyWavDataUrl() {
+  const rate = 8000;
+  const samples = Math.floor(rate * 0.2);
+  const buf = Buffer.alloc(44 + samples * 2);
+  buf.write('RIFF', 0);
+  buf.writeUInt32LE(36 + samples * 2, 4);
+  buf.write('WAVEfmt ', 8);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20); // PCM
+  buf.writeUInt16LE(1, 22); // mono
+  buf.writeUInt32LE(rate, 24);
+  buf.writeUInt32LE(rate * 2, 28);
+  buf.writeUInt16LE(2, 32);
+  buf.writeUInt16LE(16, 34);
+  buf.write('data', 36);
+  buf.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++) {
+    buf.writeInt16LE(Math.round(Math.sin((i / rate) * 2 * Math.PI * 440) * 12000), 44 + i * 2);
+  }
+  return `data:audio/wav;base64,${buf.toString('base64')}`;
+}
+const audioImport = await call('import_audio', { name: 'clang-sfx', dataUrl: tinyWavDataUrl() });
+await call('set_event', { name: 'clang', audio: audioImport.asset, volume: 0.9 });
+await call('set_event_keyframe', { animation: 'walk', name: 'clang', time: 0.25, balance: -0.5 });
+const audioState = await call('get_project_state');
+const audioExport = JSON.parse((await call('export_spine_json')).json);
+
 // ---- Phase 14: auto-rig from parts + preset walk
 console.error('[e2e] auto-rig flow');
 const PART_BOXES = [
@@ -340,6 +368,13 @@ console.log(
         pruneRes.weighted === true &&
         (p19Flag?.uvs?.length ?? 0) / 2 === meshEditRes.vertexCount &&
         p19Flag?.vertices?.length !== p19Flag?.uvs?.length,
+      audioWorks:
+        audioImport.asset === 'clang-sfx' &&
+        (audioState.audioAssets ?? []).includes('clang-sfx') &&
+        audioExport.events?.clang?.audio === 'clang-sfx' &&
+        (audioExport.animations?.walk?.events ?? []).some(
+          (k) => k.name === 'clang' && k.balance === -0.5,
+        ),
       rigFromPartsWorks:
         rigRes.bones.includes('spine') &&
         rigBoneNames.includes('upper_leg_l') &&
