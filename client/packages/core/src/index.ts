@@ -33,4 +33,5 @@ export * from './path.js';
 export * from './physics.js';
 export * from './atlas-import.js';
 export * from './autorig.js';
+export * from './mixer.js';
 export * from './presets.js';
