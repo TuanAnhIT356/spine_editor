@@ -117,6 +117,7 @@ export function Viewport() {
   const animCurrent = useEditor((s) => s.anim.current);
   const animTime = useEditor((s) => s.anim.time);
   const animGhost = useEditor((s) => s.anim.ghost);
+  const ghostConfig = useEditor((s) => s.ghostConfig);
   const viewFilters = useEditor((s) => s.viewFilters);
   const hiddenBones = useEditor((s) => s.hiddenBones);
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
@@ -141,22 +142,27 @@ export function Viewport() {
     return doc.data.bones;
   }
 
-  /** Onion-skin poses around the playhead: 2 past (blue) + 2 future (green). */
+  /** Onion-skin poses around the playhead: past (blue) + future (green) per ghostConfig. */
   function buildGhosts(): RenderInput['ghosts'] {
     const state = useEditor.getState();
-    const { doc, anim } = state;
+    const { doc, anim, ghostConfig } = state;
     if (!anim.ghost || !anim.current) return undefined;
     const animation = doc.getAnimation(anim.current);
     if (!animation) return undefined;
     const duration = getAnimationDuration(animation);
-    const spacing = Math.max(duration / 12, 1 / 30);
+    const spacing = Math.max(ghostConfig.spacingFrames, 1) / 30;
+    const alpha = 0.7 * ghostConfig.opacity;
+    const steps: number[] = [];
+    for (let i = -Math.round(ghostConfig.before); i < 0; i++) steps.push(i);
+    for (let i = 1; i <= Math.round(ghostConfig.after); i++) steps.push(i);
     const ghosts: NonNullable<RenderInput['ghosts']> = [];
-    for (const step of [-2, -1, 1, 2]) {
+    for (const step of steps) {
       const t = anim.time + step * spacing;
       if (t < 0 || t > duration || Math.abs(t - anim.time) < 1e-6) continue;
       ghosts.push({
         bones: computeAnimatedLocals(doc.data, anim.current, t),
         color: step < 0 ? 0x5b87b5 : 0x5bb587,
+        alpha,
       });
     }
     return ghosts.length > 0 ? ghosts : undefined;
@@ -249,6 +255,7 @@ export function Viewport() {
     animCurrent,
     animTime,
     animGhost,
+    ghostConfig,
     viewFilters,
     hiddenBones,
     hiddenSlots,

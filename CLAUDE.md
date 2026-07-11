@@ -69,7 +69,12 @@ toolbar (Filter by timeline type, Lock rows, Shift selected keys, Offset all key
 Current/Loop Start/End fields with loop-range playback, full transport, colored key
 ticks + per-bone summary rows (white on multi-type frames) + red summary diamonds +
 interpolation connectors, and transient posing when Auto Key is off (key buttons
-commit the pose). Next: PLAN.md §8 phases 18–22.
+commit the pose). **Phase 18 done**: `core/src/mixer.ts` TrackMixer (4 tracks,
+crossfade/speed/loop/alpha/hold-previous/additive on bone locals), floating Preview
+window (own SceneRenderer + RAF, animation list click-assign, per-track Speed/Mix/
+Repeat + Alpha/Hold/Additive), configurable onion-skin ghosting (store `ghostConfig`
+before/after/spacing/opacity + Ghosting window; Playback view folded into the P17
+transport + Preview). Next: PLAN.md §8 phases 19–22.
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —

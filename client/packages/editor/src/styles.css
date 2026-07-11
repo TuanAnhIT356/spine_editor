@@ -1536,3 +1536,106 @@ button.active {
 .bone-summary {
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* ---- Preview window (P18) ---- */
+.preview-window {
+  position: fixed;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.preview-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.preview-canvas {
+  flex: 1;
+  min-width: 0;
+}
+.preview-side {
+  width: 170px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.preview-side .panel-title {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.preview-side button {
+  text-align: left;
+  padding: 3px 6px;
+}
+.preview-side button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.preview-side .empty {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.preview-side .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+.preview-side .field input[type='number'] {
+  width: 56px;
+}
+.preview-side .field input[type='range'] {
+  width: 80px;
+}
+.preview-tracks {
+  display: flex;
+  gap: 4px;
+}
+.preview-tracks button {
+  flex: 1;
+  text-align: center;
+}
+
+/* ---- Ghosting window (P18) ---- */
+.ghosting-window {
+  position: fixed;
+  z-index: 25;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.ghosting-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ghosting-body .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+.ghosting-body .field input[type='number'] {
+  width: 56px;
+}
+.ghosting-body .field input[type='range'] {
+  width: 90px;
+}

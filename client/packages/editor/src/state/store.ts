@@ -33,6 +33,14 @@ export interface GroupFilter {
   labels: boolean;
 }
 
+/** Onion-skin ghosting configuration (frames before/after, spacing, opacity). */
+export interface GhostConfig {
+  before: number;
+  after: number;
+  spacingFrames: number;
+  opacity: number;
+}
+
 export interface ViewFilters {
   bones: GroupFilter;
   images: GroupFilter;
@@ -149,6 +157,8 @@ interface EditorState {
   assets: Record<string, ImageAsset>;
   error: string | null;
   anim: AnimationUiState;
+  /** Onion-skin ghosting knobs (editor-only, never serialized). */
+  ghostConfig: GhostConfig;
   /** Gizmo/drag space for transform tools (Spine-style Local/Parent/World). */
   axesMode: AxesMode;
   /** Per-group selectability / visibility / name-label toggles (tool cluster). */
@@ -188,6 +198,7 @@ interface EditorState {
   setLoop(loop: boolean): void;
   setSpeed(speed: number): void;
   setGhost(ghost: boolean): void;
+  setGhostConfig(patch: Partial<GhostConfig>): void;
   setAxesMode(mode: AxesMode): void;
   toggleViewFilter(group: keyof ViewFilters, key: keyof GroupFilter): void;
   setAutoKey(on: boolean): void;
@@ -239,6 +250,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     loopStart: null,
     loopEnd: null,
   },
+  ghostConfig: { before: 2, after: 2, spacingFrames: 4, opacity: 0.5 },
   axesMode: 'local',
   viewFilters: {
     bones: { select: true, visible: true, labels: false },
@@ -331,6 +343,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setSpeed: (speed) =>
     set((s) => ({ anim: { ...s.anim, speed: Math.min(4, Math.max(0.1, speed)) } })),
   setGhost: (ghost) => set((s) => ({ anim: { ...s.anim, ghost } })),
+  setGhostConfig: (patch) => set((s) => ({ ghostConfig: { ...s.ghostConfig, ...patch } })),
   setAxesMode: (axesMode) => set({ axesMode }),
   toggleViewFilter: (group, key) =>
     set((s) => ({
