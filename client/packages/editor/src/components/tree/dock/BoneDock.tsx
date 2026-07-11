@@ -1,6 +1,7 @@
 import {
   RemoveBone,
   RenameBone,
+  SetBoneColor,
   SetBoneTransform,
   type BoneTransformPatch,
 } from '@spine-editor/core';
@@ -57,6 +58,24 @@ export function BoneDock({ name }: { name: string }) {
       <NumField label="Scale X" value={bone.scaleX} onCommit={(scaleX) => patch({ scaleX })} />
       <NumField label="Scale Y" value={bone.scaleY} onCommit={(scaleY) => patch({ scaleY })} />
       <NumField label="Length" value={bone.length} onCommit={(length) => patch({ length })} />
+      <label className="field">
+        <span>Color</span>
+        <input
+          type="color"
+          value={`#${(bone.color ?? 'e8a13cff').slice(0, 6)}`}
+          onChange={(e) =>
+            useEditor.getState().execute(new SetBoneColor(name, `${e.target.value.slice(1)}ff`))
+          }
+        />
+        {bone.color && (
+          <button
+            title="Clear color"
+            onClick={() => useEditor.getState().execute(new SetBoneColor(name, undefined))}
+          >
+            ✕
+          </button>
+        )}
+      </label>
       {bone.parent !== null && (
         <button
           className="danger"

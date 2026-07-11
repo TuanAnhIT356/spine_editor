@@ -14,8 +14,10 @@ import {
 import { Resizer } from './Resizer.js';
 import { clickSelect } from './tree/tree-actions.js';
 import { TreeRows } from './tree/TreeRows.js';
+import { AnimationDock } from './tree/dock/AnimationDock.js';
 import { BoneDock } from './tree/dock/BoneDock.js';
-import { InfoDock } from './tree/dock/InfoDock.js';
+import { ConstraintDock } from './tree/dock/ConstraintDock.js';
+import { EventDock } from './tree/dock/EventDock.js';
 import { SlotDock } from './tree/dock/SlotDock.js';
 
 /** Skin list: pick the active (rendered) skin, create/duplicate/remove skins. */
@@ -274,9 +276,14 @@ export function TreePanel() {
         {!primary && <div className="empty">Select a bone or slot to edit its properties.</div>}
         {primary?.kind === 'bone' && <BoneDock name={primary.name} />}
         {primary?.kind === 'slot' && <SlotDock name={primary.name} />}
-        {primary && primary.kind !== 'bone' && primary.kind !== 'slot' && (
-          <InfoDock item={primary} />
+        {(primary?.kind === 'ik' ||
+          primary?.kind === 'transform' ||
+          primary?.kind === 'path' ||
+          primary?.kind === 'physics') && (
+          <ConstraintDock kind={primary.kind} name={primary.name} />
         )}
+        {primary?.kind === 'event' && <EventDock name={primary.name} />}
+        {primary?.kind === 'animation' && <AnimationDock name={primary.name} />}
       </div>
     </div>
   );
