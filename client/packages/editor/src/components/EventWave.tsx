@@ -29,10 +29,14 @@ export function EventWave({
     const peaks = audioEngine.peaks(name, buckets);
     const g = canvas.getContext('2d');
     if (!peaks || !g) return;
-    canvas.width = buckets;
-    canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = buckets * dpr;
+    canvas.height = height * dpr;
+    g.scale(dpr, dpr);
     g.clearRect(0, 0, buckets, height);
-    g.fillStyle = 'rgba(56, 117, 183, 0.55)'; // --accent, translucent
+    const accent = getComputedStyle(canvas).getPropertyValue('--accent').trim() || '#3875b7';
+    g.fillStyle = accent;
+    g.globalAlpha = 0.55;
     const mid = height / 2;
     for (let x = 0; x < buckets; x++) {
       const h = Math.max(1, peaks[x]! * (height - 2));

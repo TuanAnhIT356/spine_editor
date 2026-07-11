@@ -1,5 +1,6 @@
 import { RemoveBone } from '@spine-editor/core';
 import { useEffect, useState } from 'react';
+import { audioEngine } from './audio/engine.js';
 import { TreePanel } from './components/TreePanel.js';
 import { Resizer } from './components/Resizer.js';
 import { ShortcutsHelp } from './components/ShortcutsHelp.js';
@@ -16,6 +17,7 @@ export function App() {
   const error = useEditor((s) => s.error);
   const mode = useEditor((s) => s.mode);
   const panels = useEditor((s) => s.panelVisibility);
+  const audioAssets = useEditor((s) => s.audioAssets);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
@@ -109,6 +111,11 @@ export function App() {
       window.clearTimeout(timer);
     };
   }, []);
+
+  useEffect(() => {
+    audioEngine.retain(Object.keys(audioAssets));
+    for (const a of Object.values(audioAssets)) audioEngine.ensure(a.name, a.dataUrl);
+  }, [audioAssets]);
 
   useEffect(() => {
     // Restore the server session from the refresh cookie (no-op when the

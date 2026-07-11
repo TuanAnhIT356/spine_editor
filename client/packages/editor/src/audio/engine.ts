@@ -125,6 +125,17 @@ class AudioEngine {
     }
   }
 
+  /** Drops cached audio for any name not in `names` (store reconciliation). */
+  retain(names: readonly string[]): void {
+    const keep = new Set(names);
+    for (const name of [...this.buffers.keys()]) {
+      if (!keep.has(name)) this.remove(name);
+    }
+    for (const name of [...this.urls.keys()]) {
+      if (!keep.has(name)) this.urls.delete(name);
+    }
+  }
+
   setMuted(m: boolean): void {
     this.muted = m;
     if (m) this.stopAll();

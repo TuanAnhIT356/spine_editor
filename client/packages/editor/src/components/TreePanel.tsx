@@ -12,6 +12,7 @@ import {
 import { useCallback, useRef, useState } from 'react';
 import { audioEngine } from '../audio/engine.js';
 import { useServer } from '../server/api.js';
+import { readFileAsDataUrl } from '../state/persistence.js';
 import { primarySelection, uniqueName, useEditor, type AudioAsset } from '../state/store.js';
 import {
   AnimationIcon,
@@ -299,13 +300,8 @@ function AudioSection() {
     try {
       const next: AudioAsset[] = [];
       for (const file of Array.from(files)) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error(`Cannot read "${file.name}".`));
-          reader.readAsDataURL(file);
-        });
-        const base = file.name.replace(/\.[^.]+$/, '');
+        const dataUrl = await readFileAsDataUrl(file);
+        const base = file.name.replace(/\.[^.]+$/, '') || 'audio';
         const name = uniqueName(
           base,
           (n) => n in state.audioAssets || next.some((a) => a.name === n),
