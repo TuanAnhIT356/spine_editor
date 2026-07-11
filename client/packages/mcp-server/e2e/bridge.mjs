@@ -292,6 +292,22 @@ await call('set_event_keyframe', { animation: 'walk', name: 'clang', time: 0.25,
 const audioState = await call('get_project_state');
 const audioExport = JSON.parse((await call('export_spine_json')).json);
 
+// 10c. Slot setup color + tint black + two-color keyframe (Phase 21).
+const colorRes = await call('set_slot_color', {
+  slot: flagSlot.slot,
+  color: 'ff8800ff',
+  dark: '332211',
+});
+await call('set_slot_color_keyframe', {
+  animation: 'flutter',
+  slot: flagSlot.slot,
+  time: 0.75,
+  color: '00ff00ff',
+  dark: 'ffffff',
+});
+const p21Export = JSON.parse((await call('export_spine_json')).json);
+const p21Slot = (p21Export.slots ?? []).find((sl) => sl.name === flagSlot.slot);
+
 // ---- Phase 14: auto-rig from parts + preset walk
 console.error('[e2e] auto-rig flow');
 const PART_BOXES = [
@@ -380,6 +396,14 @@ console.log(
         audioExport.events?.clang?.audio === 'clang-sfx' &&
         (audioExport.animations?.walk?.events ?? []).some(
           (k) => k.name === 'clang' && k.balance === -0.5,
+        ),
+      slotColorWorks:
+        colorRes.color === 'ff8800ff' &&
+        colorRes.dark === '332211' &&
+        p21Slot?.color === 'ff8800ff' &&
+        p21Slot?.dark === '332211' &&
+        (p21Export.animations?.flutter?.slots?.[flagSlot.slot]?.rgba2 ?? []).some(
+          (k) => k.light === '00ff00ff' && k.dark === 'ffffff',
         ),
       rigFromPartsWorks:
         rigRes.bones.includes('spine') &&

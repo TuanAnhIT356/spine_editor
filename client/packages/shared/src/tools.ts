@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the 62 editor tools: name, description, zod
+ * Single source of truth for the 63 editor tools: name, description, zod
  * params shape, the bridge op that implements it, and how to present the
  * result. Consumed by the MCP server (registers them as MCP tools) and by
  * the editor's chat client (sends JSON Schemas to the chat loop and
@@ -146,6 +146,15 @@ export const TOOL_DEFS: ToolDef[] = [
       name: z.string().optional().describe('Asset name; auto-generated when omitted.'),
     },
   ),
+  def(
+    'set_slot_color',
+    'Set a slot\'s SETUP color (8-hex rgba) and/or tint-black dark color (6-hex rgb; pass "none" to disable two-color tinting). For animated colors use set_slot_color_keyframe.',
+    {
+      slot: z.string(),
+      color: z.string().optional().describe('8-hex rgba, e.g. "ff8800ff"'),
+      dark: z.string().optional().describe('6-hex rgb to enable tint black, or "none" to disable'),
+    },
+  ),
   def('set_draw_order', 'Move a slot to a draw-order index (0 = drawn first / furthest behind).', {
     slot: z.string(),
     index: z.number().int().min(0),
@@ -243,6 +252,7 @@ export const TOOL_DEFS: ToolDef[] = [
       slot: z.string(),
       time: z.number().min(0),
       color: z.string().regex(/^[0-9a-fA-F]{8}$/),
+      dark: z.string().optional().describe('6-hex rgb — writes an rgba2 (two-color) key'),
       curve: curveSchema,
     },
   ),
