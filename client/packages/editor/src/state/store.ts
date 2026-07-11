@@ -23,7 +23,21 @@ export interface ImageAsset {
   origin?: { x: number; y: number; sourceWidth: number; sourceHeight: number };
 }
 
-export type Tool = 'select' | 'translate' | 'rotate' | 'create';
+export type Tool = 'select' | 'translate' | 'rotate' | 'scale' | 'shear' | 'create';
+
+export type AxesMode = 'local' | 'parent' | 'world';
+
+export interface GroupFilter {
+  select: boolean;
+  visible: boolean;
+  labels: boolean;
+}
+
+export interface ViewFilters {
+  bones: GroupFilter;
+  images: GroupFilter;
+  others: GroupFilter;
+}
 export type SelectionItem = { kind: 'bone' | 'slot'; name: string };
 /** Zero or more selected items; the last entry is the "primary" one shown in the properties panel. */
 export type Selection = SelectionItem[];
@@ -129,6 +143,15 @@ interface EditorState {
   assets: Record<string, ImageAsset>;
   error: string | null;
   anim: AnimationUiState;
+  /** Gizmo/drag space for transform tools (Spine-style Local/Parent/World). */
+  axesMode: AxesMode;
+  /** Per-group selectability / visibility / name-label toggles (tool cluster). */
+  viewFilters: ViewFilters;
+  /** When off, animate-mode edits are blocked instead of auto-keyed. */
+  autoKey: boolean;
+  panelVisibility: { hierarchy: boolean; properties: boolean; timeline: boolean };
+  /** revision at the last save/open — dirty indicator = revision !== savedRevision. */
+  savedRevision: number;
 
   setTool(tool: Tool): void;
   setMode(mode: 'setup' | 'animate'): void;
@@ -151,6 +174,12 @@ interface EditorState {
   setLoop(loop: boolean): void;
   setSpeed(speed: number): void;
   setGhost(ghost: boolean): void;
+  setAxesMode(mode: AxesMode): void;
+  toggleViewFilter(group: keyof ViewFilters, key: keyof GroupFilter): void;
+  setAutoKey(on: boolean): void;
+  togglePanel(panel: 'hierarchy' | 'properties' | 'timeline'): void;
+  /** Marks the current revision as saved (clears the dirty indicator). */
+  markSaved(): void;
   /** Steps the playhead by `frames` at 30fps, clamped to [0, duration]. */
   stepFrame(frames: number): void;
   execute(command: Command): boolean;
@@ -182,6 +211,15 @@ export const useEditor = create<EditorState>()((set, get) => ({
   assets: {},
   error: null,
   anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
+  axesMode: 'local',
+  viewFilters: {
+    bones: { select: true, visible: true, labels: false },
+    images: { select: true, visible: true, labels: false },
+    others: { select: true, visible: true, labels: false },
+  },
+  autoKey: true,
+  panelVisibility: { hierarchy: true, properties: true, timeline: true },
+  savedRevision: 0,
 
   setTool: (tool) => set({ tool }),
   setMode: (mode) =>
@@ -258,6 +296,20 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setSpeed: (speed) =>
     set((s) => ({ anim: { ...s.anim, speed: Math.min(4, Math.max(0.1, speed)) } })),
   setGhost: (ghost) => set((s) => ({ anim: { ...s.anim, ghost } })),
+  setAxesMode: (axesMode) => set({ axesMode }),
+  toggleViewFilter: (group, key) =>
+    set((s) => ({
+      viewFilters: {
+        ...s.viewFilters,
+        [group]: { ...s.viewFilters[group], [key]: !s.viewFilters[group][key] },
+      },
+    })),
+  setAutoKey: (autoKey) => set({ autoKey }),
+  togglePanel: (panel) =>
+    set((s) => ({
+      panelVisibility: { ...s.panelVisibility, [panel]: !s.panelVisibility[panel] },
+    })),
+  markSaved: () => set((s) => ({ savedRevision: s.revision })),
   stepFrame: (frames) =>
     set((s) => {
       const anim = s.anim.current ? s.doc.getAnimation(s.anim.current) : undefined;
@@ -353,6 +405,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       meshEdit: null,
       error: null,
       revision: s.revision + 1,
+      savedRevision: s.revision + 1,
       anim: { current: null, time: 0, playing: false, loop: true, speed: 1, ghost: false },
     }));
     return issues;

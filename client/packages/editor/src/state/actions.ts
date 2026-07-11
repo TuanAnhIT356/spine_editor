@@ -11,4 +11,5 @@ export function saveProjectFile(): void {
     assets: Object.values(state.assets),
   };
   downloadText('project.spine-editor.json', JSON.stringify(payload));
+  state.markSaved();
 }
