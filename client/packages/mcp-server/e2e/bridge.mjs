@@ -212,6 +212,23 @@ const weightedFlag = flagAtts.flag?.vertices?.length !== flagAtts.flag?.uvs?.len
 const clipShot = await call('screenshot_viewport');
 fs.writeFileSync(`${OUT}/clipping.png`, Buffer.from(clipShot.image, 'base64'));
 
+// 9c2. Mesh geometry + weight tools (Phase 19).
+const meshEditRes = await call('edit_mesh', {
+  slot: flagSlot.slot,
+  attachment: 'flag',
+  action: 'add_vertex',
+  x: 7,
+  y: 3,
+});
+const pruneRes = await call('adjust_weights', {
+  slot: flagSlot.slot,
+  attachment: 'flag',
+  action: 'prune',
+  threshold: 0.01,
+});
+const p19Export = JSON.parse((await call('export_spine_json')).json);
+const p19Flag = p19Export.skins?.[0]?.attachments?.[flagSlot.slot]?.flag;
+
 // 9d. Path + physics + transform constraints (Phase 9 tools).
 await call('add_bone', { parent: 'root', name: 'rider', length: 20 });
 const pathAtt = await call('add_path', { slot: flagSlot.slot });
@@ -318,6 +335,11 @@ console.log(
       pointAtt: flagAtts['flag-tip'],
       eventDefs: exportedEvents.events,
       eventKeys: exportedEvents.animations?.walk?.events,
+      meshEditWorks:
+        meshEditRes.vertexCount === (flagAtts.flag?.uvs?.length ?? 0) / 2 + 1 &&
+        pruneRes.weighted === true &&
+        (p19Flag?.uvs?.length ?? 0) / 2 === meshEditRes.vertexCount &&
+        p19Flag?.vertices?.length !== p19Flag?.uvs?.length,
       rigFromPartsWorks:
         rigRes.bones.includes('spine') &&
         rigBoneNames.includes('upper_leg_l') &&

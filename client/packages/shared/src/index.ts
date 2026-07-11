@@ -66,6 +66,8 @@ export const BRIDGE_OPS = [
   'set_event_keyframe',
   'set_mesh_vertices',
   'bind_weights',
+  'edit_mesh',
+  'adjust_weights',
   'add_clipping',
   'add_bounding_box',
   'add_point',
