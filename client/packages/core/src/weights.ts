@@ -151,6 +151,21 @@ export function boneWeightPerVertex(
   return out;
 }
 
+/** Bone indices appearing in a weighted vertex array's influences (sorted). */
+export function boundBoneIndices(vertices: number[], vertexCount: number): number[] {
+  if (!isWeightedVertices(vertices, vertexCount)) return [];
+  const out = new Set<number>();
+  let vi = 0;
+  for (let v = 0; v < vertexCount; v++) {
+    const count = vertices[vi++] ?? 0;
+    for (let b = 0; b < count; b++) {
+      out.add(vertices[vi] ?? 0);
+      vi += 4;
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 interface Influence {
   bone: number;
   x: number;

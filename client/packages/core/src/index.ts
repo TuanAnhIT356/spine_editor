@@ -35,3 +35,4 @@ export * from './atlas-import.js';
 export * from './autorig.js';
 export * from './mixer.js';
 export * from './presets.js';
+export * from './mesh-edit.js';
