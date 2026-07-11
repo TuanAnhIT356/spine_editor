@@ -8,6 +8,11 @@ export interface AtlasRegionInput {
   name: string;
   width: number;
   height: number;
+  /** Trim metadata: original (untrimmed) size and offset of the kept pixels. */
+  origWidth?: number;
+  origHeight?: number;
+  offsetX?: number;
+  offsetY?: number;
 }
 
 export interface AtlasRegionPlacement extends AtlasRegionInput {
@@ -24,6 +29,8 @@ export interface AtlasLayout {
 export interface PackOptions {
   maxWidth?: number;
   padding?: number;
+  /** Round page dimensions up to powers of two (default true). */
+  powerOfTwo?: boolean;
 }
 
 function nextPow2(v: number): number {
@@ -40,13 +47,17 @@ function nextPow2(v: number): number {
 export function packAtlas(inputs: AtlasRegionInput[], options: PackOptions = {}): AtlasLayout {
   const maxWidth = options.maxWidth ?? 1024;
   const padding = options.padding ?? 2;
+  const powerOfTwo = options.powerOfTwo ?? true;
   if (inputs.length === 0) return { width: 0, height: 0, regions: [] };
 
   const widest = Math.max(...inputs.map((r) => r.width));
   if (widest + padding * 2 > maxWidth) {
     throw new Error(`Region wider than the atlas page (max ${maxWidth}px).`);
   }
-  const pageWidth = Math.min(maxWidth, nextPow2(widest + padding * 2));
+  const pageWidth = Math.min(
+    maxWidth,
+    powerOfTwo ? nextPow2(widest + padding * 2) : widest + padding * 2,
+  );
 
   const sorted = [...inputs].sort((a, b) => b.height - a.height || b.width - a.width);
   const regions: AtlasRegionPlacement[] = [];
@@ -63,7 +74,13 @@ export function packAtlas(inputs: AtlasRegionInput[], options: PackOptions = {})
     x += input.width + padding;
     shelfHeight = Math.max(shelfHeight, input.height);
   }
-  return { width: pageWidth, height: nextPow2(y + shelfHeight + padding), regions };
+  const usedWidth = regions.reduce((m, r) => Math.max(m, r.x + r.width), 0) + padding;
+  const rawHeight = y + shelfHeight + padding;
+  return {
+    width: powerOfTwo ? pageWidth : usedWidth,
+    height: powerOfTwo ? nextPow2(rawHeight) : rawHeight,
+    regions,
+  };
 }
 
 /** Renders the libgdx `.atlas` text for a packed page. */
@@ -82,8 +99,8 @@ export function atlasToText(pngName: string, layout: AtlasLayout): string {
       '  rotate: false',
       `  xy: ${r.x}, ${r.y}`,
       `  size: ${r.width}, ${r.height}`,
-      `  orig: ${r.width}, ${r.height}`,
-      '  offset: 0, 0',
+      `  orig: ${r.origWidth ?? r.width}, ${r.origHeight ?? r.height}`,
+      `  offset: ${r.offsetX ?? 0}, ${r.offsetY ?? 0}`,
       '  index: -1',
     );
   }
