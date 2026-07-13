@@ -550,6 +550,11 @@ export class SceneRenderer {
       const bySlot = data.skins.find((s) => s.name === 'default')?.attachments?.[slot.name] ?? {};
       for (const [name, att] of Object.entries(bySlot)) {
         const isActive = slot.attachment === name;
+        const isSelected =
+          isActive && input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
+        if (isSelected) {
+          this.drawSelectionBox(att, boneWorld, data.bones, pose);
+        }
         if (att.type === 'point') {
           const p = applyMat(boneWorld, att.x ?? 0, att.y ?? 0);
           const r = 8 / this.zoom;
@@ -737,6 +742,75 @@ export class SceneRenderer {
       }
       const r = 4 / this.zoom;
       g.rect(a.x - r, a.y - r, r * 2, r * 2).fill({ color, alpha });
+    }
+  }
+
+  /** Blue bounding-box outline around the slot's active attachment when selected. */
+  private drawSelectionBox(
+    att: SpineAttachment,
+    boneWorld: Mat2D,
+    bones: BoneData[],
+    pose: Map<string, Mat2D>,
+  ): void {
+    const g = this.overlayLayer;
+    const color = 0x3875b7;
+    const width = 1.5 / this.zoom;
+    if (att.type === 'point') {
+      const p = applyMat(boneWorld, att.x ?? 0, att.y ?? 0);
+      const r = 10 / this.zoom;
+      g.rect(p.x - r, p.y - r, r * 2, r * 2).stroke({ width, color, alpha: 0.9 });
+      return;
+    }
+    if (
+      att.type === 'mesh' ||
+      att.type === 'boundingbox' ||
+      att.type === 'clipping' ||
+      att.type === 'path'
+    ) {
+      const count = attachmentVertexCount(att);
+      if (count === null) return;
+      const verts = computeVertexWorldPositions(
+        (att as { vertices: number[] }).vertices,
+        count,
+        boneWorld,
+        bones,
+        pose,
+      );
+      if (verts.length < 4) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < verts.length; i += 2) {
+        const x = verts[i]!;
+        const y = verts[i + 1]!;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+      g.rect(minX, minY, maxX - minX, maxY - minY).stroke({ width, color, alpha: 0.9 });
+      return;
+    }
+    if (att.type === undefined || att.type === 'region') {
+      const region = att as SpineRegionAttachment;
+      const rot = ((region.rotation ?? 0) * Math.PI) / 180;
+      const hw = ((region.width ?? 0) / 2) * (region.scaleX ?? 1);
+      const hh = ((region.height ?? 0) / 2) * (region.scaleY ?? 1);
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const cx = region.x ?? 0;
+      const cy = region.y ?? 0;
+      const corners: [number, number][] = [
+        [-hw, -hh],
+        [hw, -hh],
+        [hw, hh],
+        [-hw, hh],
+      ];
+      const world = corners.map(([lx, ly]) =>
+        applyMat(boneWorld, cx + lx * cos - ly * sin, cy + lx * sin + ly * cos),
+      );
+      g.poly(world.flatMap((p) => [p.x, p.y])).stroke({ width, color, alpha: 0.9 });
     }
   }
 
