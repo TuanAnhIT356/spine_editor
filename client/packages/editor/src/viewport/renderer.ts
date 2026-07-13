@@ -277,6 +277,35 @@ export class SceneRenderer {
     this.zoomAt(this.app.screen.width / 2, this.app.screen.height / 2, clamped / this.zoom);
   }
 
+  /** Full bone-name → world-matrix map from the last render (for external bounds computation). */
+  getFullPose(): Map<string, Mat2D> {
+    return this.lastPose;
+  }
+
+  /** Zooms/pans so `bounds` fits the canvas with the given fractional padding on each side. */
+  frameBounds(
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    padding = 0.1,
+  ): void {
+    const w = Math.max(1e-3, bounds.maxX - bounds.minX);
+    const h = Math.max(1e-3, bounds.maxY - bounds.minY);
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    const screenW = this.app.screen.width;
+    const screenH = this.app.screen.height;
+    this.zoom = Math.min(
+      20,
+      Math.max(
+        0.05,
+        Math.min(screenW / (w * (1 + padding * 2)), screenH / (h * (1 + padding * 2))),
+      ),
+    );
+    this.offsetX = screenW / 2 - cx * this.zoom;
+    this.offsetY = screenH / 2 + cy * this.zoom;
+    this.applyCamera();
+    this.onZoomChange?.(this.zoom);
+  }
+
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
     return { x: (sx - this.offsetX) / this.zoom, y: (this.offsetY - sy) / this.zoom };
   }

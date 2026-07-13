@@ -220,3 +220,5 @@ export const RulerIcon = ({ size }: { size?: number }) =>
       <path d="M2 5h2M2 8h3M2 11h2M5 2h2M8 2h3M11 2h2" />
     </>,
   );
+export const FrameIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />);
