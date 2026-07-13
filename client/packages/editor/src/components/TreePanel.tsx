@@ -13,7 +13,13 @@ import { useCallback, useRef, useState } from 'react';
 import { audioEngine } from '../audio/engine.js';
 import { useServer } from '../server/api.js';
 import { readFileAsDataUrl } from '../state/persistence.js';
-import { primarySelection, uniqueName, useEditor, type AudioAsset } from '../state/store.js';
+import {
+  primarySelection,
+  uniqueName,
+  useEditor,
+  type AudioAsset,
+  type ImageAsset,
+} from '../state/store.js';
 import {
   AnimationIcon,
   CurveIcon,
@@ -25,6 +31,7 @@ import {
 } from './icons.js';
 import { Resizer } from './Resizer.js';
 import { ContextMenu, type MenuItem } from './tree/ContextMenu.js';
+import { HoverPreview } from './tree/HoverPreview.js';
 import { clickSelect } from './tree/tree-actions.js';
 import { TreeRows } from './tree/TreeRows.js';
 import { AnimationDock } from './tree/dock/AnimationDock.js';
@@ -375,6 +382,7 @@ export function TreePanel() {
   const [show, setShow] = useState({ slots: true, attachments: true, constraints: true });
   const [dockHeight, setDockHeight] = useState(260);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [hovered, setHovered] = useState<{ x: number; y: number; asset: ImageAsset } | null>(null);
   const openMenu = useCallback<OpenMenu>((e, items) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, items });
@@ -410,7 +418,12 @@ export function TreePanel() {
           </span>
           {projectName}
         </div>
-        <TreeRows query={filter.trim().toLowerCase()} show={show} openMenu={openMenu} />
+        <TreeRows
+          query={filter.trim().toLowerCase()}
+          show={show}
+          openMenu={openMenu}
+          onHover={setHovered}
+        />
         {show.constraints && <ConstraintsSection openMenu={openMenu} />}
         <SkinsSection />
         <EventsSection openMenu={openMenu} />
@@ -435,6 +448,7 @@ export function TreePanel() {
         {primary?.kind === 'event' && <EventDock name={primary.name} />}
         {primary?.kind === 'animation' && <AnimationDock name={primary.name} />}
       </div>
+      {hovered && <HoverPreview x={hovered.x} y={hovered.y} asset={hovered.asset} />}
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
     </div>
   );

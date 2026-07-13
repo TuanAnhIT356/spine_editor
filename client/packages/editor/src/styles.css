@@ -228,6 +228,23 @@ button.danger {
   color: #b5977f;
 }
 
+.tree .row .chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.tree .row .chevron-spacer {
+  display: inline-block;
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .tree .row-actions {
   margin-left: auto;
   display: flex;
@@ -1083,6 +1100,33 @@ button.danger {
   position: relative;
 }
 
+.hover-preview {
+  position: fixed;
+  z-index: 45;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.hover-preview img {
+  display: block;
+  max-width: 96px;
+  max-height: 96px;
+  object-fit: contain;
+  background: #1b1b1f;
+}
+
+.hover-preview-meta {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .dropdown {
   position: absolute;
   top: 100%;
@@ -1286,6 +1330,10 @@ button.active {
 .zoom-control button {
   padding: 2px 6px;
   font-size: 11px;
+}
+
+.zoom-control button.active {
+  background: var(--accent-soft);
 }
 
 /* ---- unified tree panel ---- */

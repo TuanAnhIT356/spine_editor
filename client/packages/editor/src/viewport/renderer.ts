@@ -32,6 +32,7 @@ import {
   Texture,
 } from 'pixi.js';
 import type { ImageAsset, Selection, ViewFilters } from '../state/store.js';
+import { GIZMO_HANDLE_PX, GIZMO_RING_PX, GIZMO_SCALE_BOX_PX, type GizmoFrame } from './gizmo.js';
 
 export interface RenderInput {
   data: SkeletonData;
@@ -69,6 +70,16 @@ export interface RenderInput {
   };
   assets: Record<string, ImageAsset>;
   selection: Selection;
+  /** Editor-only ruler overlay toggle (never serialized). */
+  showRulers?: boolean;
+  /** Transform gizmo to draw at a bone/attachment origin (setup or animate mode for bones; setup-only for attachments — the caller decides). */
+  gizmo?: { tool: 'translate' | 'rotate' | 'scale' | 'shear'; frame: GizmoFrame };
+  /** Live-preview patch for a region/point attachment during a gizmo drag (setup mode only). */
+  attachmentOverride?: {
+    slot: string;
+    attachment: string;
+    patch: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number };
+  };
 }
 
 /** Vertex count for any vertex-based attachment, or null for other types. */
@@ -200,6 +211,9 @@ export class SceneRenderer {
   /** Name labels drawn in screen space (the world container is y-flipped). */
   private labelLayer = new Container();
   private labels = new Map<string, Text>();
+  /** Ruler overlay: screen-space, drawn directly on the stage (outside the zoom/pan matrix). */
+  private rulerLayer = new Graphics();
+  private rulerGarbage: Text[] = [];
   private viewFilters: ViewFilters | null = null;
   private hiddenBones: Set<string> | null = null;
   private hiddenSlots: Set<string> | null = null;
@@ -230,6 +244,7 @@ export class SceneRenderer {
     );
     this.app.stage.addChild(this.world);
     this.app.stage.addChild(this.labelLayer);
+    this.app.stage.addChild(this.rulerLayer);
     this.offsetX = host.clientWidth / 2;
     this.offsetY = host.clientHeight * 0.75;
     this.drawGrid();
@@ -269,6 +284,47 @@ export class SceneRenderer {
   setZoomCenter(zoom: number): void {
     const clamped = Math.min(20, Math.max(0.05, zoom));
     this.zoomAt(this.app.screen.width / 2, this.app.screen.height / 2, clamped / this.zoom);
+  }
+
+  /** Full bone-name → world-matrix map from the last render (for external bounds computation). */
+  getFullPose(): Map<string, Mat2D> {
+    return this.lastPose;
+  }
+
+  /** Zooms/pans so `bounds` fits the canvas with the given fractional padding on each side. */
+  frameBounds(
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    padding = 0.1,
+  ): void {
+    const w = Math.max(1e-3, bounds.maxX - bounds.minX);
+    const h = Math.max(1e-3, bounds.maxY - bounds.minY);
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    const screenW = this.app.screen.width;
+    const screenH = this.app.screen.height;
+    this.zoom = Math.min(
+      20,
+      Math.max(
+        0.05,
+        Math.min(screenW / (w * (1 + padding * 2)), screenH / (h * (1 + padding * 2))),
+      ),
+    );
+    this.offsetX = screenW / 2 - cx * this.zoom;
+    this.offsetY = screenH / 2 + cy * this.zoom;
+    this.applyCamera();
+    this.onZoomChange?.(this.zoom);
+  }
+
+  /** Applies a live gizmo-drag patch to one region/point attachment, for preview rendering. */
+  private withOverride(
+    att: SpineAttachment,
+    slotName: string,
+    attachmentName: string,
+    override: RenderInput['attachmentOverride'],
+  ): SpineAttachment {
+    return override && override.slot === slotName && override.attachment === attachmentName
+      ? ({ ...att, ...override.patch } as SpineAttachment)
+      : att;
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
@@ -325,6 +381,53 @@ export class SceneRenderer {
     g.stroke({ width: 1, color: 0x36363c, pixelLine: true });
     g.moveTo(-size, 0).lineTo(size, 0).stroke({ width: 1, color: 0x6b4040, pixelLine: true });
     g.moveTo(0, -size).lineTo(0, size).stroke({ width: 1, color: 0x40604a, pixelLine: true });
+  }
+
+  /** Screen-space ruler strips (top + left) with world-unit tick labels. */
+  private drawRulers(): void {
+    for (const t of this.rulerGarbage) t.destroy();
+    this.rulerGarbage = [];
+    const g = this.rulerLayer;
+    g.clear();
+    if (!this.ready) return;
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const band = 18;
+    g.rect(0, 0, w, band).fill({ color: 0x1b1b1f, alpha: 0.85 });
+    g.rect(0, 0, band, h).fill({ color: 0x1b1b1f, alpha: 0.85 });
+    // Pick a "nice" world-unit step so ticks land roughly every 50-100 screen px.
+    const rawStep = 70 / this.zoom;
+    const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+    const candidates = [1, 2, 5, 10].map((m) => m * magnitude);
+    const step = candidates.find((c) => c >= rawStep) ?? candidates[candidates.length - 1]!;
+    const topLeftWorld = this.screenToWorld(band, band);
+    const bottomRightWorld = this.screenToWorld(w, h);
+    const startX = Math.floor(topLeftWorld.x / step) * step;
+    const endX = Math.ceil(bottomRightWorld.x / step) * step;
+    for (let wx = startX; wx <= endX; wx += step) {
+      const sx = this.worldToScreen(wx, 0).x;
+      if (sx < band || sx > w) continue;
+      g.moveTo(sx, band - 6)
+        .lineTo(sx, band)
+        .stroke({ width: 1, color: 0x8a8a92, pixelLine: true });
+      const t = new Text({ text: String(Math.round(wx)), style: { fontSize: 9, fill: 0x9a9aa2 } });
+      t.position.set(sx + 2, 2);
+      this.rulerLayer.addChild(t);
+      this.rulerGarbage.push(t);
+    }
+    const startY = Math.floor(bottomRightWorld.y / step) * step;
+    const endY = Math.ceil(topLeftWorld.y / step) * step;
+    for (let wy = startY; wy <= endY; wy += step) {
+      const sy = this.worldToScreen(0, wy).y;
+      if (sy < band || sy > h) continue;
+      g.moveTo(band - 6, sy)
+        .lineTo(band, sy)
+        .stroke({ width: 1, color: 0x8a8a92, pixelLine: true });
+      const t = new Text({ text: String(Math.round(wy)), style: { fontSize: 9, fill: 0x9a9aa2 } });
+      t.position.set(2, sy + 2);
+      this.rulerLayer.addChild(t);
+      this.rulerGarbage.push(t);
+    }
   }
 
   private async ensureTexture(asset: ImageAsset): Promise<Texture> {
@@ -451,7 +554,12 @@ export class SceneRenderer {
         endClipAfter(slot.name);
         continue;
       }
-      const region = att as SpineRegionAttachment;
+      const region = this.withOverride(
+        att,
+        slot.name,
+        attachmentName,
+        input.attachmentOverride,
+      ) as SpineRegionAttachment;
       const asset = input.assets[region.path ?? region.name ?? attachmentName];
       if (!asset) {
         endClipAfter(slot.name);
@@ -497,6 +605,9 @@ export class SceneRenderer {
     this.drawBones(data.bones, pose, input.selection);
     this.drawOverlays(data, pose, input);
     this.updateLabels(data, pose);
+    this.rulerLayer.visible = input.showRulers === true;
+    if (input.showRulers) this.drawRulers();
+    if (input.gizmo) this.drawGizmo(input.gizmo);
   }
 
   /** Screen-space name tags for bones/attachments, driven by the filter matrix. */
@@ -548,8 +659,14 @@ export class SceneRenderer {
       const boneWorld = pose.get(slot.bone);
       if (!boneWorld) continue;
       const bySlot = data.skins.find((s) => s.name === 'default')?.attachments?.[slot.name] ?? {};
-      for (const [name, att] of Object.entries(bySlot)) {
+      for (const [name, rawAtt] of Object.entries(bySlot)) {
         const isActive = slot.attachment === name;
+        const att = this.withOverride(rawAtt, slot.name, name, input.attachmentOverride);
+        const isSelected =
+          isActive && input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
+        if (isSelected) {
+          this.drawSelectionBox(att, boneWorld, data.bones, pose);
+        }
         if (att.type === 'point') {
           const p = applyMat(boneWorld, att.x ?? 0, att.y ?? 0);
           const r = 8 / this.zoom;
@@ -740,6 +857,123 @@ export class SceneRenderer {
     }
   }
 
+  /** Blue bounding-box outline around the slot's active attachment when selected. */
+  private drawSelectionBox(
+    att: SpineAttachment,
+    boneWorld: Mat2D,
+    bones: BoneData[],
+    pose: Map<string, Mat2D>,
+  ): void {
+    const g = this.overlayLayer;
+    const color = 0x3875b7;
+    const width = 1.5 / this.zoom;
+    if (att.type === 'point') {
+      const p = applyMat(boneWorld, att.x ?? 0, att.y ?? 0);
+      const r = 10 / this.zoom;
+      g.rect(p.x - r, p.y - r, r * 2, r * 2).stroke({ width, color, alpha: 0.9 });
+      return;
+    }
+    if (
+      att.type === 'mesh' ||
+      att.type === 'boundingbox' ||
+      att.type === 'clipping' ||
+      att.type === 'path'
+    ) {
+      const count = attachmentVertexCount(att);
+      if (count === null) return;
+      const verts = computeVertexWorldPositions(
+        (att as { vertices: number[] }).vertices,
+        count,
+        boneWorld,
+        bones,
+        pose,
+      );
+      if (verts.length < 4) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < verts.length; i += 2) {
+        const x = verts[i]!;
+        const y = verts[i + 1]!;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+      g.rect(minX, minY, maxX - minX, maxY - minY).stroke({ width, color, alpha: 0.9 });
+      return;
+    }
+    if (att.type === undefined || att.type === 'region') {
+      const region = att as SpineRegionAttachment;
+      const rot = ((region.rotation ?? 0) * Math.PI) / 180;
+      const hw = ((region.width ?? 0) / 2) * (region.scaleX ?? 1);
+      const hh = ((region.height ?? 0) / 2) * (region.scaleY ?? 1);
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const cx = region.x ?? 0;
+      const cy = region.y ?? 0;
+      const corners: [number, number][] = [
+        [-hw, -hh],
+        [hw, -hh],
+        [hw, hh],
+        [-hw, hh],
+      ];
+      const world = corners.map(([lx, ly]) =>
+        applyMat(boneWorld, cx + lx * cos - ly * sin, cy + lx * sin + ly * cos),
+      );
+      g.poly(world.flatMap((p) => [p.x, p.y])).stroke({ width, color, alpha: 0.9 });
+    }
+  }
+
+  /** Draws the active transform gizmo's handles at `input.gizmo.frame.origin`. */
+  private drawGizmo(gizmo: NonNullable<RenderInput['gizmo']>): void {
+    const g = this.overlayLayer;
+    const { tool, frame } = gizmo;
+    const handleLen = GIZMO_HANDLE_PX / this.zoom;
+    const ringR = GIZMO_RING_PX / this.zoom;
+    const RED = 0xe0524a;
+    const GREEN = 0x5ac25a;
+    const o = frame.origin;
+    if (tool === 'rotate') {
+      g.circle(o.x, o.y, ringR).stroke({ width: 2 / this.zoom, color: RED, alpha: 0.9 });
+      return;
+    }
+    const drawAxis = (axis: { x: number; y: number }, color: number) => {
+      const ex = o.x + axis.x * handleLen;
+      const ey = o.y + axis.y * handleLen;
+      g.moveTo(o.x, o.y)
+        .lineTo(ex, ey)
+        .stroke({ width: 2 / this.zoom, color, alpha: 0.9 });
+      if (tool === 'scale') {
+        const box = GIZMO_SCALE_BOX_PX / this.zoom;
+        g.rect(ex - box / 2, ey - box / 2, box, box).fill({ color, alpha: 0.9 });
+      } else {
+        // Simple arrowhead: two short strokes back from the tip.
+        const backX = o.x + axis.x * (handleLen - 8 / this.zoom);
+        const backY = o.y + axis.y * (handleLen - 8 / this.zoom);
+        const nx = -axis.y * (4 / this.zoom);
+        const ny = axis.x * (4 / this.zoom);
+        g.poly([ex, ey, backX + nx, backY + ny, backX - nx, backY - ny]).fill({
+          color,
+          alpha: 0.9,
+        });
+      }
+    };
+    if (tool === 'translate' || tool === 'scale') {
+      drawAxis(frame.axisX, RED);
+      drawAxis(frame.axisY, GREEN);
+    } else {
+      // Shear: a plain Y arrow plus an X line skewed by the bone's own shear (visual hint only).
+      drawAxis(frame.axisY, GREEN);
+      const ex = o.x + frame.axisX.x * handleLen;
+      const ey = o.y + frame.axisX.y * handleLen;
+      g.moveTo(o.x, o.y)
+        .lineTo(ex, ey)
+        .stroke({ width: 2 / this.zoom, color: RED, alpha: 0.9 });
+    }
+  }
+
   private drawBones(bones: BoneData[], pose: Map<string, Mat2D>, selection: Selection): void {
     const g = this.boneLayer;
     g.clear();
@@ -748,7 +982,8 @@ export class SceneRenderer {
       const m = pose.get(bone.name);
       if (!m) continue;
       const selected = selection.some((s) => s.kind === 'bone' && s.name === bone.name);
-      const color = selected ? 0xffcc33 : (this.weightTint?.get(bone.name) ?? 0x7fb2e5);
+      const defaultColor = bone.color ? parseInt(bone.color.slice(0, 6), 16) || 0x7fb2e5 : 0x7fb2e5;
+      const color = selected ? 0x3875b7 : (this.weightTint?.get(bone.name) ?? defaultColor);
       const ox = m.tx;
       const oy = m.ty;
       if (bone.length > 0) {
@@ -756,7 +991,7 @@ export class SceneRenderer {
         const dx = tip.x - ox;
         const dy = tip.y - oy;
         const len = Math.hypot(dx, dy) || 1;
-        const w = Math.min(len * 0.15, 8 / this.zoom);
+        const w = Math.min(len * 0.12, 6 / this.zoom);
         const nx = (-dy / len) * w;
         const ny = (dx / len) * w;
         g.poly([ox + nx, oy + ny, tip.x, tip.y, ox - nx, oy - ny]).fill({
@@ -764,16 +999,10 @@ export class SceneRenderer {
           alpha: selected ? 1 : 0.6,
         });
       }
-      const radius = (bone.parent === null ? 7 : 5) / this.zoom;
-      if (selected) {
-        // Bright outer ring makes the selection pop even at low zoom.
-        g.circle(ox, oy, radius + 3 / this.zoom).stroke({
-          width: 2 / this.zoom,
-          color: 0xfff2c9,
-          alpha: 0.95,
-        });
-      }
-      g.circle(ox, oy, radius).fill({ color, alpha: 0.95 });
+      const radius = (bone.parent === null ? 6 : 4.5) / this.zoom;
+      g.circle(ox, oy, radius)
+        .fill({ color, alpha: 0.95 })
+        .stroke({ width: 1.2 / this.zoom, color: 0x1b1b1f, alpha: 0.8 });
     }
   }
 }

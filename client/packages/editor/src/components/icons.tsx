@@ -210,3 +210,15 @@ export const SkeletonIcon = ({ size }: { size?: number }) =>
   );
 export const SkinIcon = ({ size }: { size?: number }) =>
   svg(size, <path d="M5 3 3 5v3h2v5h6V8h2V5l-2-2-2 1.5h-2z" />);
+export const ChevronIcon = ({ size, collapsed }: { size?: number; collapsed?: boolean }) =>
+  svg(size, <path d={collapsed ? 'M6 3l5 5-5 5' : 'M3 6l5 5 5-5'} />);
+export const RulerIcon = ({ size }: { size?: number }) =>
+  svg(
+    size,
+    <>
+      <rect x="2" y="2" width="12" height="12" />
+      <path d="M2 5h2M2 8h3M2 11h2M5 2h2M8 2h3M11 2h2" />
+    </>,
+  );
+export const FrameIcon = ({ size }: { size?: number }) =>
+  svg(size, <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />);

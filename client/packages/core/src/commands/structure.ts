@@ -260,6 +260,63 @@ export class SetAttachmentVertices implements Command {
   }
 }
 
+/**
+ * Patches x/y/rotation/scaleX/scaleY on a region attachment, or x/y/rotation
+ * on a point attachment — the only two attachment types with transform
+ * fields in the data model (mesh/linkedmesh/boundingbox/clipping/path have
+ * none; their shape comes from `vertices`, edited via SetAttachmentVertices).
+ */
+export class SetAttachmentTransform implements Command {
+  readonly label: string;
+  private before: SpineSkin | undefined;
+
+  private static readonly ALLOWED: Record<string, readonly string[]> = {
+    region: ['x', 'y', 'rotation', 'scaleX', 'scaleY'],
+    point: ['x', 'y', 'rotation'],
+  };
+
+  constructor(
+    private readonly skinName: string,
+    private readonly slotName: string,
+    private readonly attachmentName: string,
+    private readonly patch: {
+      x?: number;
+      y?: number;
+      rotation?: number;
+      scaleX?: number;
+      scaleY?: number;
+    },
+  ) {
+    this.label = `Transform attachment "${attachmentName}"`;
+  }
+
+  execute(data: SkeletonData): void {
+    const skin = data.skins.find((s) => s.name === this.skinName);
+    if (!skin) throw new Error(`Skin "${this.skinName}" does not exist.`);
+    const att = skin.attachments?.[this.slotName]?.[this.attachmentName];
+    if (!att) {
+      throw new Error(
+        `Attachment "${this.attachmentName}" does not exist on slot "${this.slotName}" in skin "${this.skinName}".`,
+      );
+    }
+    const allowed = SetAttachmentTransform.ALLOWED[att.type ?? 'region'];
+    if (!allowed) throw new Error(`Attachment type "${att.type}" has no transform fields.`);
+    for (const key of Object.keys(this.patch)) {
+      if (!allowed.includes(key)) {
+        throw new Error(`Attachment type "${att.type ?? 'region'}" has no "${key}" field.`);
+      }
+    }
+    this.before = structuredClone(skin);
+    Object.assign(att, this.patch);
+  }
+
+  undo(data: SkeletonData): void {
+    if (!this.before) return;
+    const idx = data.skins.findIndex((s) => s.name === this.skinName);
+    if (idx >= 0) data.skins[idx] = this.before;
+  }
+}
+
 export interface MeshGeometry {
   vertices: number[];
   uvs: number[];
