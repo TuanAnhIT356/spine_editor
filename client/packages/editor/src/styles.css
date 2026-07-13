@@ -1100,6 +1100,33 @@ button.danger {
   position: relative;
 }
 
+.hover-preview {
+  position: fixed;
+  z-index: 45;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.hover-preview img {
+  display: block;
+  max-width: 96px;
+  max-height: 96px;
+  object-fit: contain;
+  background: #1b1b1f;
+}
+
+.hover-preview-meta {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .dropdown {
   position: absolute;
   top: 100%;

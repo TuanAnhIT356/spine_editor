@@ -1,6 +1,6 @@
 import { AddBone, RemoveBone, RenameBone, ReparentBone, createBone } from '@spine-editor/core';
 import { useState } from 'react';
-import { isSelected, uniqueName, useEditor } from '../../state/store.js';
+import { isSelected, uniqueName, useEditor, type ImageAsset } from '../../state/store.js';
 import type { MenuItem } from './ContextMenu.js';
 import {
   BBoxIcon,
@@ -42,10 +42,12 @@ export function TreeRows({
   query,
   show,
   openMenu,
+  onHover,
 }: {
   query: string;
   show: { slots: boolean; attachments: boolean; constraints: boolean };
   openMenu: (e: React.MouseEvent, items: MenuItem[]) => void;
+  onHover: (info: { x: number; y: number; asset: ImageAsset } | null) => void;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const revision = useEditor((s) => s.revision);
@@ -54,6 +56,7 @@ export function TreeRows({
   const hiddenBones = useEditor((s) => s.hiddenBones);
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
   const collapsedNodes = useEditor((s) => s.collapsedNodes);
+  const assets = useEditor((s) => s.assets);
   void revision;
 
   const bones = doc.data.bones;
@@ -75,6 +78,11 @@ export function TreeRows({
         {Object.entries(bySlot).map(([attName, att]) => {
           const type = (att as { type?: string }).type ?? 'region';
           const Icon = ATT_ICONS[type] ?? ImageIcon;
+          const assetKey =
+            (att as { path?: string; name?: string }).path ??
+            (att as { path?: string; name?: string }).name ??
+            attName;
+          const asset = assets[assetKey];
           return (
             <div
               key={attName}
@@ -82,6 +90,15 @@ export function TreeRows({
               style={{ paddingLeft: 8 + depth * 14 }}
               title={type}
               onClick={(e) => clickSelect(e, { kind: 'slot', name: slotName })}
+              onMouseEnter={
+                asset
+                  ? (e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      onHover({ x: rect.right + 8, y: rect.top, asset });
+                    }
+                  : undefined
+              }
+              onMouseLeave={asset ? () => onHover(null) : undefined}
             >
               <span className="chevron-spacer" />
               <span className="type-icon">
