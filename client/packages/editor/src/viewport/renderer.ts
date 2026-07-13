@@ -32,6 +32,7 @@ import {
   Texture,
 } from 'pixi.js';
 import type { ImageAsset, Selection, ViewFilters } from '../state/store.js';
+import { GIZMO_HANDLE_PX, GIZMO_RING_PX, GIZMO_SCALE_BOX_PX, type GizmoFrame } from './gizmo.js';
 
 export interface RenderInput {
   data: SkeletonData;
@@ -71,6 +72,8 @@ export interface RenderInput {
   selection: Selection;
   /** Editor-only ruler overlay toggle (never serialized). */
   showRulers?: boolean;
+  /** Transform gizmo to draw at a bone/attachment origin (setup or animate mode for bones; setup-only for attachments — the caller decides). */
+  gizmo?: { tool: 'translate' | 'rotate' | 'scale' | 'shear'; frame: GizmoFrame };
 }
 
 /** Vertex count for any vertex-based attachment, or null for other types. */
@@ -581,6 +584,7 @@ export class SceneRenderer {
     this.updateLabels(data, pose);
     this.rulerLayer.visible = input.showRulers === true;
     if (input.showRulers) this.drawRulers();
+    if (input.gizmo) this.drawGizmo(input.gizmo);
   }
 
   /** Screen-space name tags for bones/attachments, driven by the filter matrix. */
@@ -895,6 +899,54 @@ export class SceneRenderer {
         applyMat(boneWorld, cx + lx * cos - ly * sin, cy + lx * sin + ly * cos),
       );
       g.poly(world.flatMap((p) => [p.x, p.y])).stroke({ width, color, alpha: 0.9 });
+    }
+  }
+
+  /** Draws the active transform gizmo's handles at `input.gizmo.frame.origin`. */
+  private drawGizmo(gizmo: NonNullable<RenderInput['gizmo']>): void {
+    const g = this.overlayLayer;
+    const { tool, frame } = gizmo;
+    const handleLen = GIZMO_HANDLE_PX / this.zoom;
+    const ringR = GIZMO_RING_PX / this.zoom;
+    const RED = 0xe0524a;
+    const GREEN = 0x5ac25a;
+    const o = frame.origin;
+    if (tool === 'rotate') {
+      g.circle(o.x, o.y, ringR).stroke({ width: 2 / this.zoom, color: RED, alpha: 0.9 });
+      return;
+    }
+    const drawAxis = (axis: { x: number; y: number }, color: number) => {
+      const ex = o.x + axis.x * handleLen;
+      const ey = o.y + axis.y * handleLen;
+      g.moveTo(o.x, o.y)
+        .lineTo(ex, ey)
+        .stroke({ width: 2 / this.zoom, color, alpha: 0.9 });
+      if (tool === 'scale') {
+        const box = GIZMO_SCALE_BOX_PX / this.zoom;
+        g.rect(ex - box / 2, ey - box / 2, box, box).fill({ color, alpha: 0.9 });
+      } else {
+        // Simple arrowhead: two short strokes back from the tip.
+        const backX = o.x + axis.x * (handleLen - 8 / this.zoom);
+        const backY = o.y + axis.y * (handleLen - 8 / this.zoom);
+        const nx = -axis.y * (4 / this.zoom);
+        const ny = axis.x * (4 / this.zoom);
+        g.poly([ex, ey, backX + nx, backY + ny, backX - nx, backY - ny]).fill({
+          color,
+          alpha: 0.9,
+        });
+      }
+    };
+    if (tool === 'translate' || tool === 'scale') {
+      drawAxis(frame.axisX, RED);
+      drawAxis(frame.axisY, GREEN);
+    } else {
+      // Shear: a plain Y arrow plus an X line skewed by the bone's own shear (visual hint only).
+      drawAxis(frame.axisY, GREEN);
+      const ex = o.x + frame.axisX.x * handleLen;
+      const ey = o.y + frame.axisX.y * handleLen;
+      g.moveTo(o.x, o.y)
+        .lineTo(ex, ey)
+        .stroke({ width: 2 / this.zoom, color: RED, alpha: 0.9 });
     }
   }
 

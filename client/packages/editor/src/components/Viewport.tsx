@@ -38,6 +38,17 @@ import { useEffect, useRef, useState } from 'react';
 import { bridgeRuntime } from '../bridge/runtime.js';
 import { primarySelection, uniqueName, useEditor, type SelectionItem } from '../state/store.js';
 import { SceneRenderer, attachmentVertexCount, type RenderInput } from '../viewport/renderer.js';
+import {
+  GIZMO_HANDLE_PX,
+  GIZMO_HIT_PX,
+  GIZMO_RING_PX,
+  computeFrame,
+  frameToScreen,
+  hitTestGizmo,
+  projectScreen,
+  projectWorld,
+  type GizmoFrame,
+} from '../viewport/gizmo.js';
 import { Breadcrumb } from './Breadcrumb.js';
 import { ModeBanner } from './ModeBanner.js';
 import { WEIGHT_COLORS } from './weight-colors.js';
@@ -89,6 +100,9 @@ type DragState =
       startWorld: { x: number; y: number };
       startLocals: Map<string, { x: number; y: number }>;
       invParents: Map<string, Mat2D>;
+      /** Set when a gizmo handle (not the bone body) was grabbed — locks the delta to one frame axis. */
+      axisLock?: 'x' | 'y';
+      frame?: GizmoFrame;
     }
   | {
       kind: 'rotate';
@@ -103,6 +117,8 @@ type DragState =
       startX: number;
       startY: number;
       startScales: Map<string, { x: number; y: number }>;
+      axisLock?: 'x' | 'y';
+      frame?: GizmoFrame;
     }
   | {
       kind: 'shear';
@@ -110,12 +126,26 @@ type DragState =
       startX: number;
       startY: number;
       startShears: Map<string, { x: number; y: number }>;
+      axisLock?: 'x' | 'y';
+      frame?: GizmoFrame;
     }
   | {
       kind: 'create';
       invParent: Mat2D;
       start: { x: number; y: number };
       temp: BoneData;
+    }
+  | {
+      kind: 'attachment';
+      slotName: string;
+      attachmentName: string;
+      tool: 'translate' | 'rotate' | 'scale';
+      axisLock?: 'x' | 'y';
+      frame: GizmoFrame;
+      startAtt: { x: number; y: number; rotation: number; scaleX: number; scaleY: number };
+      startWorld: { x: number; y: number };
+      startScreen: { x: number; y: number };
+      startAngle: number;
     };
 
 interface MarqueeRect {
@@ -151,6 +181,7 @@ export function Viewport() {
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
   const posePreview = useEditor((s) => s.posePreview);
   const showRulers = useEditor((s) => s.settings.showRulers);
+  const tool = useEditor((s) => s.tool);
 
   /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
   function baseLocals(): BoneData[] {
@@ -197,6 +228,28 @@ export function Viewport() {
     return ghosts.length > 0 ? ghosts : undefined;
   }
 
+  /** Gizmo to draw for the current primary selection + tool, or undefined. */
+  function currentGizmo(): RenderInput['gizmo'] {
+    const state = useEditor.getState();
+    const r = rendererRef.current;
+    if (!r) return undefined;
+    if (!(
+      state.tool === 'translate' ||
+      state.tool === 'rotate' ||
+      state.tool === 'scale' ||
+      state.tool === 'shear'
+    )) {
+      return undefined;
+    }
+    const primary = primarySelection(state.selection);
+    if (primary?.kind !== 'bone') return undefined;
+    const m = r.getBoneWorld(primary.name);
+    if (!m) return undefined;
+    const parentName = state.doc.findBone(primary.name)?.parent ?? null;
+    const parentWorld = parentName ? r.getBoneWorld(parentName) : undefined;
+    return { tool: state.tool, frame: computeFrame(state.axesMode, m, parentWorld) };
+  }
+
   function buildRenderInput(): RenderInput {
     const state = useEditor.getState();
     const animating = state.mode === 'animate' && state.anim.current;
@@ -238,6 +291,7 @@ export function Viewport() {
       hiddenBones: state.hiddenBones.length ? new Set(state.hiddenBones) : undefined,
       hiddenSlots: state.hiddenSlots.length ? new Set(state.hiddenSlots) : undefined,
       showRulers: state.settings.showRulers,
+      gizmo: currentGizmo(),
     };
   }
 
@@ -295,6 +349,7 @@ export function Viewport() {
     hiddenSlots,
     posePreview,
     showRulers,
+    tool,
   ]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {
@@ -533,6 +588,106 @@ export function Viewport() {
       case 'rotate':
       case 'scale':
       case 'shear': {
+        // Gizmo handles take priority over the generic bone-body hit-test: if
+        // the primary selection already shows a gizmo for this tool, grabbing
+        // a handle locks the drag to that handle instead of picking whichever
+        // bone happens to be under the cursor.
+        if (primary?.kind === 'bone') {
+          const m = r.getBoneWorld(primary.name);
+          if (m) {
+            const parentName = state.doc.findBone(primary.name)?.parent ?? null;
+            const parentWorld = parentName ? r.getBoneWorld(parentName) : undefined;
+            const frame = computeFrame(state.axesMode, m, parentWorld);
+            const screen = frameToScreen(frame, (x, y) => r.worldToScreen(x, y));
+            const gizmoHit = hitTestGizmo(
+              state.tool,
+              screen.origin,
+              screen.axisX,
+              screen.axisY,
+              GIZMO_HANDLE_PX,
+              GIZMO_RING_PX,
+              GIZMO_HIT_PX,
+              p,
+            );
+            if (gizmoHit) {
+              const activeBones = state.selection
+                .filter((s): s is SelectionItem & { kind: 'bone' } => s.kind === 'bone')
+                .map((s) => s.name);
+              const bones = activeBones.length > 0 ? activeBones : [primary.name];
+              if (state.tool === 'translate' && gizmoHit.tool === 'axis') {
+                const startLocals = new Map<string, { x: number; y: number }>();
+                const invParents = new Map<string, Mat2D>();
+                for (const boneName of bones) {
+                  const bone = base.find((b) => b.name === boneName);
+                  if (!bone) continue;
+                  const pw = bone.parent !== null ? r.getBoneWorld(bone.parent) : undefined;
+                  startLocals.set(boneName, { x: bone.x, y: bone.y });
+                  invParents.set(boneName, invertMat(pw ?? IDENTITY));
+                }
+                dragRef.current = {
+                  kind: 'translate',
+                  bones: [...startLocals.keys()],
+                  startWorld: world,
+                  startLocals,
+                  invParents,
+                  axisLock: gizmoHit.axis,
+                  frame,
+                };
+                return;
+              }
+              if (state.tool === 'scale' && gizmoHit.tool === 'axis') {
+                const startScales = new Map<string, { x: number; y: number }>();
+                for (const boneName of bones) {
+                  const bone = base.find((b) => b.name === boneName);
+                  if (bone) startScales.set(boneName, { x: bone.scaleX, y: bone.scaleY });
+                }
+                dragRef.current = {
+                  kind: 'scale',
+                  bones: [...startScales.keys()],
+                  startX: p.x,
+                  startY: p.y,
+                  startScales,
+                  axisLock: gizmoHit.axis,
+                  frame,
+                };
+                return;
+              }
+              if (state.tool === 'shear' && gizmoHit.tool === 'axis') {
+                const startShears = new Map<string, { x: number; y: number }>();
+                for (const boneName of bones) {
+                  const bone = base.find((b) => b.name === boneName);
+                  if (bone) startShears.set(boneName, { x: bone.shearX, y: bone.shearY });
+                }
+                dragRef.current = {
+                  kind: 'shear',
+                  bones: [...startShears.keys()],
+                  startX: p.x,
+                  startY: p.y,
+                  startShears,
+                  axisLock: gizmoHit.axis,
+                  frame,
+                };
+                return;
+              }
+              if (state.tool === 'rotate' && gizmoHit.tool === 'rotate') {
+                const startRotations = new Map<string, number>();
+                for (const boneName of bones) {
+                  const bone = base.find((b) => b.name === boneName);
+                  if (bone) startRotations.set(boneName, bone.rotation);
+                }
+                dragRef.current = {
+                  kind: 'rotate',
+                  bones: [...startRotations.keys()],
+                  origin: frame.origin,
+                  startAngle: Math.atan2(world.y - frame.origin.y, world.x - frame.origin.x),
+                  startRotations,
+                };
+                return;
+              }
+            }
+          }
+        }
+
         const name = hit ?? (primary?.kind === 'bone' ? primary.name : null);
         if (!name) return;
         const alreadySelected = state.selection.some((s) => s.kind === 'bone' && s.name === name);
@@ -675,7 +830,11 @@ export function Viewport() {
     if (drag.kind === 'translate') {
       let wx = world.x - drag.startWorld.x;
       let wy = world.y - drag.startWorld.y;
-      if (e.shiftKey) {
+      if (drag.axisLock && drag.frame) {
+        const proj = projectWorld(wx, wy, drag.frame, drag.axisLock);
+        wx = proj.x;
+        wy = proj.y;
+      } else if (e.shiftKey) {
         // Shift constrains the drag to the dominant axis of the chosen frame
         // (Local = bone axes, Parent = parent axes, World = screen axes).
         const s = useEditor.getState();
@@ -721,20 +880,35 @@ export function Viewport() {
       });
     } else if (drag.kind === 'scale') {
       // Horizontal drag scales X, vertical scales Y (up = grow); 120px = ×2.
-      const fx = 1 + (p.x - drag.startX) / 120;
-      const fy = 1 + (drag.startY - p.y) / 120;
+      let fx = 1 + (p.x - drag.startX) / 120;
+      let fy = 1 + (drag.startY - p.y) / 120;
+      if (drag.axisLock && drag.frame) {
+        const screen = frameToScreen(drag.frame, (x, y) => r.worldToScreen(x, y));
+        const axis = drag.axisLock === 'x' ? screen.axisX : screen.axisY;
+        const amount = projectScreen(p.x - drag.startX, p.y - drag.startY, axis);
+        const f = 1 + amount / 120;
+        fx = drag.axisLock === 'x' ? f : 1;
+        fy = drag.axisLock === 'y' ? f : 1;
+      }
       overrideRef.current = base.map((b) => {
         const s0 = drag.startScales.get(b.name);
         return s0 ? { ...b, scaleX: s0.x * fx, scaleY: s0.y * fy } : b;
       });
     } else if (drag.kind === 'shear') {
-      const dx = (p.x - drag.startX) / 2;
-      const dy = (drag.startY - p.y) / 2;
+      let dx = (p.x - drag.startX) / 2;
+      let dy = (drag.startY - p.y) / 2;
+      if (drag.axisLock && drag.frame) {
+        const screen = frameToScreen(drag.frame, (x, y) => r.worldToScreen(x, y));
+        const axis = drag.axisLock === 'x' ? screen.axisX : screen.axisY;
+        const amount = projectScreen(p.x - drag.startX, p.y - drag.startY, axis) / 2;
+        dx = drag.axisLock === 'x' ? amount : 0;
+        dy = drag.axisLock === 'y' ? amount : 0;
+      }
       overrideRef.current = base.map((b) => {
         const s0 = drag.startShears.get(b.name);
         return s0 ? { ...b, shearX: s0.x + dx, shearY: s0.y + dy } : b;
       });
-    } else {
+    } else if (drag.kind === 'create') {
       const lp = applyMat(drag.invParent, world.x, world.y);
       const dx = lp.x - drag.start.x;
       const dy = lp.y - drag.start.y;
