@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useEditor } from '../state/store.js';
+import { RulerIcon } from './icons.js';
 import type { SceneRenderer } from '../viewport/renderer.js';
 
 /** Spine-style zoom slider in the viewport's lower-left corner. */
 export function ZoomControl({ getRenderer }: { getRenderer: () => SceneRenderer | null }) {
   const [zoom, setZoom] = useState(1);
+  const showRulers = useEditor((s) => s.settings.showRulers);
   useEffect(() => {
     const r = getRenderer();
     if (!r) return;
@@ -16,6 +19,17 @@ export function ZoomControl({ getRenderer }: { getRenderer: () => SceneRenderer 
   const apply = (z: number) => getRenderer()?.setZoomCenter(z);
   return (
     <div className="zoom-control">
+      <button
+        className={showRulers ? 'active' : ''}
+        title="Toggle rulers"
+        onClick={() =>
+          useEditor
+            .getState()
+            .setSettings({ showRulers: !useEditor.getState().settings.showRulers })
+        }
+      >
+        <RulerIcon size={13} />
+      </button>
       <button onClick={() => apply(zoom * 1.25)}>+</button>
       <input
         type="range"

@@ -52,12 +52,13 @@ export interface EditorSettings {
   fps: 24 | 30 | 60;
   autosave: boolean;
   welcome: boolean;
+  showRulers: boolean;
 }
 
 const SETTINGS_KEY = 'spine-editor.settings';
 
 function loadSettings(): EditorSettings {
-  const defaults: EditorSettings = { fps: 30, autosave: true, welcome: true };
+  const defaults: EditorSettings = { fps: 30, autosave: true, welcome: true, showRulers: false };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return defaults;
@@ -66,6 +67,7 @@ function loadSettings(): EditorSettings {
       fps: parsed.fps === 24 || parsed.fps === 60 ? parsed.fps : 30,
       autosave: parsed.autosave !== false,
       welcome: parsed.welcome !== false,
+      showRulers: parsed.showRulers === true,
     };
   } catch {
     return defaults;

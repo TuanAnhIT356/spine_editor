@@ -69,6 +69,8 @@ export interface RenderInput {
   };
   assets: Record<string, ImageAsset>;
   selection: Selection;
+  /** Editor-only ruler overlay toggle (never serialized). */
+  showRulers?: boolean;
 }
 
 /** Vertex count for any vertex-based attachment, or null for other types. */
@@ -200,6 +202,9 @@ export class SceneRenderer {
   /** Name labels drawn in screen space (the world container is y-flipped). */
   private labelLayer = new Container();
   private labels = new Map<string, Text>();
+  /** Ruler overlay: screen-space, drawn directly on the stage (outside the zoom/pan matrix). */
+  private rulerLayer = new Graphics();
+  private rulerGarbage: Text[] = [];
   private viewFilters: ViewFilters | null = null;
   private hiddenBones: Set<string> | null = null;
   private hiddenSlots: Set<string> | null = null;
@@ -230,6 +235,7 @@ export class SceneRenderer {
     );
     this.app.stage.addChild(this.world);
     this.app.stage.addChild(this.labelLayer);
+    this.app.stage.addChild(this.rulerLayer);
     this.offsetX = host.clientWidth / 2;
     this.offsetY = host.clientHeight * 0.75;
     this.drawGrid();
@@ -325,6 +331,53 @@ export class SceneRenderer {
     g.stroke({ width: 1, color: 0x36363c, pixelLine: true });
     g.moveTo(-size, 0).lineTo(size, 0).stroke({ width: 1, color: 0x6b4040, pixelLine: true });
     g.moveTo(0, -size).lineTo(0, size).stroke({ width: 1, color: 0x40604a, pixelLine: true });
+  }
+
+  /** Screen-space ruler strips (top + left) with world-unit tick labels. */
+  private drawRulers(): void {
+    for (const t of this.rulerGarbage) t.destroy();
+    this.rulerGarbage = [];
+    const g = this.rulerLayer;
+    g.clear();
+    if (!this.ready) return;
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const band = 18;
+    g.rect(0, 0, w, band).fill({ color: 0x1b1b1f, alpha: 0.85 });
+    g.rect(0, 0, band, h).fill({ color: 0x1b1b1f, alpha: 0.85 });
+    // Pick a "nice" world-unit step so ticks land roughly every 50-100 screen px.
+    const rawStep = 70 / this.zoom;
+    const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+    const candidates = [1, 2, 5, 10].map((m) => m * magnitude);
+    const step = candidates.find((c) => c >= rawStep) ?? candidates[candidates.length - 1]!;
+    const topLeftWorld = this.screenToWorld(band, band);
+    const bottomRightWorld = this.screenToWorld(w, h);
+    const startX = Math.floor(topLeftWorld.x / step) * step;
+    const endX = Math.ceil(bottomRightWorld.x / step) * step;
+    for (let wx = startX; wx <= endX; wx += step) {
+      const sx = this.worldToScreen(wx, 0).x;
+      if (sx < band || sx > w) continue;
+      g.moveTo(sx, band - 6)
+        .lineTo(sx, band)
+        .stroke({ width: 1, color: 0x8a8a92, pixelLine: true });
+      const t = new Text({ text: String(Math.round(wx)), style: { fontSize: 9, fill: 0x9a9aa2 } });
+      t.position.set(sx + 2, 2);
+      this.rulerLayer.addChild(t);
+      this.rulerGarbage.push(t);
+    }
+    const startY = Math.floor(bottomRightWorld.y / step) * step;
+    const endY = Math.ceil(topLeftWorld.y / step) * step;
+    for (let wy = startY; wy <= endY; wy += step) {
+      const sy = this.worldToScreen(0, wy).y;
+      if (sy < band || sy > h) continue;
+      g.moveTo(band - 6, sy)
+        .lineTo(band, sy)
+        .stroke({ width: 1, color: 0x8a8a92, pixelLine: true });
+      const t = new Text({ text: String(Math.round(wy)), style: { fontSize: 9, fill: 0x9a9aa2 } });
+      t.position.set(2, sy + 2);
+      this.rulerLayer.addChild(t);
+      this.rulerGarbage.push(t);
+    }
   }
 
   private async ensureTexture(asset: ImageAsset): Promise<Texture> {
@@ -497,6 +550,8 @@ export class SceneRenderer {
     this.drawBones(data.bones, pose, input.selection);
     this.drawOverlays(data, pose, input);
     this.updateLabels(data, pose);
+    this.rulerLayer.visible = input.showRulers === true;
+    if (input.showRulers) this.drawRulers();
   }
 
   /** Screen-space name tags for bones/attachments, driven by the filter matrix. */

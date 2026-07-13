@@ -150,6 +150,7 @@ export function Viewport() {
   const hiddenBones = useEditor((s) => s.hiddenBones);
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
   const posePreview = useEditor((s) => s.posePreview);
+  const showRulers = useEditor((s) => s.settings.showRulers);
 
   /** Locals the tools operate on: setup pose, or the animated pose in animate mode. */
   function baseLocals(): BoneData[] {
@@ -236,6 +237,7 @@ export function Viewport() {
       selection: state.selection,
       hiddenBones: state.hiddenBones.length ? new Set(state.hiddenBones) : undefined,
       hiddenSlots: state.hiddenSlots.length ? new Set(state.hiddenSlots) : undefined,
+      showRulers: state.settings.showRulers,
     };
   }
 
@@ -292,6 +294,7 @@ export function Viewport() {
     hiddenBones,
     hiddenSlots,
     posePreview,
+    showRulers,
   ]);
 
   function localPoint(e: React.PointerEvent): { x: number; y: number } {

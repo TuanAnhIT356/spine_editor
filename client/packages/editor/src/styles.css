@@ -1332,6 +1332,10 @@ button.active {
   font-size: 11px;
 }
 
+.zoom-control button.active {
+  background: var(--accent-soft);
+}
+
 /* ---- unified tree panel ---- */
 
 .tree-panel {
