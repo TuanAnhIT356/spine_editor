@@ -74,6 +74,12 @@ export interface RenderInput {
   showRulers?: boolean;
   /** Transform gizmo to draw at a bone/attachment origin (setup or animate mode for bones; setup-only for attachments — the caller decides). */
   gizmo?: { tool: 'translate' | 'rotate' | 'scale' | 'shear'; frame: GizmoFrame };
+  /** Live-preview patch for a region/point attachment during a gizmo drag (setup mode only). */
+  attachmentOverride?: {
+    slot: string;
+    attachment: string;
+    patch: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number };
+  };
 }
 
 /** Vertex count for any vertex-based attachment, or null for other types. */
@@ -309,6 +315,18 @@ export class SceneRenderer {
     this.onZoomChange?.(this.zoom);
   }
 
+  /** Applies a live gizmo-drag patch to one region/point attachment, for preview rendering. */
+  private withOverride(
+    att: SpineAttachment,
+    slotName: string,
+    attachmentName: string,
+    override: RenderInput['attachmentOverride'],
+  ): SpineAttachment {
+    return override && override.slot === slotName && override.attachment === attachmentName
+      ? ({ ...att, ...override.patch } as SpineAttachment)
+      : att;
+  }
+
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
     return { x: (sx - this.offsetX) / this.zoom, y: (this.offsetY - sy) / this.zoom };
   }
@@ -536,7 +554,12 @@ export class SceneRenderer {
         endClipAfter(slot.name);
         continue;
       }
-      const region = att as SpineRegionAttachment;
+      const region = this.withOverride(
+        att,
+        slot.name,
+        attachmentName,
+        input.attachmentOverride,
+      ) as SpineRegionAttachment;
       const asset = input.assets[region.path ?? region.name ?? attachmentName];
       if (!asset) {
         endClipAfter(slot.name);
@@ -636,8 +659,9 @@ export class SceneRenderer {
       const boneWorld = pose.get(slot.bone);
       if (!boneWorld) continue;
       const bySlot = data.skins.find((s) => s.name === 'default')?.attachments?.[slot.name] ?? {};
-      for (const [name, att] of Object.entries(bySlot)) {
+      for (const [name, rawAtt] of Object.entries(bySlot)) {
         const isActive = slot.attachment === name;
+        const att = this.withOverride(rawAtt, slot.name, name, input.attachmentOverride);
         const isSelected =
           isActive && input.selection.some((s) => s.kind === 'slot' && s.name === slot.name);
         if (isSelected) {

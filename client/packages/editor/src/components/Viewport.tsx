@@ -3,6 +3,7 @@ import {
   Composite,
   IDENTITY,
   PhysicsSimulator,
+  SetAttachmentTransform,
   SetAttachmentVertices,
   SetBoneTransform,
   SetMeshGeometry,
@@ -27,6 +28,7 @@ import {
   invertMat,
   isWeightedVertices,
   meshVertexCount,
+  mulMat,
   removeMeshVertex,
   type BoneData,
   type Command,
@@ -162,6 +164,8 @@ export function Viewport() {
   const overrideRef = useRef<BoneData[] | undefined>(undefined);
   /** Uncommitted vertex array during a mesh-edit drag or paint stroke. */
   const editVertsRef = useRef<number[] | null>(null);
+  /** Uncommitted region/point attachment transform patch during a gizmo drag. */
+  const attachmentOverrideRef = useRef<RenderInput['attachmentOverride']>(undefined);
   /** Deterministic physics preview; rebuilt whenever the document changes. */
   const physicsRef = useRef<PhysicsSimulator | null>(null);
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
@@ -242,12 +246,66 @@ export function Viewport() {
       return undefined;
     }
     const primary = primarySelection(state.selection);
-    if (primary?.kind !== 'bone') return undefined;
-    const m = r.getBoneWorld(primary.name);
-    if (!m) return undefined;
-    const parentName = state.doc.findBone(primary.name)?.parent ?? null;
-    const parentWorld = parentName ? r.getBoneWorld(parentName) : undefined;
-    return { tool: state.tool, frame: computeFrame(state.axesMode, m, parentWorld) };
+    if (primary?.kind === 'bone') {
+      const m = r.getBoneWorld(primary.name);
+      if (!m) return undefined;
+      const parentName = state.doc.findBone(primary.name)?.parent ?? null;
+      const parentWorld = parentName ? r.getBoneWorld(parentName) : undefined;
+      return { tool: state.tool, frame: computeFrame(state.axesMode, m, parentWorld) };
+    }
+    if (primary?.kind === 'slot' && state.mode === 'setup' && state.tool !== 'shear') {
+      const info = attachmentFrame(state, r, primary.name);
+      if (!info) return undefined;
+      if (state.tool === 'scale' && info.attType !== 'region') return undefined;
+      return { tool: state.tool, frame: info.frame };
+    }
+    return undefined;
+  }
+
+  /**
+   * World frame for a selected slot's active region/point attachment, or
+   * null if unsupported. Reads `attachmentOverrideRef` (declared right after
+   * this function) so the frame tracks the live drag instead of freezing at
+   * the pre-drag position — the same way a bone gizmo's frame already
+   * tracks `bonesOverride` via `r.getBoneWorld`/`lastPose`.
+   */
+  function attachmentFrame(
+    state: ReturnType<typeof useEditor.getState>,
+    r: SceneRenderer,
+    slotName: string,
+  ): { frame: GizmoFrame; attType: 'region' | 'point' } | null {
+    const slot = state.doc.findSlot(slotName);
+    if (!slot?.attachment) return null;
+    const stored = state.doc.data.skins.find((s) => s.name === 'default')?.attachments?.[
+      slotName
+    ]?.[slot.attachment];
+    if (
+      !stored ||
+      (stored.type !== undefined && stored.type !== 'region' && stored.type !== 'point')
+    ) {
+      return null;
+    }
+    const override = attachmentOverrideRef.current;
+    const att =
+      override && override.slot === slotName && override.attachment === slot.attachment
+        ? { ...stored, ...override.patch }
+        : stored;
+    const boneWorld = r.getBoneWorld(slot.bone);
+    if (!boneWorld) return null;
+    const rot = ((att.rotation ?? 0) * Math.PI) / 180;
+    const attLocal: Mat2D = {
+      a: Math.cos(rot),
+      b: -Math.sin(rot),
+      c: Math.sin(rot),
+      d: Math.cos(rot),
+      tx: att.x ?? 0,
+      ty: att.y ?? 0,
+    };
+    const attWorld = mulMat(boneWorld, attLocal);
+    return {
+      frame: computeFrame(state.axesMode, attWorld, boneWorld),
+      attType: stored.type === 'point' ? 'point' : 'region',
+    };
   }
 
   function buildRenderInput(): RenderInput {
@@ -292,6 +350,7 @@ export function Viewport() {
       hiddenSlots: state.hiddenSlots.length ? new Set(state.hiddenSlots) : undefined,
       showRulers: state.settings.showRulers,
       gizmo: currentGizmo(),
+      attachmentOverride: attachmentOverrideRef.current,
     };
   }
 
@@ -686,6 +745,75 @@ export function Viewport() {
               }
             }
           }
+        } else if (primary?.kind === 'slot' && state.mode === 'setup' && state.tool !== 'shear') {
+          const info = attachmentFrame(state, r, primary.name);
+          if (info && !(state.tool === 'scale' && info.attType !== 'region')) {
+            const screen = frameToScreen(info.frame, (x, y) => r.worldToScreen(x, y));
+            const gizmoHit = hitTestGizmo(
+              state.tool,
+              screen.origin,
+              screen.axisX,
+              screen.axisY,
+              GIZMO_HANDLE_PX,
+              GIZMO_RING_PX,
+              GIZMO_HIT_PX,
+              p,
+            );
+            if (gizmoHit) {
+              const slot = state.doc.findSlot(primary.name)!;
+              const att = state.doc.data.skins.find((s) => s.name === 'default')?.attachments?.[
+                primary.name
+              ]?.[slot.attachment!] as {
+                x?: number;
+                y?: number;
+                rotation?: number;
+                scaleX?: number;
+                scaleY?: number;
+              };
+              const startAtt = {
+                x: att.x ?? 0,
+                y: att.y ?? 0,
+                rotation: att.rotation ?? 0,
+                scaleX: att.scaleX ?? 1,
+                scaleY: att.scaleY ?? 1,
+              };
+              if (state.tool === 'rotate' && gizmoHit.tool === 'rotate') {
+                dragRef.current = {
+                  kind: 'attachment',
+                  slotName: primary.name,
+                  attachmentName: slot.attachment!,
+                  tool: 'rotate',
+                  frame: info.frame,
+                  startAtt,
+                  startWorld: world,
+                  startScreen: p,
+                  startAngle: Math.atan2(
+                    world.y - info.frame.origin.y,
+                    world.x - info.frame.origin.x,
+                  ),
+                };
+                return;
+              }
+              if (
+                (state.tool === 'translate' || state.tool === 'scale') &&
+                gizmoHit.tool === 'axis'
+              ) {
+                dragRef.current = {
+                  kind: 'attachment',
+                  slotName: primary.name,
+                  attachmentName: slot.attachment!,
+                  tool: state.tool,
+                  axisLock: gizmoHit.axis,
+                  frame: info.frame,
+                  startAtt,
+                  startWorld: world,
+                  startScreen: p,
+                  startAngle: 0,
+                };
+                return;
+              }
+            }
+          }
         }
 
         const name = hit ?? (primary?.kind === 'bone' ? primary.name : null);
@@ -908,6 +1036,42 @@ export function Viewport() {
         const s0 = drag.startShears.get(b.name);
         return s0 ? { ...b, shearX: s0.x + dx, shearY: s0.y + dy } : b;
       });
+    } else if (drag.kind === 'attachment') {
+      const patch: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number } =
+        {};
+      if (drag.tool === 'rotate') {
+        const angle = Math.atan2(world.y - drag.frame.origin.y, world.x - drag.frame.origin.x);
+        patch.rotation = drag.startAtt.rotation + (angle - drag.startAngle) * RAD_DEG;
+      } else if (drag.tool === 'translate') {
+        let wx = world.x - drag.startWorld.x;
+        let wy = world.y - drag.startWorld.y;
+        if (drag.axisLock) {
+          const proj = projectWorld(wx, wy, drag.frame, drag.axisLock);
+          wx = proj.x;
+          wy = proj.y;
+        }
+        patch.x = round2(drag.startAtt.x + wx);
+        patch.y = round2(drag.startAtt.y + wy);
+      } else {
+        // scale
+        const screen = frameToScreen(drag.frame, (x, y) => r.worldToScreen(x, y));
+        const axis = drag.axisLock === 'x' ? screen.axisX : screen.axisY;
+        const amount = drag.axisLock
+          ? projectScreen(p.x - drag.startScreen.x, p.y - drag.startScreen.y, axis)
+          : 0;
+        const f = 1 + amount / 120;
+        patch.scaleX =
+          drag.axisLock === 'x' ? round2(drag.startAtt.scaleX * f) : drag.startAtt.scaleX;
+        patch.scaleY =
+          drag.axisLock === 'y' ? round2(drag.startAtt.scaleY * f) : drag.startAtt.scaleY;
+      }
+      attachmentOverrideRef.current = {
+        slot: drag.slotName,
+        attachment: drag.attachmentName,
+        patch,
+      };
+      redraw();
+      return;
     } else if (drag.kind === 'create') {
       const lp = applyMat(drag.invParent, world.x, world.y);
       const dx = lp.x - drag.start.x;
@@ -922,10 +1086,26 @@ export function Viewport() {
   function onPointerUp() {
     const drag = dragRef.current;
     const override = overrideRef.current;
+    const attachmentOverride = attachmentOverrideRef.current;
     dragRef.current = null;
     overrideRef.current = undefined;
+    attachmentOverrideRef.current = undefined;
     if (!drag || drag.kind === 'pan') return;
     const state = useEditor.getState();
+    if (drag.kind === 'attachment') {
+      if (attachmentOverride) {
+        state.execute(
+          new SetAttachmentTransform(
+            'default',
+            attachmentOverride.slot,
+            attachmentOverride.attachment,
+            attachmentOverride.patch,
+          ),
+        );
+      }
+      redraw();
+      return;
+    }
     const animating = state.mode === 'animate' && state.anim.current !== null;
     if (animating && !state.autoKey && drag.kind === 'vertex') {
       state.setError('Auto Key is off — enable it to key deform changes.');
