@@ -110,6 +110,19 @@ chưa có tài liệu — physics, slot rgb/alpha/rgb2, single-axis bone timelin
 round-trip nội bộ, KHÔNG verify bằng runtime chính thức), menu Export/Import
 SKEL, MCP `export_skel` trả base64 — **65 MCP tools total**.
 **Roadmap §8 (Spine parity) HOÀN TẤT — phases 15–22 done.**
+**Phase 23 done** (post-roadmap UI polish): tree panel expand/collapse
+(`collapsedNodes` + chevrons, localStorage-persisted); bone rendering đọc
+`bone.color` (trước đây hardcode) với dart shape thon hơn + màu chọn xanh
+dương (`--accent`); slot/attachment chọn có khung bounding-box xanh dương
+(`viewport/renderer.ts` `drawSelectionBox`) cùng hover preview thumbnail
+trong tree (`components/tree/HoverPreview.tsx`); viewport thêm nút bật/tắt
+thước đo (`drawRulers`) và nút Center fit-to-content
+(`viewport/bounds.ts` `computeSkeletonBounds` + `SceneRenderer.frameBounds`);
+và trọng tâm phase — gizmo tương tác thật (`viewport/gizmo.ts`, thuần logic
+kèm unit test riêng — lần test đầu tiên của gói editor) cho Rotate/Translate/
+Scale/Shear với tay cầm khóa trục, áp dụng cho cả bone (dùng lại đường commit
+sẵn có) và region/point attachment (command mới `SetAttachmentTransform`,
+chỉ setup mode — không thêm MCP tool, **vẫn 65 tools**).
 Architecture: AI ⇄ MCP (stdio, `client/packages/mcp-server`) ⇄ ws://localhost:8017 ⇄ editor tab
 (`src/bridge/` dispatches ops through the same command API as the UI).
 Verify changes end-to-end with the project verify skill (`.claude/skills/verify/SKILL.md`) —
