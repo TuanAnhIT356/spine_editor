@@ -748,7 +748,8 @@ export class SceneRenderer {
       const m = pose.get(bone.name);
       if (!m) continue;
       const selected = selection.some((s) => s.kind === 'bone' && s.name === bone.name);
-      const color = selected ? 0xffcc33 : (this.weightTint?.get(bone.name) ?? 0x7fb2e5);
+      const defaultColor = bone.color ? parseInt(bone.color.slice(0, 6), 16) || 0x7fb2e5 : 0x7fb2e5;
+      const color = selected ? 0x3875b7 : (this.weightTint?.get(bone.name) ?? defaultColor);
       const ox = m.tx;
       const oy = m.ty;
       if (bone.length > 0) {
@@ -756,7 +757,7 @@ export class SceneRenderer {
         const dx = tip.x - ox;
         const dy = tip.y - oy;
         const len = Math.hypot(dx, dy) || 1;
-        const w = Math.min(len * 0.15, 8 / this.zoom);
+        const w = Math.min(len * 0.12, 6 / this.zoom);
         const nx = (-dy / len) * w;
         const ny = (dx / len) * w;
         g.poly([ox + nx, oy + ny, tip.x, tip.y, ox - nx, oy - ny]).fill({
@@ -764,16 +765,10 @@ export class SceneRenderer {
           alpha: selected ? 1 : 0.6,
         });
       }
-      const radius = (bone.parent === null ? 7 : 5) / this.zoom;
-      if (selected) {
-        // Bright outer ring makes the selection pop even at low zoom.
-        g.circle(ox, oy, radius + 3 / this.zoom).stroke({
-          width: 2 / this.zoom,
-          color: 0xfff2c9,
-          alpha: 0.95,
-        });
-      }
-      g.circle(ox, oy, radius).fill({ color, alpha: 0.95 });
+      const radius = (bone.parent === null ? 6 : 4.5) / this.zoom;
+      g.circle(ox, oy, radius)
+        .fill({ color, alpha: 0.95 })
+        .stroke({ width: 1.2 / this.zoom, color: 0x1b1b1f, alpha: 0.8 });
     }
   }
 }
