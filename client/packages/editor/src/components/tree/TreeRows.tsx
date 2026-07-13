@@ -5,6 +5,7 @@ import type { MenuItem } from './ContextMenu.js';
 import {
   BBoxIcon,
   BoneIcon,
+  ChevronIcon,
   ClipIcon,
   CurveIcon,
   ImageIcon,
@@ -52,6 +53,7 @@ export function TreeRows({
   const selection = useEditor((s) => s.selection);
   const hiddenBones = useEditor((s) => s.hiddenBones);
   const hiddenSlots = useEditor((s) => s.hiddenSlots);
+  const collapsedNodes = useEditor((s) => s.collapsedNodes);
   void revision;
 
   const bones = doc.data.bones;
@@ -81,6 +83,7 @@ export function TreeRows({
               title={type}
               onClick={(e) => clickSelect(e, { kind: 'slot', name: slotName })}
             >
+              <span className="chevron-spacer" />
               <span className="type-icon">
                 <Icon size={12} />
               </span>
@@ -136,6 +139,12 @@ export function TreeRows({
     const boneSlots = slots
       .map((s, index) => ({ slot: s, index }))
       .filter(({ slot }) => slot.bone === name);
+    const childBones = childrenOf(name);
+    const hasChildren = show.slots
+      ? boneSlots.length > 0 || childBones.length > 0
+      : childBones.length > 0;
+    const nodeId = `bone:${name}`;
+    const collapsed = collapsedNodes.has(nodeId);
     return (
       <>
         <div
@@ -163,6 +172,19 @@ export function TreeRows({
             hidden={hiddenBones.includes(name)}
             onToggle={() => useEditor.getState().toggleBoneHidden(name)}
           />
+          {hasChildren ? (
+            <button
+              className="chevron"
+              onClick={(e) => {
+                e.stopPropagation();
+                useEditor.getState().toggleCollapsed(nodeId);
+              }}
+            >
+              <ChevronIcon size={10} collapsed={collapsed} />
+            </button>
+          ) : (
+            <span className="chevron-spacer" />
+          )}
           <span className="type-icon" style={{ color: boneTint(name) }}>
             <BoneIcon size={12} />
           </span>
@@ -182,7 +204,8 @@ export function TreeRows({
             name
           )}
         </div>
-        {show.slots &&
+        {!collapsed &&
+          show.slots &&
           boneSlots.map(({ slot, index }) => {
             const slotSelected = isSelected(selection, 'slot', slot.name);
             return (
@@ -238,9 +261,10 @@ export function TreeRows({
               </div>
             );
           })}
-        {childrenOf(name).map((child) => (
-          <BoneRow key={child.name} name={child.name} depth={depth + 1} />
-        ))}
+        {!collapsed &&
+          childBones.map((child) => (
+            <BoneRow key={child.name} name={child.name} depth={depth + 1} />
+          ))}
       </>
     );
   }

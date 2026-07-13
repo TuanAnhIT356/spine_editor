@@ -228,6 +228,23 @@ button.danger {
   color: #b5977f;
 }
 
+.tree .row .chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.tree .row .chevron-spacer {
+  display: inline-block;
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .tree .row-actions {
   margin-left: auto;
   display: flex;

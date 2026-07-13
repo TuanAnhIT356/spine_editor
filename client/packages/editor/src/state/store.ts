@@ -177,6 +177,29 @@ function saveLayout(layout: LayoutState): void {
   }
 }
 
+const TREE_COLLAPSED_KEY = 'spine-editor:tree-collapsed';
+
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(TREE_COLLAPSED_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((v): v is string => typeof v === 'string'))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCollapsed(collapsed: Set<string>): void {
+  try {
+    localStorage.setItem(TREE_COLLAPSED_KEY, JSON.stringify([...collapsed]));
+  } catch {
+    // Storage may be unavailable (private browsing); collapse state just won't persist.
+  }
+}
+
 interface EditorState {
   doc: SpineDocument;
   /** Bumped after every document mutation so React re-renders. */
@@ -213,6 +236,8 @@ interface EditorState {
     Partial<Record<'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'shearX' | 'shearY', number>>
   > | null;
   hiddenSlots: string[];
+  /** Tree node ids currently collapsed ("bone:name" / "slot:name" / "att:slot/name"). */
+  collapsedNodes: Set<string>;
 
   setTool(tool: Tool): void;
   setMode(mode: 'setup' | 'animate'): void;
@@ -248,6 +273,7 @@ interface EditorState {
   clearPosePreview(): void;
   toggleBoneHidden(name: string): void;
   toggleSlotHidden(name: string): void;
+  toggleCollapsed(id: string): void;
   /** Marks the current revision as saved (clears the dirty indicator). */
   markSaved(): void;
   /** Steps the playhead by `frames` at 30fps, clamped to [0, duration]. */
@@ -310,6 +336,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   savedRevision: 0,
   hiddenBones: [],
   hiddenSlots: [],
+  collapsedNodes: loadCollapsed(),
   posePreview: null,
 
   setTool: (tool) => set({ tool }),
@@ -448,6 +475,14 @@ export const useEditor = create<EditorState>()((set, get) => ({
         ? s.hiddenSlots.filter((n) => n !== name)
         : [...s.hiddenSlots, name],
     })),
+  toggleCollapsed: (id) =>
+    set((s) => {
+      const next = new Set(s.collapsedNodes);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveCollapsed(next);
+      return { collapsedNodes: next };
+    }),
   markSaved: () => set((s) => ({ savedRevision: s.revision })),
   stepFrame: (frames) =>
     set((s) => {

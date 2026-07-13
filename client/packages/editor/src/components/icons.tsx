@@ -210,3 +210,5 @@ export const SkeletonIcon = ({ size }: { size?: number }) =>
   );
 export const SkinIcon = ({ size }: { size?: number }) =>
   svg(size, <path d="M5 3 3 5v3h2v5h6V8h2V5l-2-2-2 1.5h-2z" />);
+export const ChevronIcon = ({ size, collapsed }: { size?: number; collapsed?: boolean }) =>
+  svg(size, <path d={collapsed ? 'M6 3l5 5-5 5' : 'M3 6l5 5 5-5'} />);
